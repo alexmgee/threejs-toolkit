@@ -1,18 +1,28 @@
 # threejs-toolkit
 
 A sibling of `sparkjs-toolkit`: the same 3D Gaussian-splat website toolkit, rebuilt on
-three.js r186 native splat rendering (`GaussianSplatMesh` + `WebGPURenderer`) instead of
-the Spark library.
+three.js native splat rendering (`GaussianSplatMesh` + `WebGPURenderer`) instead of the
+Spark library.
 
-**Status: PLANNING. No code exists yet. Nothing runs yet.**
+The renderer is pinned to **three 0.185.1** (published), with the `GaussianSplatMesh`
+addon **vendored from the three.js dev branch** into `spikes/native-rad/vendor/` — the
+addon is not in any published release yet. `spikes/native-rad/package.json` is the
+authority on the version; don't quote a release number from prose.
+
+**Status: PLANNING for the toolkit — no toolkit code exists yet. The Phase 0 spike is
+underway** in `spikes/native-rad/` and does run. Current spike state, remaining tasks,
+and the traps that cost real time are in
+[.scratch/handoffs/001-2026-08-15-phase0-spike-continuation.md](.scratch/handoffs/001-2026-08-15-phase0-spike-continuation.md).
 
 ## Ground rules
 
 1. **`sparkjs-toolkit` is never modified.** It is source material and the reference
    implementation. Every parity check in this project runs *against* it, side by side.
-2. **Nothing here is trusted until executed.** The entire plan derives from source
-   reading (twice-read, adversarially reviewed) — but no frame has been rendered and no
-   millisecond measured. Phase 0 (the spike) is the first execution of anything.
+2. **Nothing here is trusted until executed.** The plan derives from source reading
+   (twice-read, adversarially reviewed); Phase 0 exists to execute it. Frames now
+   render and the `.rad` decoder passes a golden test, but **no measurement against
+   the Spark control has been taken yet** — every performance claim in the plan docs
+   remains unverified until `docs/plan/results/phase-0.md` exists.
 3. **No duration estimates, anywhere.** All scope is countable: files, adaptation
    points, new modules, deleted lines. See `docs/plan/00-charter.md` for why.
 
