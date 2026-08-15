@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>native-rad spike</title>
+  <style>
+    html, body { margin: 0; height: 100%; background: #0f1319; color: #eaeef4;
+      font: 12px/1.5 ui-monospace, Consolas, monospace; }
+    #app { position: fixed; inset: 0; }
+    #hud { position: fixed; top: 10px; left: 10px; z-index: 10;
+      background: rgba(15,19,25,.85); border: 1px solid #2a3240; border-radius: 6px;
+      padding: 10px 12px; white-space: pre; pointer-events: none; }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+  <div id="hud">boot…</div>
+  <script type="module" src="/main.ts"></script>
+</body>
+</html>

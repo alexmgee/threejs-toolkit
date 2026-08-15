@@ -1,0 +1,21 @@
+{
+  "name": "native-rad-spike",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "description": "Phase 0 spike: .rad pager on three.js native GaussianSplatMesh, measured against the sparkjs-toolkit Spark control (ADR 0001: baseline, not gate)",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "check": "tsc --noEmit",
+    "smoke": "vite build --logLevel info"
+  },
+  "dependencies": {
+    "three": "0.185.1"
+  },
+  "devDependencies": {
+    "@types/three": "0.185.0",
+    "typescript": "^5.7.3",
+    "vite": "^6.0.11"
+  }
+}

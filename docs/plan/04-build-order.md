@@ -1,0 +1,134 @@
+# 04 — Build order
+
+Reframed from the reviewed proposal's in-place plan for the sibling-repo reality.
+Ordering principle unchanged: **the unknown most able to cancel or reshape the project
+is resolved first and cheapest.** Every phase names entry criteria, work, exit
+criteria; early phases end in decision gates. No durations (charter invariant 3);
+sizes are the reviewed adaptation-point counts, reinterpreted for copied files.
+
+A greenfield note: because nothing here can break sparkjs-toolkit, the *risk* ordering
+matters less than in-place — but the *information* ordering matters exactly as much.
+Building the easy 62% first would feel productive and prove nothing. The spike still
+goes first.
+
+---
+
+## Phase 0 — The spike  ·  0 toolkit files · 9 spike files  ·  BASELINE
+
+**Question it answers:** how fast is a toolkit-owned pager on three.js against the
+Spark control on the real hero — and how does the WebGL2 fallback behave?
+(Per ADR 0001 the port is unconditional: the spike measures and sets the
+optimization baseline; it no longer holds a cancellation power.)
+
+**Entry:** the local r186 snapshot; one real hero `.rad` + its Spark control harness;
+permission to compile the Rust reference decoder.
+
+**Work** (`spikes/native-rad/`, never imported by src/): `index.html`, `main.ts`,
+`RadHeader.ts`, `RadFetcher.ts`, `rad-worker.ts`, `measure.ts`,
+`GaussianSplatMesh.fork.js`, `rad-three/Cargo.toml`, `rad-three/src/lib.rs`.
+Implements only: correct RAD0 parsing (§A1 math), range fetch, one decode worker,
+fixed 32-page pool, base+SH upload, explicit sort/SH invalidation, the Spark
+baseline's camera pose, WebGPU + forceWebGL runs. Two free extras while in there:
+confirm raycast absence empirically; time a picking prototype (§B route choice).
+
+**Exit:** the ten numeric criteria of doc 05 H-LOAD, five cold-cache trials per
+backend vs five Spark control trials.
+
+**STEERING (ADR 0001):** the ten criteria are recorded as the project baseline.
+Misses on reveal (1), fallback frame cost (5) or memory (6) open named optimization
+items that Phase 2 must carry forward; misses on correctness criteria (2, 7–10) are
+bugs fixed in the spike before promotion. Nothing here stops the port — the spike's
+job is to make every later optimization argument a comparison against measured
+numbers instead of guesses.
+
+## Phase 1 — Repo scaffold + COPY mass + renderer foundation  ·  47 adapt points  ·  GATE
+
+**Entry:** Phase 0 passed. r186 published (or the snapshot pinned with a re-verify
+task recorded).
+
+**Work:**
+1. Scaffold: package.json (three r186, no Spark), tsconfig, vite configs (+ WASM
+   worker), lint rule enforcing the vendor-import boundary, `three-gs.d.ts`.
+2. Copy the 86 COPY files + barrel; compile clean.
+3. `ThreeSplatScene`: WebGPURenderer via the sync-facade + ready-promise pattern;
+   `workingColorSpace = SRGBColorSpace`; tone-mapping/background parity with
+   SparkScene's choices.
+4. The 47 renderer adaptation points across the 18 three-only files: CameraSystem
+   literals + dead fields, MediaLayer capabilities throw, EnvironmentLoader async
+   PMREM, SceneGrade → node PostProcessing + TSL (largest single item).
+5. Vendor the fork **unmodified** (delta zero) + `FORK.md` scaffold.
+
+**Exit:** every copied sandbox that needs no splats runs; a plain three.js mesh scene
+renders under ThreeSplatScene on both backends; MediaLayer color re-measured and
+recorded as the new baseline; SceneGrade output approved against sparkjs-toolkit
+side-by-side (H-GRADE).
+
+**GATE:** if SceneGrade cannot reach visual parity on node PostProcessing (upstream
+WebGPU post-processing is young — watch condition 13), decide grade-parity-later vs
+block, with the owner. Everything else here has no plausible blocker.
+
+## Phase 2 — Backend + production pager + load contract  ·  ≥114 adapt points  ·  GATE
+
+**Entry:** Phases 0–1. The spike's numbers are the bar to beat.
+
+**Work:** promote spike → `src/backend/` per doc 02: SplatBackend seam;
+ThreeGsBackend; RadPager (4-worker pool, device-classed page budget, LRU, LOD
+traversal, `center.w`+`setBinNode` selection, explicit invalidations); monolithic
+SPZ/PLY path for small scenes (same seam); dispose + capacity guard + culling in the
+fork (first real fork deltas, each a titled FORK.md patch); load/reveal/ready contract
+(§A5) wired into the copied SplatSiteElement untouched; SiteRuntime seams re-pointed
+(:2221 registration, :4133 teardown); StatsHUD/SplatBounds fed from backend counters;
+diagnostics rewired (§G) and the ~4,300 gross lines left behind for good.
+
+**Exit:** H-LOAD re-run **on the production runtime** matches or beats the spike;
+H-LIFE (load→dispose→load ×N, memory flat); a real site.json drives the whole element
+end to end on both backends.
+
+**GATE:** regression vs the spike's own numbers ⇒ the integration (not the concept)
+is at fault; find it before any interaction work stacks on top.
+
+## Phase 3 — Interaction: picking + SDF edits  ·  18(+1) adapt points  ·  GATE
+
+**Work:** land the Phase-0-chosen picking route behind `backend.raycast()`; re-point
+all three consumers. EditLayer (§C route 2 first: `colorRead` compute + pristine
+copy); SplatHighlight on it; CropTool preview on it (pending Q7's answer on whether
+the original preview ever worked); dynamic edit capacity; WebGL2 fallback edit path;
+SceneComposer crop hydration (+1).
+
+**Exit:** H-PICK and H-EDIT parity on both backends.
+
+**GATE:** this phase prices the fork honestly — if route 2 proves insufficient and
+route 1 (node-graph surgery) balloons the fork delta, the owner re-answers Q5/Q6
+(glow/crop worth it?) with real costs in hand.
+
+## Phase 4 — Assets: export + text + bounds tail  ·  ≥16 adapt points
+
+**Work:** preserve-at-decode attributes through pager + loaders; SplatExporter on
+them; `textSplatGeometry.ts` + SplatTextMesh rebuild (8 regions); recolor/opacity via
+`setMeshColor`; bounds percentile clamping + rail-sandbox centroid call site.
+**Exit:** H-ASSET (export round-trip; text parity vs sparkjs-toolkit).
+
+## Phase 5 — Optics  ·  14–16 adapt points
+
+Last: nothing depends on it, and Q11 may delete it. **Work:** DoF uniforms in the
+forked vertex node (Spark-congruent math, 512 radius cap); `setOptics` per rail stop;
+DebugPanel optics folder rewired. **Exit:** H-OPTICS focus-ramp parity.
+
+## Phase 6 — Hardening + first consumer switch
+
+Device matrix (desktop WebGPU, desktop forceWebGL, one real mobile, one iOS/Safari —
+Q4/Q6 decide weight); full H-suite on the kitchen-sink example; TOOLKIT-GUIDE /
+CLAUDE.md / CONTEXT.md for this repo; then **one** consuming site switches its `file:`
+dependency (lowest-stakes site first — plants/tangible class, doc 06 Q15), runs its
+own content through the harness, and ships. Portfolio switches last.
+
+---
+
+## Standing rules across all phases
+
+- FORK.md updated in the same change as any vendor edit — no drift, ever.
+- Every "while we're at it" → doc 06, not code (charter non-goal 1).
+- Each phase ends with its H-suite results written to `docs/plan/results/phase-N.md` —
+  measured numbers, not adjectives. Claims without artifacts do not close a phase.
+- Upstream watch (doc 06 list) checked at each phase boundary; if upstream lands
+  streaming/raycast/dispose mid-build, prefer deleting our code to keeping it.

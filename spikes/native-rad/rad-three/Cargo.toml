@@ -1,0 +1,21 @@
+[package]
+name = "rad-three"
+version = "0.1.0"
+edition = "2021"
+description = "Minimal .rad chunk decoder for the native-rad spike: chunk bytes -> three.js geometry-contract arrays"
+license = "MIT"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+wasm-bindgen = "0.2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+miniz_oxide = "0.8"
+half = "2"
+js-sys = "0.3"
+
+[profile.release]
+opt-level = 3
+lto = true
