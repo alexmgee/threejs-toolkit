@@ -1,11 +1,14 @@
-# Node
+# dependencies / machine-generated — never history
 node_modules/
 dist/
-
-# Rust / wasm-pack
 target/
 spikes/native-rad/rad-three/pkg/
 
-# OS / editor
+# local tooling & scratch
+.collab-logs/
+.claude/launch.json
+*.log
+
+# OS noise
 Thumbs.db
 .DS_Store
