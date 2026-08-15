@@ -39,6 +39,26 @@ gate** — misses become named optimization items, never stops.
   wrapping WASM, transfers all arrays). NOT written: PagePool, LOD frontier,
   main.ts hero mode.
 
+## Since this handoff was written (same day, later session)
+
+- **Trap 6 is resolved.** `.claude/launch.json` now exists HERE, with `native-rad-spike`
+  (port 5209) and `spark-parity-control` (sparkjs-toolkit dev, port 5173). Stop using the
+  sparkjs-toolkit shim. The file is **gitignored** (machine-local, holds absolute paths) —
+  if it's missing, recreate it; it is not in history. It is only visible to a session
+  anchored in `D:/Projects/threejs-toolkit`.
+- **Re-verified by execution, not assumption:** `npm run check` exit 0 · `npm run smoke`
+  exit 0 (11 modules) · `cargo test --release` → `decodes_hero_chunk0 ... ok` ·
+  hero over `/@fs/D:/Projects/sparkjs-toolkit/examples/assets/lab-sh1-sparsity.rad` with a
+  Range header → **206, exact byte count**. The 206-or-die transport path is real, not
+  inferred.
+- **Port 5209 may already be held** by a parallel session. `--strictPort` turns that into
+  a hard failure (`Error: Port 5209 is already in use`), and a `curl` against 5209 will
+  still return 200 from the *other* server — that check cannot distinguish them. Use a
+  free port to test a config change.
+- **README corrected** (commit `3ffe260`): it claimed three.js **r186**; the real pin is
+  **0.185.1** with the addon vendored from the dev branch. Ground rule 2 no longer claims
+  "no frame has been rendered" — it now expires against `docs/plan/results/phase-0.md`.
+
 ## What remains
 
 **Task 4 (finish)** — `src/PagePool.ts`: 32 pages × 65,536 splats fixed capacity
