@@ -25,8 +25,9 @@ cut with `python graph-check.py` in this directory.
 1. D:\Projects\sparkjs-toolkit is PERMANENTLY READ-ONLY. Copy from it; never
    write to it.
 2. Never commit — the owner commits, explicitly, per instance.
-3. `npm run check` (typecheck + lint:boundaries) must be green at the end of
-   every ticket. The boundary rules are architectural law (doc 02 rule 2).
+3. `npm run check` (typecheck + lint:boundaries + both vite builds; builds
+   folded in by owner ruling 2026-08-19, ticket 01) must be green at the end
+   of every ticket. The boundary rules are architectural law (doc 02 rule 2).
 4. No Spark NUMBER comparisons, ever (ADR 0003/D16). Visual comparison per D16.
 5. COPY files land byte-identical (verify with diff); every deliberate
    divergence is declared in the ticket's Comments — an undeclared improvement

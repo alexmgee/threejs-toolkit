@@ -11,6 +11,7 @@ This repo uses a local-markdown tracker, so there is no label system as such —
 | `ready-for-agent`          | `ready-for-agent`    | Fully specified, ready for an AFK agent  |
 | `ready-for-human`          | `ready-for-human`    | Requires human implementation            |
 | `wontfix`                  | `wontfix`            | Will not be actioned                     |
+| *(none upstream)*          | `done`               | Completed and verified; ticket closed    |
 
 When a skill mentions a role (e.g. "apply the AFK-ready triage label"), use the corresponding label string from this table.
 

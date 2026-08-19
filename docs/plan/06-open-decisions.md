@@ -96,7 +96,10 @@ Events that shrink or delete our work — prefer deleting our code when one land
 7. Global cross-mesh sorting — deletes accepted regression §H1.
 8. WebGL fallback sort off-main-thread — fallback risk shrinks.
 9. Loader workers/incremental decode — first upstream streaming signal.
-10. Addon TS declarations ship — delete `three-gs.d.ts`.
+10. Addon TS declarations ship — drop the reliance on `allowJs` JSDoc
+    inference for the vendored addon and reconcile against upstream's own
+    declarations (no `three-gs.d.ts` exists to delete — owner ruling
+    2026-08-19, ticket 01, doc 03 §F).
 11. WebGPU PostProcessing stabilizes documented grade patterns — SceneGrade risk
     shrinks.
 12. Addon moves examples/jsm → core — API stability signal.
@@ -107,3 +110,9 @@ Events that shrink or delete our work — prefer deleting our code when one land
     boundary — not from scratch.
 14. Spark adds WebGPU or a public pager contract — reshapes the comparison but not
     this repo's course (D0.1/D0.2 stand unless you reopen them).
+15. COPY mass complete (Phase 6) — revisit re-enabling `noUnusedLocals` /
+    `noUnusedParameters` in the root tsconfig. Dropped 2026-08-19 (owner
+    ruling, ticket 01): sparkjs-toolkit never had them (strict only), so they
+    collided with spec rule 5's byte-identical COPY — 14 files under src/ +
+    9 under examples/ fail them. Once the copies are landed and diverging is
+    permitted, the hygiene flags can return.

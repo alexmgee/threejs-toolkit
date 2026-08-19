@@ -125,7 +125,7 @@ threejs-toolkit/
 │  ├─ cells/ rules/ site/ text/ locative/ embed/ diag/  ← COPY per doc 01
 │  └─ index.ts                 ← same barrel names as sparkjs-toolkit (API parity)
 ├─ examples/                   ← parity fixtures, one per subsystem (doc 05)
-└─ vite.config.ts / vite.embed.config.ts  ← + WASM worker bundling
+└─ vite.config.ts / vite.embed.config.ts  ← WASM worker bundling in Phase 2 (ruling 2026-08-19)
 ```
 
 ## Known hard ceilings (accepted, not solved)

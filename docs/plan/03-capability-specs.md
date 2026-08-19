@@ -199,7 +199,25 @@ local change as a titled patch (teardown, EditLayer, optics uniforms, capacity g
 fallback paths, maxPixelRadius), and the per-release re-diff procedure. Local changes
 are **additive supersets** wherever possible — with all features off, behavior must
 equal upstream byte-for-byte (that identity is itself a parity test, doc 05 H-FORK).
-TypeScript: the addon ships no declarations — we write `three-gs.d.ts` locally.
+TypeScript: the addon ships no declarations, but none are hand-written locally
+(owner ruling, ticket 01, 2026-08-19 — supersedes this section's earlier
+"we write `three-gs.d.ts` locally"). The vendored JS is **inferred-from but
+never checked**: the root tsconfig's `allowJs: true` gives importers types
+inferred from upstream's JSDoc (a bogus-method probe fails TS2339), but the
+JS bodies themselves are not type-checked (`checkJs` is off), and constructor
+parameters whose JSDoc type names don't resolve in the JS module's scope
+silently degrade to `any` — verified: `new GaussianSplatMesh("wrong")` passes
+tsc exit 0. The import resolving is NOT the same as the call being checked.
+A hand-written sibling `.d.ts` is rejected because tsc silently prefers it and
+never checks it against the JS (a deliberately false one passed, exit 0). If a
+pinned audit surface is ever wanted, GENERATE it —
+`npx tsc <vendored .js files> --declaration --allowJs --emitDeclarationOnly`
+(verified accurate, exit 0) — mark it derived, and never hand-edit it.
+Public-vs-private narrowing stays a separate, later job (FORK.md).
+**OPEN QUESTION for ticket 02 (named, not settled): how do fork patches get
+type-checked?** Local patches to the vendored JS inherit the never-checked
+gap above; candidate answers (patches authored in `.ts` alongside, per-file
+`// @ts-check` after triaging upstream's own errors) are recorded, not chosen.
 
 Fork-carried items beyond §§C–D:
 - **`dispose()`** [must-invent]: upstream has none; the official demo leaks every

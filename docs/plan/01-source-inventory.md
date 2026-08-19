@@ -135,7 +135,7 @@ Reviewed floor across all deletions: **≥1,903 lines** of old code deleted or r
 | Item | Disposition |
 |---|---|
 | examples/* sandboxes (11 entry points, vite-registered) | Rebuilt selectively — each is a parity fixture. `examples/rail/main.ts:131–154` has a `forEachSplat` centroid call site review caught being missed. `examples/loadtest` is Spark-stack top to bottom → replaced by the new pager's own load harness. |
-| vite.config.ts / vite.embed.config.ts | New copies + WASM worker integration for the decoder (doc 03 §A). |
+| vite.config.ts / vite.embed.config.ts | New copies; WASM worker integration for the decoder (doc 03 §A) lands in Phase 2 (owner ruling 2026-08-19, ticket 01). |
 | package.json | three pinned to r186 line; no `@sparkjsdev/spark`; `@types` strategy for the undeclared addon (doc 03 §F). |
 | TOOLKIT-GUIDE.md, CLAUDE.md, CONTEXT.md | Rewritten for this repo; CONTEXT.md's domain language carries over verbatim — the domain didn't change. |
 | Consuming sites (portfolio, sculpture, plants) | **Explicitly unsurveyed** — an open tail. Each switches its `file:` dependency only after the parity harness passes for its content. See doc 06 Q15. |

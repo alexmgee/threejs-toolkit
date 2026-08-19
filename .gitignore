@@ -1,6 +1,7 @@
 # dependencies / machine-generated — never history
 node_modules/
 dist/
+dist-embed/
 target/
 spikes/native-rad/rad-three/pkg/
 

@@ -24,6 +24,10 @@ a cycle, land together), all of `locative/` (2), `site/AnnotationMeta`,
       Comments
 - [ ] The PLACEHOLDER `src/core/index.ts` is DELETED as the real core files
       land — never left beside them
+- [ ] `vite.config.ts` is REPOINTED off `src/core/index.ts` when that file is
+      deleted (owner ruling 2026-08-19, ticket 01) — the site build's scaffold
+      entry dies with this ticket, and `npm run check` now runs both builds,
+      so leaving it stale fails the gate loudly
 - [ ] The camera-rail parity fixture (from sparkjs-toolkit examples) is copied
       and runs — it needs no splats
 - [ ] `npm run check` green

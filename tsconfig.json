@@ -5,15 +5,21 @@
     "module": "ESNext",
     "moduleResolution": "bundler",
     "strict": true,
-    "noUnusedLocals": true,
-    "noUnusedParameters": true,
+    // noUnusedLocals / noUnusedParameters DROPPED 2026-08-19 (owner ruling,
+    // ticket 01): sparkjs-toolkit never had them (strict only), so they were
+    // a new preference colliding with spec rule 5's byte-identical COPY —
+    // 14 files under src/ + 9 under examples/ would fail. Revisit once the
+    // COPY mass is complete (doc 06 watch item, Phase 6).
     "noFallthroughCasesInSwitch": true,
     "noEmit": true,
     "skipLibCheck": true,
     "isolatedModules": true,
     "allowJs": true,
     "resolveJsonModule": true,
-    "forceConsistentCasingInFileNames": true
+    "forceConsistentCasingInFileNames": true,
+    "paths": {
+      "@toolkit/*": ["./src/*"]
+    }
   },
-  "include": ["src"]
+  "include": ["src", "examples/**/*.ts"]
 }

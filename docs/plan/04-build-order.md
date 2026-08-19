@@ -71,8 +71,10 @@ task recorded).
 1. Scaffold: package.json (three pinned **0.185.1**, no Spark — r186 is not
    published as of the 2026-08-19 check, watch item 13; the `GaussianSplatMesh`
    addon stays vendored from the dev branch until it ships in a release),
-   tsconfig, vite configs (+ WASM worker), lint rule enforcing the
-   vendor-import boundary, `three-gs.d.ts`.
+   tsconfig, vite configs (WASM worker bundling deferred to Phase 2 — owner
+   ruling 2026-08-19, ticket 01), lint rule enforcing the vendor-import
+   boundary. No `three-gs.d.ts` — hand-written declarations rejected; the
+   vendored JS is inferred-from but never checked (same ruling, doc 03 §F).
 2. Copy the 86 COPY files + barrel; compile clean.
 3. `ThreeSplatScene`: WebGPURenderer via the sync-facade + ready-promise pattern;
    `workingColorSpace = SRGBColorSpace`; tone-mapping/background parity with
