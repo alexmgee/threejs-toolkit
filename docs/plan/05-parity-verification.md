@@ -2,8 +2,20 @@
 
 How we prove threejs-toolkit equals sparkjs-toolkit, phase by phase. The sibling repo
 is what makes this strong: the reference implementation is always alive next door,
-running the same content. **Every harness compares against sparkjs-toolkit executing,
-never against remembered or documented behavior.**
+running the same content. **Every harness that still compares against
+sparkjs-toolkit compares against it executing, never against remembered or
+documented behavior** — see the amendment below for which no longer compare at all.
+
+> **Amendment 2026-08-16 (ADR 0003):** performance and selection METRICS are no
+> longer scored against sparkjs-toolkit. The owner's ruling: the toolkits are
+> separate products; each optimizes against itself. H-LOAD below is rewritten as
+> an absolute-baseline instrument; Spark figures (e.g. the historical 2.3 s hero
+> reveal) may appear as context, never as pass/fail. One visual-parity item IS
+> re-scoped by this amendment: old H-LOAD criterion 4 (FrameDiffValidator vs the
+> Spark control) becomes a self-stability check below — whether a
+> Spark-visual-diff returns at Phase 1 is part of doc 06 D16. The remaining
+> visual/behavioral parity harnesses (H-VISUAL, H-PICK, H-EDIT…) are NOT yet
+> re-scoped; settling their status is also D16, due before Phase 1 review.
 
 ## Ground rules
 
@@ -25,31 +37,55 @@ never against remembered or documented behavior.**
 |---|---|---|
 | No striping ever, 4× memory | three stores float32; Spark packs float16 (`extSplats` dance dies) | H-VISUAL clean; H-LOAD memory row high |
 | SH banding possible | 8-bit quantized SH vs Spark precision | glossy fixtures |
-| Splat edge falloff detail | different kernel constants (radius cap 512 matched in fork) | pixel-diff tolerance band |
+| Splat edge falloff detail | different kernel constants; the fork still carries upstream's 1024 px radius cap (`MAX_SCREEN_SPACE_SPLAT_SIZE`), NOT Spark's 512 — matching it is Phase 5 work (doc 03 §D, doc 04 Phase 5) | pixel-diff tolerance band, widened until the cap is matched |
 | Overlap popping | no cross-mesh sort (accepted regression §H) | H-COMPOSE overlap fixture only |
 
 ## The harnesses
 
-### H-LOAD — the ten criteria (spike + Phase 2)
-Five cold-cache trials per backend vs five Spark control trials, same harness. Pass =
-ALL of:
-1. median first acceptable render **no worse than the Spark control** (2.3 s today);
+### H-LOAD — the ten criteria (spike + Phase 2; amended 2026-08-16, ADR 0003)
+Five cold-cache trials per backend, two regimes: the **derived default** (pool =
+`min(P_limits, P_asset)`; 122 pages for the hero on this machine) and the
+**constrained eviction regime** (`?pages=32`). All numbers are absolute records —
+this toolkit's own baseline (ADR 0001); no Spark control trials run.
+1. median navigation→first-pixel **recorded** per backend and regime, and
+   →full-quality recorded for the **derived-default regime only** — full quality
+   is structurally unreachable in the constrained `?pages=32` regime, where some
+   wanted chunk is always non-resident, so those rows record "n/a (by design)"
+   rather than a missing measurement. (first-pixel = first rendered frame with a
+   non-empty selection — a post-render proxy, not readback-verified: an in-band
+   readback would stall the very moment being timed; historical context only:
+   Spark's tuned hero reveal was 2.3 s);
 2. all splat payload requests are byte ranges — no monolithic fetch before reveal;
-3. selected splat count at the test pose within **1%** of Spark control;
-4. `FrameDiffValidator` passes at its existing threshold (if the threshold is
-   unsuitable for stochastic within-bin ordering, result is **UNKNOWN**, not a pass —
-   recalibrate first);
-5. fallback p95 rendered-frame cost during the scripted camera drag no worse than the
-   Spark control;
-6. no storage-buffer allocation failure; page pool stays exactly at budget;
-7. eviction correctness: revisiting the initial pose restores selected count + passes
-   the same frame diff;
-8. reported progress never decreases during eviction;
-9. a page uploaded under a motionless camera receives valid SH contribution;
+3. selected splat count at the test pose **recorded** and identical across trials
+   (the traversal is deterministic at a fixed pose; any variance is a bug);
+4. rendered output at the test pose is **pixel-stable across trials** of the same
+   regime (readback screenshot diff; within-bin sort order may reorder equal-depth
+   splats — if that makes strict stability unachievable, record the measured diff
+   band, never a silent pass);
+5. fallback p95 rendered-frame cost during the scripted camera drag **recorded**;
+6. no storage-buffer allocation failure; the pool stays exactly at its configured
+   budget in both regimes;
+7. eviction correctness (`?pages=32` regime): revisiting the initial pose restores
+   the same selected count and passes the same pixel-stability check;
+8. reported progress is derived from completed work, never residency (A5), so
+   decrease during eviction is structurally impossible; the instrument still
+   samples it through the eviction regime as a regression tripwire — this
+   criterion is satisfied by construction, not by test, and says so;
+9. a page uploaded under a motionless camera becomes visible with sort + SH
+   explicitly re-dispatched (verified via selection growth + the invalidate()
+   path; a direct SH-output assertion is deferred to the production diag
+   stack — recorded as a gap, not a pass);
 10. a page/selection change updates visible order without camera motion.
 Instrumented by `measure.ts` (spike) then the rewired diag stack (production):
-navigation-start→first-pixel, →full-quality, longest main-thread block, peak JS heap,
-peak GPU memory.
+navigation-start→first-pixel, →full-quality, longest main-thread block, peak JS heap.
+**Peak GPU memory is NOT measured** — no browser API reports it; `measure.ts` records
+`gpuPoolBytes`, an analytic model of the WebGPU pool's allocation layout
+(`capacity × GPU_BYTES_PER_SPLAT + GPU_FIXED_BYTES`, each term named at its
+definition). It models the WebGPU path only; the WebGL fallback's ~3× copies are not
+included. Treat it as a derived figure, never as a measurement.
+
+Measurement runs pin `setPixelRatio(1)` and a fixed window size so logical and
+drawing-buffer sizes agree across trials.
 
 ### H-VISUAL — rendering parity (every phase)
 Fixture scenes (small static SPZ; paged hero; glossy SH worst case) rendered by both

@@ -11,6 +11,8 @@ export interface DecodeRequest {
 
 export interface DecodeResult {
   index: number;
+  /** The request's chunk bytes, transferred back so the caller's cache survives the zero-copy round trip. */
+  bytes: ArrayBuffer;
   base: number;
   count: number;
   center: Float32Array;
@@ -35,6 +37,7 @@ self.onmessage = async (ev: MessageEvent<DecodeRequest>) => {
     const d = decode_chunk(new Uint8Array(bytes));
     const out: DecodeResult = {
       index,
+      bytes,
       base: d.base,
       count: d.count,
       center: d.take_center(),
@@ -50,11 +53,13 @@ self.onmessage = async (ev: MessageEvent<DecodeRequest>) => {
     };
     d.free();
     (self as unknown as Worker).postMessage(out, [
+      out.bytes,
       out.center.buffer, out.covariance.buffer, out.color.buffer, out.sh1.buffer,
       out.alpha.buffer, out.scale.buffer, out.quat.buffer,
       out.childCount.buffer, out.childStart.buffer,
     ]);
   } catch (e) {
-    (self as unknown as Worker).postMessage({ index, error: String(e) });
+    // Return the transferred request bytes even on failure so the caller's cache survives.
+    (self as unknown as Worker).postMessage({ index, error: String(e), bytes }, [bytes]);
   }
 };

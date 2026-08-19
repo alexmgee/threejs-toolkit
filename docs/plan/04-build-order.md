@@ -11,28 +11,40 @@ matters less than in-place — but the *information* ordering matters exactly as
 Building the easy 62% first would feel productive and prove nothing. The spike still
 goes first.
 
+> **Amendment 2026-08-16 (ADR 0003).** Phase 0's description below is corrected in
+> three places: measurements are **absolute baselines for this toolkit**, so no Spark
+> control trials run (Spark figures are context only); the page pool is a
+> **runtime-derived budget**, not a fixed 32-page pin; and the trials run in **two
+> regimes** (derived default + `?pages=32` eviction regime) rather than against a
+> control. Phase 0's measured outcome is `docs/plan/results/phase-0.md`.
+
 ---
 
 ## Phase 0 — The spike  ·  0 toolkit files · 9 spike files  ·  BASELINE
 
-**Question it answers:** how fast is a toolkit-owned pager on three.js against the
-Spark control on the real hero — and how does the WebGL2 fallback behave?
+**Question it answers:** how does a toolkit-owned pager on three.js perform on the
+real hero, as this toolkit's own baseline — and how does the WebGL2 fallback behave?
 (Per ADR 0001 the port is unconditional: the spike measures and sets the
 optimization baseline; it no longer holds a cancellation power.)
 
-**Entry:** the local r186 snapshot; one real hero `.rad` + its Spark control harness;
-permission to compile the Rust reference decoder.
+**Entry:** the local r186 snapshot; one real hero `.rad`; permission to compile the
+Rust reference decoder.
 
 **Work** (`spikes/native-rad/`, never imported by src/): `index.html`, `main.ts`,
 `RadHeader.ts`, `RadFetcher.ts`, `rad-worker.ts`, `measure.ts`,
 `GaussianSplatMesh.fork.js`, `rad-three/Cargo.toml`, `rad-three/src/lib.rs`.
 Implements only: correct RAD0 parsing (§A1 math), range fetch, one decode worker,
-fixed 32-page pool, base+SH upload, explicit sort/SH invalidation, the Spark
-baseline's camera pose, WebGPU + forceWebGL runs. Two free extras while in there:
-confirm raycast absence empirically; time a picking prototype (§B route choice).
+runtime-derived page pool (`pages = min(P_limits, P_asset)` from the created device's
+real limits per ADR 0003 — 122 pages on the trial machine; `?pages=32` is the
+constrained eviction-test regime only), base+SH upload, explicit sort/SH
+invalidation, the pinned test camera pose, WebGPU + forceWebGL runs. Two free
+extras while in there: confirm raycast absence empirically (**done** — 9 rays,
+0 hits); time a picking prototype for the §B route choice (**not done** — moved
+to Phase 3 entry).
 
-**Exit:** the ten numeric criteria of doc 05 H-LOAD, five cold-cache trials per
-backend vs five Spark control trials.
+**Exit:** the ten numeric criteria of doc 05 H-LOAD *as amended*, five cold-cache
+trials per backend in each of the two regimes, recorded as absolute baselines.
+**Met 2026-08-16** — `docs/plan/results/phase-0.md`.
 
 **STEERING (ADR 0001):** the ten criteria are recorded as the project baseline.
 Misses on reveal (1), fallback frame cost (5) or memory (6) open named optimization
@@ -89,8 +101,11 @@ is at fault; find it before any interaction work stacks on top.
 
 ## Phase 3 — Interaction: picking + SDF edits  ·  18(+1) adapt points  ·  GATE
 
-**Work:** land the Phase-0-chosen picking route behind `backend.raycast()`; re-point
-all three consumers. EditLayer (§C route 2 first: `colorRead` compute + pristine
+**Work:** time both §B candidate routes at phase entry (CPU ray-ellipsoid over
+retained position+covariance with page-AABB pre-filter, vs GPU ID/depth readback) —
+Phase 0 confirmed raycast absence empirically but did **not** choose a route, so the
+choice lands here — then put the winner behind `backend.raycast()`; re-point all
+three consumers. EditLayer (§C route 2 first: `colorRead` compute + pristine
 copy); SplatHighlight on it; CropTool preview on it (pending Q7's answer on whether
 the original preview ever worked); dynamic edit capacity; WebGL2 fallback edit path;
 SceneComposer crop hydration (+1).
@@ -110,7 +125,9 @@ them; `textSplatGeometry.ts` + SplatTextMesh rebuild (8 regions); recolor/opacit
 
 ## Phase 5 — Optics  ·  14–16 adapt points
 
-Last: nothing depends on it, and Q11 may delete it. **Work:** DoF uniforms in the
+Last: nothing depends on it, so it is ordered last for scheduling reasons only —
+doc 06 **D10** rules DoF is built regardless of current usage, so this phase is
+not cancellable. **Work:** DoF uniforms in the
 forked vertex node (Spark-congruent math, 512 radius cap); `setOptics` per rail stop;
 DebugPanel optics folder rewired. **Exit:** H-OPTICS focus-ramp parity.
 
@@ -119,8 +136,9 @@ DebugPanel optics folder rewired. **Exit:** H-OPTICS focus-ramp parity.
 Device matrix (desktop WebGPU, desktop forceWebGL, one real mobile, one iOS/Safari —
 Q4/Q6 decide weight); full H-suite on the kitchen-sink example; TOOLKIT-GUIDE /
 CLAUDE.md / CONTEXT.md for this repo; then **one** consuming site switches its `file:`
-dependency (lowest-stakes site first — plants/tangible class, doc 06 Q15), runs its
-own content through the harness, and ships. Portfolio switches last.
+dependency — **alexgee.online first, per doc 06 D15** (the owner's call; order is
+inconsequential to the build plan) — runs its own content through the harness, and
+ships. Remaining sites follow.
 
 ---
 

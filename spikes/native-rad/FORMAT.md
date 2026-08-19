@@ -115,7 +115,9 @@ array (children are contiguous). Interior nodes are renderable coarse proxies
 (alpha aggregates >1 under lodOpacity). Traversal: start at roots, descend while a
 node's projected size exceeds threshold, render the frontier. (Frontier selection
 math is ours; the format only gives center/scales/alpha + child pointers. Spark's
-selection heuristics live in TS `SplatPager.ts` — consult for parity, not bytes.)
+selection heuristics live in Rust `spark-worker-rs/src/lod_tree.rs`
+(`traverse_lod_trees`), not in TS `SplatPager.ts` — consult as concept
+reference only; per ADR 0003 we do not target parity with them.)
 
 ## The hero file (ground truth, probed 2026-08-15)
 

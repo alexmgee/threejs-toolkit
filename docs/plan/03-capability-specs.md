@@ -155,7 +155,8 @@ Exact-parity nicety: upstream hardcodes max pixel radius 1024 vs Spark's 512 —
 Spark for visual parity (one line, flagged in FORK.md).
 
 **Scope:** 14–16 counted regions + the fork delta. Deferrable: nothing depends on it
-(Phase 5 last; doc 06 Q11 may delete it). **Verify:** doc 05 H-OPTICS (authored-stop
+(Phase 5 last for scheduling only; doc 06 D10 rules DoF is built regardless of
+current usage, so it is not cancellable). **Verify:** doc 05 H-OPTICS (authored-stop
 fixture, focus ramp screenshots vs sparkjs-toolkit).
 
 ---

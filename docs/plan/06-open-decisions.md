@@ -51,6 +51,20 @@ integrity hash; revisit with real size numbers.*
 inconsequential to the build plan. Standing task unchanged: one-pass survey of each
 consuming site's toolkit-API usage before its switch.
 
+**D16 — OPEN (raised 2026-08-16, ADR 0003): how far does the no-comparison ruling
+reach?** The owner ruled performance/selection metrics are absolute baselines, never
+Spark comparisons. Not yet settled: whether H-VISUAL / H-PICK / H-EDIT / H-OPTICS
+pixel-diff-vs-Spark harnesses survive as-is, become self-referential, or are
+re-scoped per capability. Settle with the owner before Phase 1 review. Related
+DECIDED items from the same session: pool budget is runtime-derived
+(`min(P_limits, P_asset)`, `?pages=N` override; ADR 0003 §2); eviction is
+priority-protection (§3); eviction criteria run in the `?pages=32` regime (§4);
+mobile budgets deliberately unpinned until measured on-device (Phase 2).
+
+**D17 — OPEN (2026-08-16): reclaim `covarianceB.zw`** — 8 % of pool bytes are dead
+lanes per splat (adversarial-review finding). Candidate: repack SH1 words or
+selection flags into them. Pure optimization; touch only with measurements in hand.
+
 ## Upstream watch list (checked at every phase boundary)
 
 Events that shrink or delete our work — prefer deleting our code when one lands:
@@ -69,7 +83,10 @@ Events that shrink or delete our work — prefer deleting our code when one land
 11. WebGPU PostProcessing stabilizes documented grade patterns — SceneGrade risk
     shrinks.
 12. Addon moves examples/jsm → core — API stability signal.
-13. r186 publishes (due 2026-08-19) — re-verify every file:line in doc 03 before
-    Phase 1.
+13. r186 publishes — re-verify every file:line in doc 03 before Phase 1.
+    **Checked 2026-08-19: NOT published** (`npm view three version` → 0.185.1).
+    The vendored dev-branch `GaussianSplatMesh` addon stays as-is, and doc 03's
+    citations stand against 0.185.1. Re-check from this point at the next phase
+    boundary — not from scratch.
 14. Spark adds WebGPU or a public pager contract — reshapes the comparison but not
     this repo's course (D0.1/D0.2 stand unless you reopen them).

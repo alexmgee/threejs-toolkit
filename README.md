@@ -10,19 +10,23 @@ addon is not in any published release yet. `spikes/native-rad/package.json` is t
 authority on the version; don't quote a release number from prose.
 
 **Status: PLANNING for the toolkit — no toolkit code exists yet. The Phase 0 spike is
-underway** in `spikes/native-rad/` and does run. Current spike state, remaining tasks,
-and the traps that cost real time are in
-[.scratch/handoffs/001-2026-08-15-phase0-spike-continuation.md](.scratch/handoffs/001-2026-08-15-phase0-spike-continuation.md).
+built and measured** in `spikes/native-rad/`; its baseline lives in
+[docs/plan/results/phase-0.md](docs/plan/results/phase-0.md). Current spike state,
+remaining tasks, and the traps that cost real time are in
+[.scratch/handoffs/002-2026-08-16-phase0-trials-and-close.md](.scratch/handoffs/002-2026-08-16-phase0-trials-and-close.md).
 
 ## Ground rules
 
-1. **`sparkjs-toolkit` is never modified.** It is source material and the reference
-   implementation. Every parity check in this project runs *against* it, side by side.
+1. **`sparkjs-toolkit` is never modified.** It is source material and concept
+   reference. Per ADR 0003 (2026-08-16), performance and selection metrics are
+   **absolute baselines for this toolkit** — Spark's numbers are context, never
+   pass/fail comparators. Visual/behavioral parity harnesses for later phases
+   are being re-scoped under doc 06 D16.
 2. **Nothing here is trusted until executed.** The plan derives from source reading
-   (twice-read, adversarially reviewed); Phase 0 exists to execute it. Frames now
-   render and the `.rad` decoder passes a golden test, but **no measurement against
-   the Spark control has been taken yet** — every performance claim in the plan docs
-   remains unverified until `docs/plan/results/phase-0.md` exists.
+   (twice-read, adversarially reviewed); Phase 0 executed it: the spike renders the
+   204 MB hero on both backends and its ten-criteria baseline is measured in
+   [docs/plan/results/phase-0.md](docs/plan/results/phase-0.md). Plan-doc claims
+   beyond that baseline remain unverified until their phase executes.
 3. **No duration estimates, anywhere.** All scope is countable: files, adaptation
    points, new modules, deleted lines. See `docs/plan/00-charter.md` for why.
 
