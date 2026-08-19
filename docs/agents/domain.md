@@ -12,12 +12,10 @@ If any of these files don't exist, **proceed silently**. Don't flag their absenc
 
 ## This repo's existing state
 
-`docs/adr/` already exists and is **hand-written, pre-dating these skills**:
-
-- `0001-unconditional-port.md`
-- `0002-disjoint-composition.md`
-
-Any new ADR continues that numbering from `0003`. Never renumber or rewrite the existing two.
+`docs/adr/` already exists. `0001-unconditional-port.md` and
+`0002-disjoint-composition.md` are **hand-written and pre-date these skills** —
+never renumber or rewrite those two. ADRs from `0003` onward were written under
+these skills. New ones continue from the highest existing number + 1.
 
 `docs/plan/` (charter, source inventory, architecture, capability specs, build order, parity verification, open decisions) is the substantive planning material for this repo. Read it before proposing anything architectural — `docs/plan/00-charter.md` holds the goal, non-goals and invariants, and `docs/plan/06-open-decisions.md` holds the calls that are still open.
 
