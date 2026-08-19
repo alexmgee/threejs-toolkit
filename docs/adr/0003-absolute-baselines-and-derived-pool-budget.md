@@ -11,7 +11,11 @@ per repo convention its text is left intact rather than rewritten.
 ## Decision
 
 1. **Measurements are absolute baselines for this toolkit.** No harness scores
-   this toolkit by comparison against sparkjs-toolkit executing. Spark's source,
+   this toolkit's performance or selection NUMBERS by comparison against
+   sparkjs-toolkit executing. *(Sentence tightened 2026-08-19 per D16: the
+   original read "No harness scores this toolkit by comparison…", which
+   overreached — visual/behavioral comparison harnesses survive; only number
+   comparison is retired.)* Spark's source,
    constants, and historical numbers (e.g. the 2.3 s hero reveal) remain
    *reference material* — planning direction and concept assistance — never
    pass/fail comparators. Owner, 2026-08-16: "it doesn't have to be fair! …
@@ -74,8 +78,8 @@ review established, with citations (raw logs machine-local in `.collab-logs/`):
   budget"; criteria 7–8 run in the `?pages=32` regime. Spark-control trials are
   dropped from task 6; the historical 2.3 s figure may be quoted as context.
 - Later-phase visual-parity harnesses (H-VISUAL, pixel diffs) were not
-  explicitly revoked by the owner directive; their status is an open question
-  to settle before Phase 1 review (doc 06 D16).
+  explicitly revoked by the owner directive. **Resolved 2026-08-19 (D16):
+  they survive as Spark comparisons; decision 1 above was tightened to match.**
 - Named optimization item: `covarianceB.zw` is 8 % dead weight per splat.
 - The frame-budget and foveation constants borrowed from Spark stay as
   starting values, to be retuned against our own measurements.

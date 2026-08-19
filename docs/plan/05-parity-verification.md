@@ -16,6 +16,12 @@ documented behavior** — see the amendment below for which no longer compare at
 > Spark-visual-diff returns at Phase 1 is part of doc 06 D16. The remaining
 > visual/behavioral parity harnesses (H-VISUAL, H-PICK, H-EDIT…) are NOT yet
 > re-scoped; settling their status is also D16, due before Phase 1 review.
+>
+> **D16 ruled 2026-08-19: visual/behavioral comparison against sparkjs-toolkit
+> CONTINUES** — H-GRADE, H-VISUAL, H-PICK, H-EDIT, H-OPTICS stand as written;
+> only number comparison stays retired. Criterion 4's Phase-2 re-run adds the
+> Spark visual diff back beside the self-stability check; Phase 0's recorded
+> results predate the ruling and stand as recorded.
 
 ## Ground rules
 
@@ -61,7 +67,9 @@ this toolkit's own baseline (ADR 0001); no Spark control trials run.
 4. rendered output at the test pose is **pixel-stable across trials** of the same
    regime (readback screenshot diff; within-bin sort order may reorder equal-depth
    splats — if that makes strict stability unachievable, record the measured diff
-   band, never a silent pass);
+   band, never a silent pass); from the Phase 2 re-run, additionally diffed
+   against sparkjs-toolkit's render of the same pose (D16 ruling — a visual
+   check, not a number comparison);
 5. fallback p95 rendered-frame cost during the scripted camera drag **recorded**;
 6. no storage-buffer allocation failure; the pool stays exactly at its configured
    budget in both regimes;

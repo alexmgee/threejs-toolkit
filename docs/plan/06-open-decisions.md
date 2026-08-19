@@ -51,19 +51,36 @@ integrity hash; revisit with real size numbers.*
 inconsequential to the build plan. Standing task unchanged: one-pass survey of each
 consuming site's toolkit-API usage before its switch.
 
-**D16 — OPEN (raised 2026-08-16, ADR 0003): how far does the no-comparison ruling
-reach?** The owner ruled performance/selection metrics are absolute baselines, never
-Spark comparisons. Not yet settled: whether H-VISUAL / H-PICK / H-EDIT / H-OPTICS
-pixel-diff-vs-Spark harnesses survive as-is, become self-referential, or are
-re-scoped per capability. Settle with the owner before Phase 1 review. Related
-DECIDED items from the same session: pool budget is runtime-derived
-(`min(P_limits, P_asset)`, `?pages=N` override; ADR 0003 §2); eviction is
-priority-protection (§3); eviction criteria run in the `?pages=32` regime (§4);
-mobile budgets deliberately unpinned until measured on-device (Phase 2).
+**D16 — DECIDED (2026-08-19): the no-comparison ruling reaches NUMBERS only.**
+Visual/behavioral comparison against sparkjs-toolkit executing CONTINUES —
+H-GRADE, H-VISUAL, H-PICK, H-EDIT, H-OPTICS stand as written. Performance and
+selection NUMBER comparison stays retired (ADR 0003, whose too-wide decision-1
+sentence was tightened the same day). H-LOAD's numeric rows remain absolute
+baselines; its criterion-4 visual check regains the Spark diff beside the
+self-stability check at the Phase 2 re-run (Phase 0's recorded results predate
+the ruling and stand as recorded). Related DECIDED items from the 2026-08-16
+session: pool budget is runtime-derived (`min(P_limits, P_asset)`, `?pages=N`
+override; ADR 0003 §2); eviction is priority-protection (§3); eviction criteria
+run in the `?pages=32` regime (§4); mobile budgets deliberately unpinned until
+measured on-device (Phase 2).
 
 **D17 — OPEN (2026-08-16): reclaim `covarianceB.zw`** — 8 % of pool bytes are dead
 lanes per splat (adversarial-review finding). Candidate: repack SH1 words or
 selection flags into them. Pure optimization; touch only with measurements in hand.
+
+**D18 — OPEN (2026-08-19): `src/backend/index.ts` is a PLACEHOLDER the Phase 2
+seam work must replace.** It exists only to anchor the vendor-import boundary
+rule (commit 89c35a7) before the real SplatBackend seam lands. Its sibling
+anchors (`src/vendor/three-gs/index.ts`, `src/core/index.ts`) are replaced by
+Phase 1 tickets; this one alone outlives Phase 1 — whoever builds the Phase 2
+seam deletes and replaces it, never leaves it beside the real code.
+
+**D19 — DECIDED (2026-08-19): `ui/SplatTextMesh` ships in Phase 1 as an
+API-preserving typed STUB** inside the text cluster ticket, so
+`text/SplatLane.ts` compiles unchanged (doc 01: "SplatLane unchanged *if*
+SplatTextMesh keeps its API"). The stub throws on construction with an explicit
+"rebuilt in Phase 4 (doc 03 §E)" error. Phase 4's rebuild deletes and replaces
+it — same delete-and-replace obligation as D18. Never left beside real code.
 
 ## Upstream watch list (checked at every phase boundary)
 

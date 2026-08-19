@@ -17,6 +17,15 @@ goes first.
 > **runtime-derived budget**, not a fixed 32-page pin; and the trials run in **two
 > regimes** (derived default + `?pages=32` eviction regime) rather than against a
 > control. Phase 0's measured outcome is `docs/plan/results/phase-0.md`.
+>
+> **Ticketing note (2026-08-19).** Phase 1 executes as 11 graph-verified tickets
+> in `.scratch/phase-1-foundation/`. Owner rulings at ticketing: the embed set
+> (SplatSiteElement, FragmentRouter, register, diagWiring.stub — 4 of the 86 —
+> plus the SiteRuntime/diagWiring re-typing) moves to Phase 2, so **Phase 1
+> copies 82 of the 86**; `SplatTextMesh` ships as an API-preserving typed stub
+> (doc 06 D19); `SparkPagerAdapter` is carried through Phase 1 and deleted in
+> Phase 2 (doc 03 §G); D16 ruled — visual comparison harnesses survive, so this
+> phase's H-GRADE exit stands as written.
 
 ---
 
