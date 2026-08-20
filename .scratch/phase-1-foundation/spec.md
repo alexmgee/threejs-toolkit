@@ -19,6 +19,15 @@ cut with `python graph-check.py` in this directory.
   STUB in ticket 05; Phase 4 deletes-and-replaces it.
 - **R4**: diag/SparkPagerAdapter.ts is carried through Phase 1 unmodified;
   Phase 2 deletes it (doc 03 section G).
+- **R5 (2026-08-20)**: the COPY source is sparkjs-toolkit's **working tree as
+  on disk**, not its last commit. Grounds: doc 01's inventory was scanned
+  2026-08-14 from disk (the uncommitted changes there date from Aug 7, so
+  every line count and import edge in the plan already includes them), and
+  the Phase 0 Spark control ran the disk state — the last commit is a state
+  the plan never measured. Every copying ticket (03–09) records the SHA-256
+  of each file at copy time in its Comments: that pins the bytes even though
+  a working tree can't be pinned by a commit hash. Rule 1 still binds in
+  full — never write to sparkjs-toolkit.
 
 ## Standing rules (every ticket, every agent — restated because contexts start cold)
 

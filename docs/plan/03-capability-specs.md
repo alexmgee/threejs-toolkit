@@ -194,11 +194,14 @@ fixture vs sparkjs-toolkit).
 ## §F — The fork itself  [governance]
 
 `src/vendor/three-gs/`: `GaussianSplatMesh.js` + `CountingSort.js` +
-`GaussianSplatUtils.js` (closure). `FORK.md` records: upstream commit hash, every
-local change as a titled patch (teardown, EditLayer, optics uniforms, capacity guard,
-fallback paths, maxPixelRadius), and the per-release re-diff procedure. Local changes
-are **additive supersets** wherever possible — with all features off, behavior must
-equal upstream byte-for-byte (that identity is itself a parity test, doc 05 H-FORK).
+`GaussianSplatUtils.js` (closure). `FORK.md` records: upstream provenance as
+precisely as recoverable (exact commit hash, or the pinned window ticket 02
+established), every local change as a titled patch (teardown, EditLayer, optics
+uniforms, capacity guard, fallback paths, maxPixelRadius), and the per-release
+re-diff procedure. Local changes are **additive supersets** wherever possible —
+with all features off, rendered output must equal unmodified upstream
+(pixel-identical; the identity is defined on output, not source bytes — doc 05
+H-FORK is the definition home).
 TypeScript: the addon ships no declarations, but none are hand-written locally
 (owner ruling, ticket 01, 2026-08-19 — supersedes this section's earlier
 "we write `three-gs.d.ts` locally"). The vendored JS is **inferred-from but
@@ -214,10 +217,10 @@ pinned audit surface is ever wanted, GENERATE it —
 `npx tsc <vendored .js files> --declaration --allowJs --emitDeclarationOnly`
 (verified accurate, exit 0) — mark it derived, and never hand-edit it.
 Public-vs-private narrowing stays a separate, later job (FORK.md).
-**OPEN QUESTION for ticket 02 (named, not settled): how do fork patches get
-type-checked?** Local patches to the vendored JS inherit the never-checked
-gap above; candidate answers (patches authored in `.ts` alongside, per-file
-`// @ts-check` after triaging upstream's own errors) are recorded, not chosen.
+How fork patches get type-checked: **DECIDED — D20 (doc 06, 2026-08-20)**:
+patches are authored in `.ts` files alongside the vendored JS; effective at
+the first Phase 2 fork patch. The question this paragraph used to hold open
+closed with ticket 02.
 
 Fork-carried items beyond §§C–D:
 - **`dispose()`** [must-invent]: upstream has none; the official demo leaks every

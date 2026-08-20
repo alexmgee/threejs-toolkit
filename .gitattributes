@@ -1,0 +1,11 @@
+# Byte-preservation for vendored upstream code (ticket 02, 2026-08-20).
+# The machine-wide core.autocrlf=true would rewrite these to CRLF at the
+# next checkout/clone, silently breaking FORK.md's SHA-256 drift baseline
+# and every future upstream byte-comparison (demonstrated end-to-end in
+# review). `-text` disables all line-ending conversion for these paths —
+# git stores and restores the exact bytes.
+src/vendor/three-gs/** -text
+spikes/native-rad/vendor/** -text
+# The spike's fork is the Phase 2 promotion-diff source against the vendored
+# baseline — same byte-preservation need (review sweep finding).
+spikes/native-rad/src/GaussianSplatMesh.fork.js -text

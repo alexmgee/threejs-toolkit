@@ -70,7 +70,9 @@ open eyes; doc 03 itemizes exactly which private surfaces are touched and where.
 - Repo: `D:\Projects\threejs-toolkit`
 - Package name: `threejs-toolkit` (private, consumed via `file:` like its sibling)
 - The forked upstream files live under `src/vendor/three-gs/` with a `FORK.md` recording
-  the exact upstream commit, every local change, and the re-diff procedure per release.
+  upstream provenance as precisely as recoverable (exact commit, or the pinned
+  window ticket 02 established), every local change, and the re-diff procedure
+  per release.
 
 ## Provenance and trust level
 

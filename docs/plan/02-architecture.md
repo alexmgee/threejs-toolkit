@@ -115,7 +115,7 @@ threejs-toolkit/
 ├─ spikes/native-rad/          ← Phase 0; throwaway; never imported by src/
 ├─ src/
 │  ├─ vendor/three-gs/         ← FORK: GaussianSplatMesh + CountingSort + GaussianSplatUtils
-│  │   └─ FORK.md              ← upstream commit, every local change, re-diff procedure
+│  │   └─ FORK.md              ← upstream provenance (commit or pinned window), every local change, re-diff procedure
 │  ├─ backend/                 ← SplatBackend seam + ThreeGsBackend + RadPager + workers
 │  ├─ core/    (adapted)       ← ThreeSplatScene, CameraSystem, SceneComposer, CropTool,
 │  │                              SplatExporter, SplatBounds, StatsHUD, DebugPanel, loaders

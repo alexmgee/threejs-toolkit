@@ -71,8 +71,9 @@ selection flags into them. Pure optimization; touch only with measurements in ha
 **D18 — OPEN (2026-08-19): `src/backend/index.ts` is a PLACEHOLDER the Phase 2
 seam work must replace.** It exists only to anchor the vendor-import boundary
 rule (commit 89c35a7) before the real SplatBackend seam lands. Its sibling
-anchors (`src/vendor/three-gs/index.ts`, `src/core/index.ts`) are replaced by
-Phase 1 tickets; this one alone outlives Phase 1 — whoever builds the Phase 2
+anchors (`src/vendor/three-gs/index.ts` — replaced by ticket 02 with the real
+vendored files, 2026-08-20; `src/core/index.ts` — still pending) are replaced
+by Phase 1 tickets; this one alone outlives Phase 1 — whoever builds the Phase 2
 seam deletes and replaces it, never leaves it beside the real code.
 
 **D19 — DECIDED (2026-08-19): `ui/SplatTextMesh` ships in Phase 1 as an
@@ -81,6 +82,15 @@ API-preserving typed STUB** inside the text cluster ticket, so
 SplatTextMesh keeps its API"). The stub throws on construction with an explicit
 "rebuilt in Phase 4 (doc 03 §E)" error. Phase 4's rebuild deletes and replaces
 it — same delete-and-replace obligation as D18. Never left beside real code.
+
+**D20 — DECIDED (2026-08-20): fork patches are authored in `.ts` files
+alongside the vendored JS.** New patch logic gets full type-checking; the
+remaining JS glue lines are covered by FORK.md's titled-patch inventory and
+SHA-256 digest baseline, not the type system. `// @ts-check` on the vendored
+files is REJECTED: triaging their 120 upstream errors (census in FORK.md
+§Type status) is work that dies the day the addon ships in a release.
+Takes effect when the first fork patch lands (Phase 2). Closes doc 03 §F's
+open question (assigned ticket 01 → ticket 02; ruled at ticket 02 close).
 
 ## Upstream watch list (checked at every phase boundary)
 
@@ -102,8 +112,14 @@ Events that shrink or delete our work — prefer deleting our code when one land
     2026-08-19, ticket 01, doc 03 §F).
 11. WebGPU PostProcessing stabilizes documented grade patterns — SceneGrade risk
     shrinks.
-12. Addon moves examples/jsm → core — API stability signal.
-13. r186 publishes — re-verify every file:line in doc 03 before Phase 1.
+12. Addon moves examples/jsm → core — API stability signal. **This event has
+    NOT fired.** (Related churn, not the watched event: 2026-08-19 upstream
+    renamed the class and file within examples/jsm — a path + class-name
+    change the re-diff must handle; hash/PR/r186 detail lives in
+    src/vendor/three-gs/FORK.md's "Known upstream drift" list.)
+13. r186 publishes — re-verify every file:line in doc 03 at the next phase
+    boundary after it lands ("before Phase 1" is moot — Phase 1 is underway),
+    and apply item 12's rename at publish (detail in FORK.md's drift list).
     **Checked 2026-08-19: NOT published** (`npm view three version` → 0.185.1).
     The vendored dev-branch `GaussianSplatMesh` addon stays as-is, and doc 03's
     citations stand against 0.185.1. Re-check from this point at the next phase
