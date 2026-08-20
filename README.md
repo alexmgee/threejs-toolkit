@@ -5,11 +5,14 @@ three.js native splat rendering (`GaussianSplatMesh` + `WebGPURenderer`) instead
 Spark library.
 
 The renderer is pinned to **three 0.185.1** (published), with the `GaussianSplatMesh`
-addon **vendored from the three.js dev branch** into `spikes/native-rad/vendor/` — the
-addon is not in any published release yet. `spikes/native-rad/package.json` is the
-authority on the version; don't quote a release number from prose.
+addon **vendored from the three.js dev branch** into `src/vendor/three-gs/` — the
+addon is not in any published release yet. `src/vendor/three-gs/FORK.md` is the
+authority on provenance and version (ticket 02); the spike's copy under
+`spikes/native-rad/vendor/` is the historical Phase 0 snapshot.
 
-**Status: PLANNING for the toolkit — no toolkit code exists yet. The Phase 0 spike is
+**Status: Phase 1 UNDERWAY — tickets 01 (scaffold), 02 (vendored fork), and 04
+(foundation cluster: 32 files + camera-rail fixture) are done; see
+`.scratch/phase-1-foundation/`. The Phase 0 spike is
 built and measured** in `spikes/native-rad/`; its baseline lives in
 [docs/plan/results/phase-0.md](docs/plan/results/phase-0.md). Current spike state,
 remaining tasks, and the traps that cost real time are in

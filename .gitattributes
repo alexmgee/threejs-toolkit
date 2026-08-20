@@ -9,3 +9,11 @@ spikes/native-rad/vendor/** -text
 # The spike's fork is the Phase 2 promotion-diff source against the vendored
 # baseline — same byte-preservation need (review sweep finding).
 spikes/native-rad/src/GaussianSplatMesh.fork.js -text
+# Ticket 04 (review finding, same bomb as above for the COPY mass): the
+# copied files mirror sparkjs-toolkit's MIXED line endings faithfully
+# (28 LF / 4 CRLF of the 32), and R5's SHA-256-at-copy-time baselines plus
+# the diff-vs-source re-checks are all byte-level. Broad -text on src/ and
+# examples/ preserves exact bytes for every copy this and later tickets
+# (03, 05-09) land, and costs hand-written files nothing.
+src/** -text
+examples/** -text

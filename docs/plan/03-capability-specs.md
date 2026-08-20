@@ -183,7 +183,8 @@ authoring-only. Recolor/opacity fades ride §C's `setMeshColor`.
 computed per-point (never `Box3.applyMatrix4` — 8-corner only, review). Streamed
 variant reports resident bounds from the pager (contract preserved: "currently
 readable streamed bounds"). Percentile clamping for paged-scene floaters carries over.
-Plus the missed call site: `examples/rail/main.ts:131–154` centroid.
+Plus the missed call site: **sparkjs-toolkit's** `examples/rail/main.ts:131–154`
+centroid (not this repo's same-named adapted fixture — disambiguated ticket 04).
 
 **Scope:** ≥28 regions (assets total, review-corrected from 27; includes rail
 sandbox). **Verify:** doc 05 H-ASSET (export → re-import → screenshot-diff; text

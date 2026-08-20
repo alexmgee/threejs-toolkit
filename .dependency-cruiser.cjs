@@ -18,7 +18,9 @@ module.exports = {
         "through src/backend/ instead.",
       severity: "error",
       from: {
-        path: "^src/",
+        // examples/ included since ticket 04 (owner ruling): fixtures may
+        // import src entry surfaces but never vendor/three-gs internals.
+        path: "^(src|examples)/",
         pathNot: "^src/(backend|vendor)/",
       },
       to: {
@@ -35,7 +37,9 @@ module.exports = {
         "into src/ (doc 04 Phase 2) rather than reaching into spikes/.",
       severity: "error",
       from: {
-        path: "^src/",
+        // examples/ included since ticket 04 (owner ruling): fixtures must
+        // not reach into throwaway spike code either.
+        path: "^(src|examples)/",
       },
       to: {
         path: "^spikes/",
@@ -46,11 +50,40 @@ module.exports = {
       comment:
         "Dependency cycles defeat the layering the module map describes and " +
         "make initialization order load-bearing. Extract the shared piece " +
-        "into a module both sides can depend on.",
+        "into a module both sides can depend on. ONE scoped exception " +
+        "(owner ruling, ticket 04): the upstream Channels <-> RuleModel pair " +
+        "is exempt via pathNot below. WHY it is harmless: RuleModel's side " +
+        "is `import type` (upstream's own comment, RuleModel.ts:25-27), so " +
+        "the cycle exists only in the type graph — counted at all because " +
+        "tsPreCompilationDeps:true (ticket 01, load-bearing for the seam " +
+        "rule) deliberately counts type edges. Upstream's design, carried " +
+        "byte-identical per spec rule 5. Scope note (honest): pathNot also " +
+        "exempts degenerate SELF-imports of these two files — a known, " +
+        "accepted residue (review finding, ticket 04). A future third file " +
+        "joining the cycle is itself a `from` participant and still fails. " +
+        "The companion rule below enforces the type-only premise.",
       severity: "error",
-      from: {},
+      from: {
+        pathNot: "^src/rules/(Channels|RuleModel)\\.ts$",
+      },
       to: {
         circular: true,
+      },
+    },
+    {
+      name: "rules-pair-cycle-must-stay-type-only",
+      comment:
+        "Companion tripwire to the no-circular exemption above — see its " +
+        "note for the full WHY. Fires exactly when RuleModel -> Channels " +
+        "stops being type-only, i.e. when the exemption's premise dies.",
+      severity: "error",
+      from: {
+        path: "^src/rules/RuleModel\\.ts$",
+      },
+      to: {
+        path: "^src/rules/Channels\\.ts$",
+        circular: true,
+        dependencyTypesNot: ["type-only"],
       },
     },
   ],

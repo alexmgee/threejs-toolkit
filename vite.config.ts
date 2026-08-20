@@ -2,13 +2,14 @@ import { defineConfig } from "vite";
 import { resolve } from "path";
 
 /**
- * Main site build — SCAFFOLD ENTRY (ticket 01).
+ * Main site build — a PAGE build of the examples (sibling repo's shape),
+ * repointed off the deleted src/core/index.ts scaffold entry by ticket 04.
+ * The gate (`npm run check`) runs this build, so the fixtures compile on
+ * every check run and breakage is loud.
  *
- * The real entry is a multi-page examples/*.html build (sparkjs-toolkit's
- * shape). The current entry src/core/index.ts is DELETED BY TICKET 04 (its
- * placeholder-removal criterion) — ticket 04 must repoint this config when
- * it does so (owner ruling 2026-08-19; an AC on ticket 04 records it).
- * `npm run check` runs this build, so the breakage is loud, not silent.
+ * Ticket 11 adds src/index.ts (the barrel) but the site build stays a page
+ * build — the barrel is the lib surface, not the site entry. Later tickets
+ * add pages to the same input map.
  *
  * WASM worker bundling is explicitly DEFERRED to Phase 2 (owner ruling,
  * ticket 01). When the Rust/WASM decode worker lands, take the proven
@@ -16,14 +17,22 @@ import { resolve } from "path";
  * (`worker.format: "es"`, `build.target: "esnext"`).
  */
 export default defineConfig({
+  server: {
+    // Honor a harness-assigned port (launch.json autoPort) when present.
+    // strictPort: fail loudly rather than silently binding port+1 — the
+    // harness points the preview at the assigned port, and a silent
+    // increment reproduces the wrong-app confusion autoPort exists to end.
+    port: Number(process.env.PORT) || 5173,
+    strictPort: true,
+  },
   resolve: {
     alias: [{ find: "@toolkit", replacement: resolve(__dirname, "src") }],
   },
   build: {
-    lib: {
-      entry: resolve(__dirname, "src/core/index.ts"),
-      formats: ["es"],
-      fileName: () => "core.js",
+    rollupOptions: {
+      input: {
+        rail: resolve(__dirname, "examples/rail/index.html"),
+      },
     },
   },
 });

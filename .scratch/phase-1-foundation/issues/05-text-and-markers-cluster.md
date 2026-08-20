@@ -16,6 +16,10 @@ markers ride in this ticket.)
 
 **Status:** ready-for-agent
 
+> D21 RULED (2026-08-20, doc 06): guard lifted. sparkjs-toolkit is committed
+> and clean (drift in `59b65cf`, golden rebaseline `862b9eb`); Phase 2's
+> re-sync input is the ticket-04-SHA-inventory-vs-`59b65cf` diff.
+
 - [ ] Every COPY file byte-identical; the three-only files carry only their
       doc 01 renderer adaptations, each declared in Comments
 - [ ] **D19 stub**: `ui/SplatTextMesh` lands as an API-preserving typed STUB

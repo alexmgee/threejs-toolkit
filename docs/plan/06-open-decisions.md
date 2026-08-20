@@ -72,7 +72,8 @@ selection flags into them. Pure optimization; touch only with measurements in ha
 seam work must replace.** It exists only to anchor the vendor-import boundary
 rule (commit 89c35a7) before the real SplatBackend seam lands. Its sibling
 anchors (`src/vendor/three-gs/index.ts` — replaced by ticket 02 with the real
-vendored files, 2026-08-20; `src/core/index.ts` — still pending) are replaced
+vendored files, 2026-08-20; `src/core/index.ts` — replaced by ticket 04 with
+the real core files, 2026-08-20) are replaced
 by Phase 1 tickets; this one alone outlives Phase 1 — whoever builds the Phase 2
 seam deletes and replaces it, never leaves it beside the real code.
 
@@ -91,6 +92,40 @@ files is REJECTED: triaging their 120 upstream errors (census in FORK.md
 §Type status) is work that dies the day the addon ships in a release.
 Takes effect when the first fork patch lands (Phase 2). Closes doc 03 §F's
 open question (assigned ticket 01 → ticket 02; ruled at ticket 02 close).
+
+**D21 — DECIDED (2026-08-20): Phase 1 lands on the copy-time vintage;
+Phase 2's re-sync input is the diff between ticket 04's SHA-256 inventory
+and sparkjs-toolkit commit `59b65cf` (which carries the full drift: ticket
+13 + load-optimization, 34 files; `862b9eb` is the golden rebaseline) — not
+"current disk".** Ticket 05 unguarded. Original question and evidence: Ticket 04's 32 copies were taken from disk at 03:02:31; the sparkjs
+working tree then kept moving (its "ticket 13" feature, 03:15–03:39+:
+RuleModel, DisplayChannel, SiteConfig, SiteRuntime, TextSystem, authorui
+tabHotspots + hotspotInspector — the last two are ticket 06 COPY scope —
+plus src/index.ts; the tree may still be moving). The copies match their
+recorded copy-time SHAs exactly; "diff empty vs source" is now
+time-dependent. Evidence for the ruling: every ticket-05 import into the
+04 cluster resolves at the copy-time vintage (TextSystem's SiteConfig
+surface is field-identical across vintages; the drift-added exports are
+consumed only by Phase-2-deferred SiteRuntime and the drifted rules files).
+(Gated tickets 05/06/08 while open; lifted at ruling.) Detail: ticket 04
+Comments.
+
+**D22 — OPEN (2026-08-20): CameraSystem's doc 01 renderer-type edits are
+assigned to NO ticket.** Doc 01:92 requires "2 dead fields, ~10 construction
+literals" (and its `renderer: THREE.WebGLRenderer` config field cannot take
+ticket 03's WebGPURenderer); ticket 04's AC scoped its adaptation to picking
+only, and no other ticket names CameraSystem (grep-verified across all 11).
+Needs an owner assignment before whichever ticket wires CameraSystem to
+ThreeSplatScene. Detail: ticket 04 Comments.
+
+**D23 — OPEN (2026-08-20): boundary-rule gaps surfaced by ticket 04's
+review, owner call on whether/where to guard:** (a) examples/ may legally
+import src/backend and thus the re-exported fork-mesh TYPE (the seam's
+public door — tightening is a design choice); (b) src -> examples is
+cruised but unguarded (fixture code could become load-bearing); (c) vendor
+-> src is unguarded (a fork patch could reach into toolkit code, corrupting
+re-diff purity); (d) spikes/ is outside the cruise set entirely (spike ->
+vendor internals invisible). Detail: ticket 04 Comments.
 
 ## Upstream watch list (checked at every phase boundary)
 
