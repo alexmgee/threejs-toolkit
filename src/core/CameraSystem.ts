@@ -14,6 +14,7 @@
  */
 
 import * as THREE from "three";
+import type { WebGPURenderer } from "three/webgpu";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 
 // ─── Types ────────────────────────────────────────────────
@@ -89,7 +90,8 @@ export interface CameraSystemConfig {
   camera: THREE.PerspectiveCamera;
   canvas: HTMLCanvasElement;
   scene: THREE.Scene;
-  renderer: THREE.WebGLRenderer;
+  // Widened per D22 (docs/plan/06-open-decisions.md — status lives there).
+  renderer: THREE.WebGLRenderer | WebGPURenderer;
 
   /** SparkRenderer instance — required for GPU depth readback (click-to-orbit) */
   sparkRenderer?: THREE.Mesh;

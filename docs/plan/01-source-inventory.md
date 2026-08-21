@@ -110,7 +110,7 @@ count for the whole renderer migration is **47 adaptation points**; the notable 
 
 | File | Lines | Disposition | Spec |
 |---|---:|---|---|
-| core/SparkScene.ts | 432 | **REBUILD** as `ThreeSplatScene` — owns WebGPURenderer (async-init handled via the pre-init `render()`→`renderAsync()` escape hatch), scene, camera, and the backend seam. The pager-stall fix and Spark tunables die with Spark. | 03 §A, 02 |
+| core/SparkScene.ts | 432 | **REBUILD** as `ThreeSplatScene` — owns WebGPURenderer (async-init handled via the ready-promise gate (ticket 03: first render awaits `renderer.init()`; the earlier idea of a pre-init `render()`→`renderAsync()` escape hatch was dropped — renderAsync is deprecated in 0.185), scene, camera, and the backend seam. The pager-stall fix and Spark tunables die with Spark. | 03 §A, 02 |
 | core/SplatLoader.ts | 105 | **REBUILD** — same public contract (`whenReady`, `onLoadProgress`), fed by the new pager or by the monolithic loaders for small scenes. | 03 §A5 |
 | core/CameraSystem.ts | 973 | ADAPT (above) + **REBUILD** of its raycast recenter. | 03 §B |
 | core/SceneComposer.ts | 560 | ADAPT — multi-object composition; loses nothing structurally but inherits the **cross-mesh sorting constraint**: overlapping splat objects blend wrong, permanently (no upstream path). Also a picking consumer, and crop hydration lives here. | 03 §B, §C |

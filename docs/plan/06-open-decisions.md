@@ -110,13 +110,15 @@ consumed only by Phase-2-deferred SiteRuntime and the drifted rules files).
 (Gated tickets 05/06/08 while open; lifted at ruling.) Detail: ticket 04
 Comments.
 
-**D22 — OPEN (2026-08-20): CameraSystem's doc 01 renderer-type edits are
-assigned to NO ticket.** Doc 01:92 requires "2 dead fields, ~10 construction
-literals" (and its `renderer: THREE.WebGLRenderer` config field cannot take
-ticket 03's WebGPURenderer); ticket 04's AC scoped its adaptation to picking
-only, and no other ticket names CameraSystem (grep-verified across all 11).
-Needs an owner assignment before whichever ticket wires CameraSystem to
-ThreeSplatScene. Detail: ticket 04 Comments.
+**D22 — PARTIALLY RULED (2026-08-20): the renderer TYPING half was assigned
+to ticket 03 and is DONE** (one-line widen to `WebGLRenderer |
+WebGPURenderer`, type-only import, declared adaptation). **The dead-fields /
+~10-construction-literals half remains OPEN and unassigned:** doc 01:92
+requires "2 dead fields, ~10 construction literals" for CameraSystem, and
+no ticket in the cut owns those edits (grep-verified across all 11; ticket
+04's AC scoped its adaptation to picking only). The typing obstacle is
+RESOLVED — the field now takes WebGPURenderer. Needs an owner assignment.
+Detail: ticket 04 Comments (registration) + ticket 03 Comments (the widen).
 
 **D23 — OPEN (2026-08-20): boundary-rule gaps surfaced by ticket 04's
 review, owner call on whether/where to guard:** (a) examples/ may legally
@@ -126,6 +128,13 @@ cruised but unguarded (fixture code could become load-bearing); (c) vendor
 -> src is unguarded (a fork patch could reach into toolkit code, corrupting
 re-diff purity); (d) spikes/ is outside the cruise set entirely (spike ->
 vendor internals invisible). Detail: ticket 04 Comments.
+
+**sRGB constraint — ACCEPTED (2026-08-20, ticket 03 close):** with the doc 04
+sRGB working space set (core/colorSpace.ts), assigning
+`renderer.outputColorSpace` on a CLASSIC WebGLRenderer throws inside three —
+self-enforcing at the offending line; WebGPU path unaffected. The mandate
+stands; Phase 5 (optics) inherits this knowingly. Detail: colorSpace.ts +
+ticket 03 Comments.
 
 ## Upstream watch list (checked at every phase boundary)
 

@@ -24,3 +24,22 @@ Read `../spec.md` first.
       owner decides grade-parity-later vs block — with the screenshot evidence
       in hand, per ADR 0001's miss-becomes-item principle
 - [ ] `npm run check` green
+
+## Comments
+
+**2026-08-20 (recorded at ticket 03 close — contexts start cold):**
+- ThreeSplatScene's `clock` is a THREE.Timer, NOT SparkScene's Clock: there
+  is NO `elapsedTime` property (undefined — silent NaN propagation into
+  time uniforms); use `getElapsed()`. `getElapsed()` counts from
+  construction (includes backend-init time) — continuous, fine for time
+  uniforms.
+- `renderOverride` does NOT exist on ThreeSplatScene — SceneGrade's
+  assignment sites must be adapted against the facade; the hook's design is
+  this ticket's to propose (owner rules if it changes the facade surface).
+- For pixel verification, GENERALIZE `capture()`/`captureSync()` from
+  examples/scene/main.ts — do not rewrite them; they encode the hidden-pane
+  rAF-fence finding, the timeout + finally target-restore discipline, and
+  the same-task gl.readPixels fallback.
+- Color caution: offscreen readback values are in the WORKING color space
+  when the target skips output transform — [1,1,8] is linearized 0x111133,
+  [17,17,51] is the sRGB value. Pin which space a recorded pixel is in.

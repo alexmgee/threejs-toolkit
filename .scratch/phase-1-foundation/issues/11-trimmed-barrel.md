@@ -10,6 +10,12 @@ each later phase restores its names. Read `../spec.md` first.
 
 **Status:** ready-for-agent
 
+> AC added at ticket 03 close (owner-reviewed design, D-trail in ticket 03
+> Comments): the barrel's FIRST import is `./core/colorSpace` — the
+> toolkit's sRGB working-space opt-in is a side-effect module, and a
+> consumer deep-importing only cells/ or text/ through the barrel must
+> still get it before any THREE.Color construction.
+
 - [ ] Every module landed by tickets 03-10 is exported under the same name
       sparkjs-toolkit's barrel uses
 - [ ] The 13 deferred sources are listed IN THE FILE with their returning

@@ -171,7 +171,8 @@ session report):**
   evidence for the ruling recorded in D21. Ticket 05 set to needs-info
   until D21 is ruled.
 - CameraSystem's unassigned doc 01 renderer-type edits registered as **D22
-  (doc 06, OPEN)**; boundary-rule gap classes (examples->backend legality,
+  (doc 06, OPEN at registration; typing half since RULED+DONE in ticket 03
+  — doc 06 has current status)**; boundary-rule gap classes (examples->backend legality,
   src->examples, vendor->src, spikes uncruised) registered as **D23 (doc
   06, OPEN)**.
 - EOL protection extended (the ticket-02 bomb recurred for this copy mass —
