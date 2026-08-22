@@ -110,6 +110,29 @@ consumed only by Phase-2-deferred SiteRuntime and the drifted rules files).
 (Gated tickets 05/06/08 while open; lifted at ruling.) Detail: ticket 04
 Comments.
 
+**D21 AMENDMENT (2026-08-22, ruled at owner delegation after ticket 10
+closed): the copy vintage for the UNSTARTED copy tickets (05/06) and the
+golden rebaseline RE-PIN to sparkjs commit `7599471` ("Ticket 10: Rules
+pane" — sparkjs's ticket 10, not ours).** Since the original ruling sparkjs
+gained four commits; three touch no src/ (`862b9eb`, `0ee6610`, `c782891`)
+and `7599471` alone does. Verified in-session against the sparkjs history:
+public barrel `src/index.ts` byte-identical across `59b65cf..7599471`
+(diff empty); no renames; RuleModel.ts gains six vocabulary exports and
+removes none; src changes are additions plus small in-place edits (2,308
+insertions / 11 deletions overall) to `src/rules/RuleAuthoring.ts` (new),
+`src/site/authorui/rulesPane.ts` (new), `RuleModel.ts`,
+`hotspotInspector.ts`, `AuthorPanel.ts`, and `tabContext.ts` — the last
+four all inside ticket 06's author-ui copy scope. GROUNDS for re-pin over
+bin: tickets 05/06 have not started, so no copies exist at the old vintage
+to invalidate — re-pinning means ticket 06 copies the inspector (and its
+pane siblings) WITH the Rules pane once, instead of copying stale files
+now and reconciling them again in Phase 2. CONSEQUENCE: Phase 2's re-sync
+input becomes the diff between each ticket's recorded copy-time SHAs and
+`7599471`; ticket 04's already-landed copies stay at their recorded
+vintage (unchanged — their re-sync diff simply runs against the new pin).
+Rule 1 unchanged: sparkjs stays read-only; the pin is by commit hash,
+never "current disk".
+
 **D22 — PARTIALLY RULED (2026-08-20): the renderer TYPING half was assigned
 to ticket 03 and is DONE** (one-line widen to `WebGLRenderer |
 WebGPURenderer`, type-only import, declared adaptation). **The dead-fields /
