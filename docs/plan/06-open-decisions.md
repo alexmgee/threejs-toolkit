@@ -155,7 +155,14 @@ Events that shrink or delete our work — prefer deleting our code when one land
     declarations (no `three-gs.d.ts` exists to delete — owner ruling
     2026-08-19, ticket 01, doc 03 §F).
 11. WebGPU PostProcessing stabilizes documented grade patterns — SceneGrade risk
-    shrinks.
+    shrinks. **Checked 2026-08-21 (ticket 10 start), against the pinned
+    0.185.1 install (verified by direct import against node_modules, not
+    docs):** `PostProcessing` class present in three.webgpu.js; `three/tsl`
+    exports every primitive the grade shader needs (`pass`, `renderOutput`,
+    `uniform`, `texture3D`, `mix`/`dot`/`smoothstep`/`distance`/`clamp`/
+    `fract`, `time`); `examples/jsm/tsl/display/` ships ~40 display nodes
+    including `SMAANode` (the SMAAPass analog) and `Lut3DNode`. Risk
+    assessed as materially shrunk; ticket 10 proceeds on this surface.
 12. Addon moves examples/jsm → core — API stability signal. **This event has
     NOT fired.** (Related churn, not the watched event: 2026-08-19 upstream
     renamed the class and file within examples/jsm — a path + class-name

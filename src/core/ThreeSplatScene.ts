@@ -71,6 +71,13 @@ export class ThreeSplatScene {
     return this._backend;
   }
 
+  /** When set, replaces the default `renderer.render` call each frame —
+   *  SparkScene's contract verbatim (SparkScene.ts:113/:299; owner-approved
+   *  Option A, ticket 10). ASSIGNMENT is last-writer-wins (as upstream);
+   *  only the CLEAR side is guarded — SceneGrade clears it on disable only
+   *  if it still owns it. */
+  renderOverride: (() => void) | null = null;
+
   private container: HTMLElement;
   private onFrameCallback?: (time: number, deltaTime: number) => void;
   private resizeObserver: ResizeObserver;
@@ -176,7 +183,13 @@ export class ThreeSplatScene {
       // ready get a live canvas, mirroring SparkScene's forced first render.
       // Plain render(): after await init() this is the sanctioned call
       // (renderAsync is deprecated in 0.185 for exactly this pattern).
-      this.renderer.render(this.scene, this.camera);
+      // Honor renderOverride here too: SparkScene's forced render could not
+      // race an override (sync init — the constructor returns before any
+      // consumer can assign one), but our async init means an override set
+      // before `ready` is live NOW, and the first frame must reflect it
+      // (adversarial-review finding, 2026-08-21).
+      if (this.renderOverride) this.renderOverride();
+      else this.renderer.render(this.scene, this.camera);
       this.renderer.setAnimationLoop((timeMs) => this.animate(timeMs));
     });
     // Keep init failure observable on `ready` for consumers who await it,
@@ -194,7 +207,8 @@ export class ThreeSplatScene {
     this.clock.update();
     const deltaTime = this.clock.getDelta();
     this.onFrameCallback?.(timeMs / 1000, deltaTime);
-    this.renderer.render(this.scene, this.camera);
+    if (this.renderOverride) this.renderOverride();
+    else this.renderer.render(this.scene, this.camera);
   }
 
   dispose(): void {

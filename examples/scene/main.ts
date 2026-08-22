@@ -13,6 +13,7 @@
 
 import * as THREE from "three/webgpu";
 import { ThreeSplatScene } from "@toolkit/core/ThreeSplatScene";
+import { createCapture } from "../shared/capture";
 
 const container = document.getElementById("viewer")!;
 const forceWebGL = new URLSearchParams(location.search).get("webgl") === "1";
@@ -82,128 +83,21 @@ function xFrac(worldX: number, aspect: number): number {
 }
 
 /**
- * Async capture: renders into an offscreen target and reads pixels back
- * (doc 05 H-VISUAL: "readback after completion, not toDataURL habits").
- * Returns center (red box), left (green sphere), right (yellow box), and
- * corner (background) [r,g,b,a] samples. Serialized: concurrent callers
- * share the in-flight capture (a second would clobber the bound target).
- *
- * KNOWN LIMIT (verified against three's source, ticket 03): on the WebGL2
- * fallback, readRenderTargetPixelsAsync polls its GPU fence via
- * requestAnimationFrame (three.webgpu.js:68900) — in a hidden pane the
- * promise never settles; the timeout below rejects so `finally` can
- * restore state, and callers fall back to captureSync(). While a capture
- * awaits, the live animation loop renders the same scene into the bound
- * target — content-identical, readback unaffected; the on-screen canvas
- * just freezes for the capture's duration.
+ * Capture pair from the shared module (examples/shared/capture.ts —
+ * generalized out of this file by ticket 10; the rAF-fence, target-restore,
+ * and row-padding discipline all live there now). This demo contributes
+ * only its sample-point map: center (red box), left (green sphere), right
+ * (yellow box), corner (background), all at y=H/2 (row-order note in the
+ * shared module).
  */
-let captureInFlight: Promise<Record<string, number[]>> | null = null;
-
-function capture(): Promise<Record<string, number[]>> {
-  captureInFlight ??= (async () => {
-    await scene3.ready;
-    // W is LOAD-BEARING: WebGPU pads readback rows to 256 bytes
-    // (bytesPerRow = ceil(W*4/256)*256, three.webgpu.js) and px() below
-    // indexes with stride W*4 — correct only when W*4 is a multiple of 256.
-    const W = 256;
-    const H = 128;
-    if ((W * 4) % 256 !== 0) throw new Error("W*4 must be 256-byte aligned");
-    const rt = new THREE.RenderTarget(W, H);
-    const prevAspect = scene3.camera.aspect;
-    let timeoutId: ReturnType<typeof setTimeout> | undefined;
-    let readbackSettled = false;
-    try {
-      scene3.camera.aspect = W / H;
-      scene3.camera.updateProjectionMatrix();
-      scene3.renderer.setRenderTarget(rt);
-      scene3.renderer.render(scene3.scene, scene3.camera);
-      // One full-rect readback, one timeout: four per-pixel round-trips
-      // would cost up to 4x5s of bound-target time on a hung fallback.
-      const buf = (await Promise.race([
-        scene3.renderer
-          .readRenderTargetPixelsAsync(rt, 0, 0, W, H)
-          .finally(() => {
-            readbackSettled = true;
-          }),
-        new Promise<never>((_, rej) => {
-          timeoutId = setTimeout(
-            () => rej(new Error("readback timeout — use captureSync")),
-            5000,
-          );
-        }),
-      ])) as Uint8Array | Uint8ClampedArray;
-      const px = (x: number, y: number) => {
-        const i = (y * W + x) * 4;
-        return Array.from(buf.slice(i, i + 4));
-      };
-      const aspect = W / H;
-      // All samples at y=H/2: readback row ORDER differs between backends
-      // (GL reads bottom-up, WebGPU top-down — review, verified in three's
-      // source), so only vertically symmetric sample rows are
-      // backend-independent. corner = left frame edge at mid-height.
-      return {
-        center: px(W / 2, H / 2),
-        // floor, not round: round(W * 0.999-clamped) can index one past the
-        // last column and silently read the next row's first pixel (sweep).
-        left: px(Math.floor(W * xFrac(-3, aspect)), H / 2),
-        right: px(Math.floor(W * xFrac(3, aspect)), H / 2),
-        corner: px(2, H / 2),
-      };
-    } finally {
-      // Never leave the offscreen target bound — a hung readback otherwise
-      // silently redirects every later render (observed during review).
-      clearTimeout(timeoutId);
-      scene3.renderer.setRenderTarget(null);
-      // Restore only if the ResizeObserver didn't legitimately change the
-      // aspect during the await (a mid-capture container resize would
-      // otherwise be clobbered back and stick until the next resize; sweep).
-      if (scene3.camera.aspect === W / H) {
-        scene3.camera.aspect = prevAspect;
-        scene3.camera.updateProjectionMatrix();
-      }
-      // On the hung-readback path the copy is still in flight against this
-      // texture — disposing it would race the outstanding readback (device
-      // validation errors). Leak it instead; the hang is terminal here.
-      if (readbackSettled) rt.dispose();
-    }
-  })().finally(() => {
-    captureInFlight = null;
-  });
-  return captureInFlight;
-}
-
-/**
- * Synchronous fallback capture for the WebGL2 backend (tracked code, doc 05
- * rule 2 — "artifacts or it didn't happen"): render manually, then read the
- * default framebuffer in the SAME task via the canvas's own gl context,
- * before compositing can clear it. Sample positions use the LIVE camera
- * aspect via xFrac.
- */
-function captureSync(): Record<string, number[] | string> {
-  // Never run while an async capture holds the render target (the guard
-  // below serializes capture() only against itself — review).
-  if (captureInFlight) return { error: "capture() in flight — retry later" };
-  const gl = scene3.canvas.getContext("webgl2");
-  if (!gl) return { error: "no webgl2 context (WebGPU backend? use capture())" };
-  scene3.renderer.setRenderTarget(null);
-  scene3.renderer.render(scene3.scene, scene3.camera);
-  const W = gl.drawingBufferWidth;
-  const H = gl.drawingBufferHeight;
-  const px = (x: number, y: number) => {
-    const b = new Uint8Array(4);
-    gl.readPixels(x, y, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, b);
-    return Array.from(b);
-  };
-  const aspect = scene3.camera.aspect;
-  return {
-    center: px(Math.floor(W / 2), Math.floor(H / 2)),
-    left: px(Math.floor(W * xFrac(-3, aspect)), Math.floor(H / 2)),
-    right: px(Math.floor(W * xFrac(3, aspect)), Math.floor(H / 2)),
-    // Mid-height frame edge: backend/orientation-independent (see the
-    // row-order note in capture()).
-    corner: px(2, Math.floor(H / 2)),
-  };
-}
+const { capture, captureSync } = createCapture(scene3, (W, H, aspect) => ({
+  center: [Math.floor(W / 2), Math.floor(H / 2)],
+  // floor, not round: round(W * 0.999-clamped) can index one past the
+  // last column and silently read the next row's first pixel (sweep).
+  left: [Math.floor(W * xFrac(-3, aspect)), Math.floor(H / 2)],
+  right: [Math.floor(W * xFrac(3, aspect)), Math.floor(H / 2)],
+  corner: [2, Math.floor(H / 2)],
+}));
 
 // HMR teardown: without this, each save in `vite dev` appends a second
 // canvas + live loop, and captureSync would read the stale canvas (review).
