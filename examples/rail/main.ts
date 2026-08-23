@@ -10,11 +10,13 @@
  * The complete strip/add inventory lives in ticket 04's Comments
  * (.scratch/phase-1-foundation/issues/04-foundation-cluster.md) — the single
  * home for this fixture's declared divergences; this header does not
- * re-enumerate it. When ticket 03 lands ThreeSplatScene, repointing this
- * bootstrap is ticket 03's or ticket 08's business.
+ * re-enumerate it. Ticket 08 repointed the bootstrap to ThreeSplatScene
+ * (the either/or ticket 04 left open) — divergence resolutions in ticket
+ * 08's Comments.
  */
 
 import * as THREE from "three";
+import { ThreeSplatScene } from "@toolkit/core/ThreeSplatScene";
 import { CameraSystem } from "@toolkit/core/CameraSystem";
 import { CameraRail, type RailStop } from "@toolkit/core/CameraRail";
 
@@ -47,40 +49,31 @@ const RAIL_STOPS: RailStop[] = [
   },
 ];
 
-// --- Inline bootstrap (replaces SparkScene; CameraSystemConfig requires a
-// --- WebGLRenderer, so the fixture renders WebGL) ---
+// --- ThreeSplatScene bootstrap (ticket 08 repoint, replacing ticket 04's
+// --- inline WebGL bootstrap). The facade owns sizing, the render loop, and
+// --- the splat-tuned renderer contract: antialias:false + capped
+// --- pixelRatio (this RESOLVES ticket 04's declared antialias:true +
+// --- uncapped-DPR divergence — the facade's defaults now govern). The
+// --- import also flips this page into the toolkit's sRGB working space
+// --- (core/colorSpace.ts rides in transitively): marker/background pixel
+// --- values differ from any pre-repoint captures.
 
-const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x111111);
+const forceWebGL = new URLSearchParams(location.search).get("webgl") === "1";
 
-// Sized by the zero-guarded applySize() seed below (immediate, works
-// wherever layout is computable) with the ResizeObserver as the ongoing
-// authority. Aspect starts at a safe 1 — never computed unguarded from a
-// possibly-unlaid-out container (the h=0 case yields Infinity).
-const camera = new THREE.PerspectiveCamera(60, 1, 0.1, 2000);
-camera.position.set(0, 5, 30);
+const scene3 = new ThreeSplatScene({
+  container,
+  fov: 60,
+  near: 0.1,
+  far: 2000,
+  cameraPosition: [0, 5, 30],
+  background: 0x111111,
+  forceWebGL,
+});
+const { scene, camera } = scene3;
 
-const renderer = new THREE.WebGLRenderer({ antialias: true });
-renderer.setPixelRatio(window.devicePixelRatio);
-container.appendChild(renderer.domElement);
-
-// ResizeObserver on the container, mirroring SparkScene's own sizing
-// mechanism (SparkScene.ts:233).
-const applySize = () => {
-  const width = container.clientWidth;
-  const height = container.clientHeight;
-  if (width === 0 || height === 0) return;
-  camera.aspect = width / height;
-  camera.updateProjectionMatrix();
-  renderer.setSize(width, height);
-};
-const resizeObserver = new ResizeObserver(applySize);
-resizeObserver.observe(container);
-// Seed once immediately: reading clientWidth forces layout, which covers
-// environments where ResizeObserver delivery is deferred (e.g. hidden
-// tabs — RO callbacks ride rendering steps). Zero-size guarded, so a
-// genuinely pre-layout run just waits for the observer.
-applySize();
+scene3.ready
+  .then(() => console.log(`[rail-fixture] ready, backend: ${scene3.backend}`))
+  .catch((err) => console.error("[rail-fixture] init failed", err));
 
 // Placeholder geometry so rail motion and orbit are visible without splats —
 // one wireframe marker per rail stop, at that stop's pivot.
@@ -98,9 +91,9 @@ for (const stop of RAIL_STOPS) {
 
 const cameraSystem = new CameraSystem({
   camera,
-  canvas: renderer.domElement,
+  canvas: scene3.canvas,
   scene,
-  renderer,
+  renderer: scene3.renderer,
   target: [0, 0, 0],
   minDistance: 0.5,
   maxDistance: 500,
@@ -109,7 +102,7 @@ const cameraSystem = new CameraSystem({
 
 const cameraRail = new CameraRail({
   cameraSystem,
-  canvas: renderer.domElement,
+  canvas: scene3.canvas,
   stops: RAIL_STOPS,
   transitionDuration: 2,
   settleDuration: 0.5,
@@ -170,15 +163,11 @@ toggleBtn.addEventListener("click", () => {
 });
 navBar.appendChild(toggleBtn);
 
-// --- Animation loop (replaces SparkScene.setOnFrame) ---
+// --- Per-frame updates via the facade's own loop ---
 
-const clock = new THREE.Clock();
-
-renderer.setAnimationLoop(() => {
-  const deltaTime = clock.getDelta();
+scene3.setOnFrame((_time, deltaTime) => {
   cameraSystem.update(deltaTime);
   cameraRail.update(deltaTime);
-  renderer.render(scene, camera);
 });
 
 // Programmatic hook for the parity harnesses (doc 05 drives fixtures at
@@ -190,7 +179,18 @@ if (import.meta.env.DEV) {
     camera,
     cameraSystem,
     cameraRail,
-    renderer,
+    renderer: scene3.renderer,
     scene,
+    scene3,
   };
+}
+
+// HMR teardown (sibling-fixture pattern): without it a save stacks a second
+// canvas, rAF loop, and window wheel listener on the page.
+if (import.meta.hot) {
+  import.meta.hot.dispose(() => {
+    scene3.dispose();
+    window.removeEventListener("wheel", scrollHandler);
+    navBar.remove();
+  });
 }

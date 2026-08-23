@@ -93,6 +93,9 @@ side-by-side (H-GRADE).
 WebGPU post-processing is young — watch condition 13), decide grade-parity-later vs
 block, with the owner. Everything else here has no plausible blocker.
 
+**GATE resolved 2026-08-22: grade-parity-REACHED (H-GRADE approved on the
+ticket 10 evidence).**
+
 ## Phase 2 — Backend + production pager + load contract  ·  ≥114 adapt points  ·  GATE
 
 **Entry:** Phases 0–1. The spike's numbers are the bar to beat.
