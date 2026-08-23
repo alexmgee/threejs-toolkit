@@ -79,11 +79,10 @@ export { TextSystem, type TextSystemOptions } from "./text/TextSystem";
 export { validateAnnotationRules, validateModeLocks, displayTemplatePrefix, KNOWN_MODES, DEFAULT_LIFETIME, type EffectLifetime, type LifetimeUntil, type AnnotationRule, type RuleTrigger, type RuleEffect, type ShowBlocksEffect, type SetFlagEffect, type PlayAudioEffect, type CameraSequenceEffect, type SequenceWaypoint, type SequenceTerminal, type EngageEffect, type AllowEffect, type DenyEffect, type ModeEffect, type CustomEffect, type DisplayTemplate, type RuleBlockRef, type RuleWhen, type RuleEngagementState, type SceneMode } from "./rules/RuleModel";
 export { resolveRule, matchesWhen, NO_MATCH, type RuleContext, type WhenContext } from "./rules/RuleResolver";
 export { SceneMemory, visitedFlag, VISITED_PREFIX, type SceneMemoryOptions } from "./rules/SceneMemory";
-// DisplayChannel is deliberately at ticket 04's vintage (D21 third note) —
-// its landed surface is exported; the pin's endOnTravel / dismissAll /
-// endStaleWhile / endOrphanedClaims return with Phase 2's DisplayChannel
-// re-sync (which the note orders FIRST, closing the lifetime split).
-export { showBlocks, shownBlockIds, EMPTY_DISPLAY_CHANNEL, type DisplayChannelState, type DisplayClaim } from "./rules/DisplayChannel";
+// DisplayChannel re-synced to fd67153 (Phase 2 ticket 01, 2026-08-23) —
+// the D21-third-note vintage split is CLOSED and the four trimmed names
+// are restored below; authored `lifetime` now runs for real.
+export { showBlocks, shownBlockIds, endOnTravel, dismissAll, endStaleWhile, endOrphanedClaims, EMPTY_DISPLAY_CHANNEL, type DisplayChannelState, type DisplayClaim } from "./rules/DisplayChannel";
 export { playAudio, stopAudio, EMPTY_AUDIO_CHANNEL, type AudioChannelState } from "./rules/AudioChannel";
 export { resolveSequence, resolveWaypoint, DEFAULT_FRAME_RADIUS, MIN_FRAME_RADIUS, type FlightPlan, type ResolvedWaypoint, type SequencePose, type SequenceRefs } from "./rules/CameraChannel";
 export { applyModeEffect, entryMode, initialOffered, offeredModes, type ModeState, type ModeTransition } from "./rules/ModeLocks";

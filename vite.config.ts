@@ -39,6 +39,7 @@ export default defineConfig({
         diag: resolve(__dirname, "examples/diag/index.html"),
         media: resolve(__dirname, "examples/media/index.html"),
         author: resolve(__dirname, "examples/author/index.html"),
+        "rules-lab": resolve(__dirname, "examples/rules-lab/index.html"),
       },
     },
   },

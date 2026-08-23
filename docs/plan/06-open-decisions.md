@@ -217,6 +217,18 @@ and three site/ files are byte-identical to `fd67153` already (verified
 by diff), so their recorded vintages and the pin coincide. Every other
 cluster stays per its own ticket's recorded SHAs.
 
+**D21 FOURTH NOTE (2026-08-23, Phase 2 ticket 01 close): the DisplayChannel
+vintage split — item (c) above — is CLOSED.** `src/rules/DisplayChannel.ts`
+re-synced byte-identical to `fd67153`
+(89c4a9c418a6ddb3f0de412ec7ef21ba5b65e3245665b4f250879d3c96f91716); the four
+trimmed barrel names (endOnTravel, dismissAll, endStaleWhile,
+endOrphanedClaims) restored to src/index.ts; authored `lifetime` proven to
+end a display at runtime (before/after fixture captures in
+.scratch/phase-2-backend/issues/01-displaychannel-resync.md Comments). The
+final inventory's "LANDED FILES DELIBERATELY AT THE OLD VINTAGE" set is now
+EMPTY — every landed rules/site file is at the pin. Semantic inheritances (a)
+and (b) remain pending their first runtime consumer (Phase 2 ticket 09).
+
 **D22 — PARTIALLY RULED (2026-08-20): the renderer TYPING half was assigned
 to ticket 03 and is DONE** (one-line widen to `WebGLRenderer |
 WebGPURenderer`, type-only import, declared adaptation). **The dead-fields /
