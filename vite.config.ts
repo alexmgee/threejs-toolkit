@@ -34,6 +34,7 @@ export default defineConfig({
         rail: resolve(__dirname, "examples/rail/index.html"),
         scene: resolve(__dirname, "examples/scene/index.html"),
         grade: resolve(__dirname, "examples/grade/index.html"),
+        "text-lab": resolve(__dirname, "examples/text-lab/index.html"),
       },
     },
   },

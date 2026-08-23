@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Text Lab — Pretext | SparkJS Toolkit</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="../shared/sandbox-styles.css" />
+  <style>
+    html, body { overflow: auto; }
+    body { color: #ccc; font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace; }
+    .lab { max-width: 1200px; margin: 0 auto; padding: 24px 24px 64px; }
+    h1 { font-size: 18px; color: #fff; margin-bottom: 4px; }
+    .subtitle { font-size: 12px; color: #666; margin-bottom: 20px; }
+
+    .controls {
+      display: flex; flex-wrap: wrap; gap: 16px; align-items: center;
+      padding: 12px; margin-bottom: 8px; font-size: 12px;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 8px;
+    }
+    .controls label { display: flex; align-items: center; gap: 8px; color: #888; white-space: nowrap; }
+    .controls .grow { flex: 1; min-width: 320px; }
+    .controls input[type="range"] { width: 220px; accent-color: #4ade80; }
+    .controls input[type="number"],
+    .controls input[type="text"] {
+      padding: 4px 8px;
+      background: rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 4px;
+      color: #fff; font-family: inherit; font-size: 12px; outline: none;
+    }
+    .controls input[type="number"] { width: 64px; }
+    .controls input[type="text"] { flex: 1; }
+    .controls input:focus { border-color: rgba(74, 222, 128, 0.6); }
+    .controls input[type="checkbox"] { accent-color: #4ade80; }
+
+    #status { font-size: 12px; color: #4ade80; margin: 8px 0 16px; min-height: 16px; }
+    #status.error { color: #f87171; }
+
+    .panels { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .panels.overlay-mode { grid-template-columns: 1fr; }
+    .panel {
+      padding: 16px; overflow-x: auto;
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 8px;
+    }
+    .panel h2 {
+      font-size: 11px; font-weight: normal;
+      text-transform: uppercase; letter-spacing: 1px;
+      color: #4ade80; margin-bottom: 12px;
+    }
+    .specimen { position: relative; color: #fff; }
+    #domText { overflow-wrap: break-word; white-space: normal; }
+    .ptx-line { white-space: pre; }
+    .ptx-abs {
+      position: absolute; left: 0;
+      color: #4ade80; opacity: 0.75;
+      white-space: pre; pointer-events: none;
+    }
+    .overlay-mode #domText { color: rgba(255, 255, 255, 0.45); }
+
+    /* ─── Splat text bench (Phase 2) ─── */
+    .bench-title {
+      font-size: 14px; color: #fff;
+      margin: 40px 0 4px;
+    }
+    .bench-sub { font-size: 12px; color: #666; margin-bottom: 16px; }
+    #stViewport {
+      position: relative;
+      height: 480px;
+      margin-top: 8px;
+      background: #0c0c10;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    #stOverlayBlock {
+      position: absolute;
+      left: 50%; top: 50%;
+      transform: translate(-50%, -50%);
+      color: rgba(74, 222, 128, 0.75);
+      pointer-events: none;
+      display: none;
+      z-index: 10;
+    }
+    #stStatus { font-size: 12px; color: #4ade80; margin: 8px 0; min-height: 16px; }
+    #stStatus.error { color: #f87171; }
+    .controls select {
+      padding: 4px 8px;
+      background: rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 4px;
+      color: #fff; font-family: inherit; font-size: 12px;
+    }
+    .controls button {
+      padding: 4px 12px;
+      background: rgba(74, 222, 128, 0.2);
+      border: 1px solid rgba(74, 222, 128, 0.4);
+      border-radius: 4px;
+      color: #4ade80; font-family: inherit; font-size: 12px; cursor: pointer;
+    }
+
+    /* ─── Editorial obstacle view (Phase 3) ─── */
+    #obRegion {
+      position: relative;
+      height: 560px;
+      margin-top: 8px;
+      background: #0c0c10;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    #obCanvasHost { position: absolute; inset: 0; }
+    #obTextHost {
+      position: absolute; inset: 0;
+      pointer-events: none;
+      z-index: 5;
+      color: #fff;
+    }
+    #obStatus { font-size: 12px; color: #4ade80; margin: 8px 0; min-height: 16px; }
+    .sr-only {
+      position: absolute;
+      width: 1px; height: 1px;
+      overflow: hidden;
+      clip-path: inset(50%);
+      white-space: nowrap;
+    }
+  </style>
+</head>
+<body>
+  <div class="lab">
+    <h1>Text Lab — Pretext bridge bench</h1>
+    <p class="subtitle">
+      Phase 0: font parity — native DOM wrap vs Pretext wrapLines() at identical width/font.
+      Overlay mode superimposes both (green = Pretext); any break mismatch shows as ghosting.
+    </p>
+
+    <div class="controls">
+      <label>Width
+        <input id="width" type="range" min="200" max="800" value="420" />
+        <span id="widthVal">420px</span>
+      </label>
+      <label>Line height <input id="lineHeight" type="number" min="14" max="48" value="24" /></label>
+      <label class="grow">Font <input id="font" type="text" spellcheck="false" /></label>
+      <label><input id="overlay" type="checkbox" /> Overlay</label>
+    </div>
+
+    <div id="status"></div>
+
+    <div class="panels" id="panels">
+      <div class="panel">
+        <h2>DOM — native wrap</h2>
+        <div class="specimen" id="domHost"><p id="domText"></p></div>
+      </div>
+      <div class="panel" id="ptxPanel">
+        <h2>Pretext — wrapLines()</h2>
+        <div class="specimen" id="ptxHost"></div>
+      </div>
+    </div>
+
+    <h2 class="bench-title">Splat Text Bench — Phase 2 bridge parity &amp; calibration</h2>
+    <p class="bench-sub">
+      SplatTextMesh (Pretext wrap → textSplats). "DOM overlay" superimposes the same copy as
+      green DOM text at 1:1 scale when the camera sits at the parity distance — break or
+      pitch mismatches show as ghosting. Orbit with the mouse; splat/build counters below.
+    </p>
+
+    <div class="controls">
+      <label class="grow">Text <input id="stText" type="text" spellcheck="false"
+        value="Spatial memory, measured to the pixel — captions that wrap identically in DOM and gaussians." /></label>
+      <label>Font px <input id="stFontSize" type="number" min="16" max="48" value="32" /></label>
+      <label>Wrap
+        <input id="stWidth" type="range" min="120" max="800" value="420" />
+        <span id="stWidthVal">420px</span>
+      </label>
+    </div>
+    <div class="controls">
+      <label>lineHeightWorld
+        <input id="stLhw" type="range" min="0.05" max="0.5" step="0.01" value="0.15" />
+        <span id="stLhwVal">0.15</span>
+      </label>
+      <label>Distance
+        <input id="stDist" type="range" min="1" max="10" step="0.1" value="2" />
+        <span id="stDistVal">2.0</span>
+      </label>
+      <label>Billboard
+        <select id="stBillboard">
+          <option value="full">full</option>
+          <option value="y">y</option>
+          <option value="none">none</option>
+        </select>
+      </label>
+      <label>Tint <input id="stColor" type="color" value="#ffffff" /></label>
+      <label><input id="stWeightPrefix" type="checkbox" /> "700" prefix</label>
+      <label><input id="stOverlay" type="checkbox" /> DOM overlay</label>
+      <button id="stParityCam">Snap parity distance</button>
+    </div>
+
+    <div id="stStatus"></div>
+    <div id="stViewport"><div id="stOverlayBlock"></div></div>
+
+    <h2 class="bench-title">Editorial Obstacle View — Phase 3</h2>
+    <p class="bench-sub">
+      Two Pretext columns flow over a live splat viewport; every frame the splat's sampled
+      Box3 is projected to a screen rect and each line band is carved around it. Orbit the
+      scene — the text re-routes in real time. LinePool commits DOM writes only when a line
+      actually moved (1px quantized); the commit rate below should read 0/60 while idle.
+    </p>
+
+    <div class="controls">
+      <label><input id="obBounds" type="checkbox" /> Show Box3 helper</label>
+      <span id="obStatus"></span>
+    </div>
+
+    <div id="obRegion">
+      <div id="obCanvasHost"></div>
+      <div id="obTextHost" aria-hidden="true"></div>
+      <p id="obSrCopy" class="sr-only"></p>
+    </div>
+  </div>
+  <script type="module" src="./main.ts"></script>
+</body>
+</html>
