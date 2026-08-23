@@ -133,6 +133,33 @@ vintage (unchanged — their re-sync diff simply runs against the new pin).
 Rule 1 unchanged: sparkjs stays read-only; the pin is by commit hash,
 never "current disk".
 
+**D21 SECOND AMENDMENT (2026-08-22, ruled at owner delegation before ticket
+05 start): the copy vintage for the UNSTARTED copy tickets (05/06) RE-PINS
+again, from `7599471` to sparkjs commit `fd67153` ("Ticket 12 build:
+live-markers dry-run page").** Since the first re-pin sparkjs gained two
+commits, both dated 2026-08-22, verified in-session against the sparkjs
+history: `c050cc5` ("Ticket 11: sequence waypoint capture") touches
+`src/rules/RuleAuthoring.ts` and `src/site/authorui/rulesPane.ts` — one new
+exported pure function (`withWaypointPose`) plus in-place edits (88
+insertions / 5 deletions across both files; the deletions are a comment
+rewording, an import list widened to add `formatNumber`, and UI string
+tweaks); no renames inside src/; public barrel `src/index.ts` byte-identical
+across `7599471..fd67153` (diff empty). `fd67153` touches no src/ at all
+(tickets/docs plus a `scratchpad/ → scripts/` move of `lm-check.ts`, outside
+every copy scope). GROUNDS, same as the first amendment: 05/06 have not
+started, so no copies exist at the old vintage to invalidate — ticket 06
+copies rulesPane.ts (its author-ui scope) once at the newer vintage instead
+of reconciling again in Phase 2. SCOPE PRECISION: `RuleAuthoring.ts` lives
+in `src/rules/` — ticket 04's ALREADY-LANDED cluster, not ticket 06's scope
+(sparkjs commit c050cc5's own port note calls it "ticket 06 copy scope";
+that is wrong by this repo's ticket files, and it is absent from ticket
+04's SHA inventory — it is a new-since-04 file). New-since-04 files inside
+landed clusters belong to Phase 2's re-sync, NOT to a silent pull-forward
+by any Phase 1 copy ticket. CONSEQUENCE: Phase 2's re-sync input for each
+ticket is the diff between its recorded copy-time SHAs and `fd67153`;
+ticket 04's landed copies stay at their recorded vintage. Rule 1 unchanged:
+sparkjs stays read-only; the pin is by commit hash, never "current disk".
+
 **D22 — PARTIALLY RULED (2026-08-20): the renderer TYPING half was assigned
 to ticket 03 and is DONE** (one-line widen to `WebGLRenderer |
 WebGPURenderer`, type-only import, declared adaptation). **The dead-fields /

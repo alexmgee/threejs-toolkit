@@ -23,10 +23,15 @@ Read `../spec.md` first.
       entry; note: `PostProcessing` was renamed `RenderPipeline` in r183 —
       the port uses `RenderPipeline`)
 - [x] H-GRADE: screenshot series vs sparkjs-toolkit at pinned settings,
-      approved by the OWNER — not self-assessed (OWNER RULING, dated
-      2026-08-20: APPROVED — "grade-off SHA-identical across all three
-      paths and grade-on within 1 LSB except SMAA silhouettes is parity";
-      evidence in docs/plan/results/ticket10-hgrade/)
+      approved by the OWNER — not self-assessed (OWNER RULING, made
+      2026-08-22 on evidence stamped 2026-08-21: APPROVED — "grade-off
+      SHA-identical across all three paths and grade-on within 1 LSB except
+      SMAA silhouettes is parity"; evidence in
+      docs/plan/results/ticket10-hgrade/. DATE CORRECTION 2026-08-22: this
+      ruling was first recorded as "dated 2026-08-20" on the owner's
+      erroneous instruction; the evidence README is stamped 2026-08-21 and
+      the ruling itself was made 2026-08-22. The same wrong date persists in
+      commit a112253's message, which is history and stands.)
 - [x] If visual parity proves unreachable: STOP; the doc 04 GATE opens and the
       owner decides grade-parity-later vs block — with the screenshot evidence
       in hand, per ADR 0001's miss-becomes-item principle (NOT TRIGGERED:
