@@ -37,6 +37,7 @@ export default defineConfig({
         "text-lab": resolve(__dirname, "examples/text-lab/index.html"),
         periphery: resolve(__dirname, "examples/periphery/index.html"),
         diag: resolve(__dirname, "examples/diag/index.html"),
+        media: resolve(__dirname, "examples/media/index.html"),
       },
     },
   },
