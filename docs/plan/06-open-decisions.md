@@ -160,6 +160,63 @@ ticket is the diff between its recorded copy-time SHAs and `fd67153`;
 ticket 04's landed copies stay at their recorded vintage. Rule 1 unchanged:
 sparkjs stays read-only; the pin is by commit hash, never "current disk".
 
+**D21 THIRD NOTE (2026-08-23, OWNER RULED at ticket 06 start):
+`src/rules/RuleAuthoring.ts` lands WITH ticket 06, copied byte-identical at
+pin `fd67153`.** The second amendment's ban was on SILENT pull-forwards;
+this is a declared, ruled one. Grounds: the compile edge — rulesPane.ts and
+RuleAuthoring.ts were born coupled in sparkjs `7599471` (the pane
+value-imports ~20 of its functions, `withWaypointPose` included), so ticket
+06 was never compile-closed at either re-pinned vintage without it; the
+ticket cut predates both files (2026-08-19). By graph reality the file is
+part of the pane's closure regardless of its directory. SECOND RULED
+EXCEPTION (same date): `src/rules/RuleModel.ts` — a LANDED ticket-04 copy —
+RE-PINS to `fd67153` inside ticket 06. Grounds: the pane needs RuleModel
+exports the old vintage lacks, and the pin is verified a STRICT EXPORT
+SUPERSET of the landed copy (existing consts gain `export`; new symbols
+`EffectLifetime`/`DEFAULT_LIFETIME`/`KNOWN_UNTIL_ENDINGS`/
+`KNOWN_SEQUENCE_TERMINALS`/`KNOWN_EFFECT_KINDS` etc.; NOTHING removed —
+zero only-ours exports). The ruling is CONDITIONAL on the landed-consumer
+proof: gate green plus the diag selfTest re-run in-browser staying 20/20
+(result in ticket 06's Comments). `DisplayChannel.ts` — the only other
+rules/ file differing from the pin — DELIBERATELY stays at ticket 04's
+vintage: nothing in 06's closure touches it. CONSEQUENCE: Phase 2's
+re-sync treats `src/rules/RuleAuthoring.ts` AND `src/rules/RuleModel.ts`
+as LANDED at `fd67153` (SHAs in ticket 06's Comments); the rest of ticket
+04's src/rules/ cluster stays at its recorded vintage. FINAL INVENTORY
+(ticket 06 close, 2026-08-23 — Phase 2's re-sync reads the whole vintage
+map from here): files the rulings/category rule landed at `fd67153`:
+`src/rules/RuleAuthoring.ts`
+(d69e466ffc96101b1c7d5c6a399843a5d232a971a338feb13dca35278b5c3608),
+`src/rules/RuleModel.ts`
+(83014e7fe0ac0c459eb1da23e8e9f71b1013df82b0cf52381763c9806c529b43),
+`src/site/SiteConfig.ts`
+(f34e134cadde264470892924a6c81f06543b7dfa3f76480bcc9f8aa10f0f1f0b) —
+RuleModel and SiteConfig each verified a strict export superset of the
+replaced copy before the swap (RuleAuthoring is a NEW file — it replaced
+nothing, so no superset claim applies to it); consumer proof recorded in
+ticket 06's Comments. HONEST BASIS
+CORRECTION (adversarial review, 2026-08-23): the superset test covers the
+symbol table only — the swaps ALSO carry semantic changes inside existing
+symbols, and the recorded consumer proof could not exercise them because
+NO LANDED RUNTIME CONSUMER EXISTS (verified: `normalizeSiteConfig` has
+zero callers outside its own file; every landed importer of SiteConfig is
+type-only; DisplayChannel has zero importers). That absence — not the
+fixture runs — is what guarantees no regression today. Semantic changes
+Phase 2/3 INHERITS with these files: (a) pin `normalizeSiteConfig` stops
+minting annotation-copy seeded blocks, drops the old recognizers, and
+THROWS on an authored `annotation-<id>-copy` block id; (b) pin RuleModel
+adds a validation throw on duplicate show-blocks effects; (c) the
+RuleModel-new / DisplayChannel-old vintage split means an authored
+`lifetime` on show-blocks VALIDATES but is silently ignored at runtime
+until DisplayChannel re-syncs — the pin's DisplayChannel is the file that
+implements it. Phase 2's re-sync must close (c) first. LANDED FILES
+DELIBERATELY AT THE OLD VINTAGE: `src/rules/DisplayChannel.ts` (the only
+other landed rules/site file whose bytes differ from `fd67153`; nothing
+in 06's closure touches it). The remaining seven ticket-04 rules/ files
+and three site/ files are byte-identical to `fd67153` already (verified
+by diff), so their recorded vintages and the pin coincide. Every other
+cluster stays per its own ticket's recorded SHAs.
+
 **D22 — PARTIALLY RULED (2026-08-20): the renderer TYPING half was assigned
 to ticket 03 and is DONE** (one-line widen to `WebGLRenderer |
 WebGPURenderer`, type-only import, declared adaptation). **The dead-fields /

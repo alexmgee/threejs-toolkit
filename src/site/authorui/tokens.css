@@ -1,0 +1,1236 @@
+.spark-authorui {
+  --ap-bg: #E6E7E4;
+  --ap-surface: #F1F2EF;
+  --ap-surface-raised: #DBDDD9;
+  --ap-hairline: #CBCEC8;
+  --ap-text: #23262A;
+  --ap-text-muted: #767C7B;
+  --ap-accent: #3E7D74;
+  --ap-accent-ink: #FBFAF6;
+  --ap-accent-soft: #D9E6E3;
+  --ap-positive: #4E8A63;
+  --ap-warning: #B8863C;
+  --ap-danger: #B25548;
+  --ap-danger-soft: #EFDDD8;
+  --ap-font-ui: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --ap-font-mono: ui-monospace, "JetBrains Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+}
+
+.spark-authorui,
+.spark-authorui * {
+  box-sizing: border-box;
+}
+
+.spark-authorui {
+  color: var(--ap-text);
+  font-family: var(--ap-font-ui);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.spark-authorui .ap-shell {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+  border: 1px solid var(--ap-hairline);
+  border-radius: 8px;
+  background: var(--ap-bg);
+  box-shadow: 0 12px 40px rgba(43, 41, 33, 0.22);
+}
+
+.spark-authorui .ap-shell-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px;
+  border-bottom: 1px solid var(--ap-hairline);
+  background: var(--ap-surface);
+}
+
+.spark-authorui .ap-shell-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.spark-authorui .ap-shell-title-main {
+  min-width: 0;
+}
+
+/* Drag grip (DD4): the title area is the drag handle. touch-action:none stops a
+   touch drag from scrolling the page; the cursor flips to grabbing mid-drag. */
+.spark-authorui .ap-drag-handle {
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+
+.spark-authorui .ap-drag-handle.grabbing {
+  cursor: grabbing;
+}
+
+.spark-authorui .ap-grip {
+  display: inline-flex;
+  flex: 0 0 auto;
+  color: var(--ap-text-muted);
+}
+
+/* Collapse button (DD5): compact square in the header actions. */
+.spark-authorui .ap-collapse-btn {
+  flex: 0 0 auto;
+  min-width: 26px;
+  padding: 0;
+  font-size: 16px;
+  line-height: 1;
+}
+
+/* Collapsed-panel reopen tab (DD5): carries BOTH the `spark-authorui` scope AND
+   `ap-reopen` on the SAME element (it lives outside the shell, directly in the
+   container), so these rules + the --ap-* variables apply. Position + z-index
+   are set inline by AuthorPanel. */
+.spark-authorui.ap-reopen {
+  display: inline-flex;
+  align-items: center;
+  height: 32px;
+  padding: 0 12px;
+  border: 1px solid var(--ap-hairline);
+  border-radius: 8px;
+  background: var(--ap-surface);
+  color: var(--ap-text);
+  font-family: var(--ap-font-ui);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 6px 20px rgba(43, 41, 33, 0.22);
+}
+
+.spark-authorui.ap-reopen:hover {
+  border-color: var(--ap-accent);
+  color: var(--ap-accent);
+}
+
+.spark-authorui.ap-reopen:focus-visible {
+  outline: 2px solid var(--ap-accent);
+  outline-offset: 2px;
+}
+
+.spark-authorui .ap-site-name {
+  overflow: hidden;
+  color: var(--ap-text);
+  font-size: 13px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.spark-authorui .ap-save-state {
+  margin-top: 2px;
+  color: var(--ap-text-muted);
+  font-family: var(--ap-font-mono);
+  font-size: 10px;
+}
+
+.spark-authorui .ap-header-actions {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 6px;
+}
+
+.spark-authorui .ap-tabs {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 0;
+  border-bottom: 1px solid var(--ap-hairline);
+  background: var(--ap-surface-raised);
+}
+
+.spark-authorui .ap-tab {
+  display: grid;
+  min-width: 0;
+  height: 40px;
+  place-items: center;
+  border: 0;
+  border-right: 1px solid var(--ap-hairline);
+  border-radius: 0;
+  background: transparent;
+  color: var(--ap-text-muted);
+  cursor: pointer;
+  padding: 0;
+}
+
+.spark-authorui .ap-tab:last-child {
+  border-right: 0;
+}
+
+.spark-authorui .ap-tab[aria-selected="true"] {
+  background: var(--ap-accent-soft);
+  color: var(--ap-accent);
+}
+
+.spark-authorui .ap-tab:focus-visible,
+.spark-authorui .ap-btn:focus-visible,
+.spark-authorui .ap-switch:focus-visible {
+  outline: 2px solid var(--ap-accent);
+  outline-offset: -2px;
+}
+
+.spark-authorui .ap-content {
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: 10px;
+  overflow: auto;
+}
+
+/* Pinned footer strip (P8c context simulator): sits below the scroll region
+   so it stays visible in both browse and inspect modes. */
+.spark-authorui .ap-shell-footer {
+  flex: 0 0 auto;
+  border-top: 1px solid var(--ap-hairline);
+  background: var(--ap-surface);
+}
+
+.spark-authorui .ap-sim-strip-body {
+  padding: 8px 10px;
+}
+
+.spark-authorui .ap-sim-strip-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.spark-authorui .ap-sim-strip-toggles {
+  display: flex;
+  gap: 12px;
+}
+
+/* Placement section (P8d): the gizmo bar + numeric rect/region fields sit in
+   their own labelled block within the inspector body. */
+.spark-authorui .ap-placement {
+  padding-top: 4px;
+}
+
+.spark-authorui .ap-placement .ap-actions .ap-ctrl-number {
+  min-width: 0;
+  flex: 1 1 0;
+}
+
+/* Fonts browser (P8b): family rows with a specimen line + the BYO form. */
+.spark-authorui .ap-font-group {
+  gap: 4px;
+}
+
+.spark-authorui .ap-font-row {
+  display: grid;
+  gap: 2px;
+  padding: 6px 8px;
+  border: 1px solid var(--ap-hairline);
+  border-radius: 8px;
+  background: var(--ap-surface);
+}
+
+.spark-authorui .ap-font-meta {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.spark-authorui .ap-font-specimen {
+  font-size: 20px;
+  line-height: 1.3;
+  color: var(--ap-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.spark-authorui .ap-byo-form {
+  padding: 8px;
+  border: 1px dashed var(--ap-hairline);
+  border-radius: 8px;
+}
+
+/* Chip-shaped button (P8c tour block chips): the .ap-chip look on a real
+   button, with the pointer affordances chips lack. */
+.spark-authorui button.ap-chip-btn {
+  cursor: pointer;
+  font: inherit;
+  font-family: var(--ap-font-mono);
+  font-size: 10px;
+}
+
+.spark-authorui button.ap-chip-btn:hover {
+  border-color: var(--ap-accent);
+  color: var(--ap-accent);
+}
+
+.spark-authorui .ap-placeholder {
+  display: grid;
+  min-height: 180px;
+  place-items: center;
+  color: var(--ap-text-muted);
+  font-size: 12px;
+  text-align: center;
+}
+
+.spark-authorui .ap-card {
+  border: 1px solid var(--ap-hairline);
+  border-radius: 8px;
+  background: var(--ap-surface);
+  padding: 10px;
+}
+
+.spark-authorui .ap-stack {
+  display: grid;
+  gap: 7px;
+}
+
+.spark-authorui .ap-card {
+  display: grid;
+  gap: 10px;
+}
+
+.spark-authorui .ap-card-header,
+.spark-authorui .ap-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.spark-authorui .ap-card-header {
+  align-items: center;
+  justify-content: space-between;
+}
+
+.spark-authorui .ap-fit-row {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.spark-authorui .ap-fit-row .ap-input {
+  flex: 1 1 auto;
+}
+
+.spark-authorui .ap-fit-row .ap-btn {
+  flex: 0 0 auto;
+}
+
+.spark-authorui .ap-field {
+  display: grid;
+  gap: 4px;
+}
+
+.spark-authorui .ap-field-label,
+.spark-authorui .ap-section-label {
+  color: var(--ap-text-muted);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0;
+}
+
+.spark-authorui .ap-slider-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.spark-authorui .ap-slider-value,
+.spark-authorui .ap-chip,
+.spark-authorui .ap-stop-camera-meta {
+  font-family: var(--ap-font-mono);
+}
+
+.spark-authorui .ap-slider-value {
+  color: var(--ap-text-muted);
+  font-size: 11px;
+  justify-self: end;
+}
+
+.spark-authorui .ap-range {
+  width: 100%;
+  accent-color: var(--ap-accent);
+}
+
+.spark-authorui .ap-input {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid var(--ap-hairline);
+  border-radius: 7px;
+  background: var(--ap-surface);
+  color: var(--ap-text);
+  font: inherit;
+  padding: 7px 8px;
+}
+
+.spark-authorui .ap-input:focus-visible,
+.spark-authorui .ap-color:focus-visible {
+  border-color: var(--ap-accent);
+  outline: 2px solid var(--ap-accent-soft);
+}
+
+.spark-authorui .ap-textarea {
+  min-height: 68px;
+  resize: vertical;
+}
+
+.spark-authorui .ap-color {
+  width: 44px;
+  height: 28px;
+  border: 1px solid var(--ap-hairline);
+  border-radius: 7px;
+  background: var(--ap-surface);
+  cursor: pointer;
+  padding: 2px;
+}
+
+.spark-authorui .ap-candidate-count,
+.spark-authorui .ap-hint {
+  color: var(--ap-text-muted);
+  font-size: 11px;
+}
+
+.spark-authorui .ap-candidate-count {
+  font-family: var(--ap-font-mono);
+}
+
+.spark-authorui .ap-candidate-list {
+  display: grid;
+  max-height: 184px;
+  gap: 6px;
+  overflow: auto;
+  padding-right: 2px;
+}
+
+.spark-authorui .ap-candidate-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  gap: 6px;
+  align-items: center;
+  border: 1px solid var(--ap-hairline);
+  border-radius: 7px;
+  background: var(--ap-surface-raised);
+  padding: 6px;
+}
+
+.spark-authorui .ap-candidate-title {
+  overflow: hidden;
+  min-width: 0;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.spark-authorui .ap-segmented {
+  display: grid;
+  grid-auto-columns: minmax(0, 1fr);
+  grid-auto-flow: column;
+  overflow: hidden;
+  border: 1px solid var(--ap-hairline);
+  border-radius: 7px;
+  background: var(--ap-surface-raised);
+}
+
+.spark-authorui .ap-segment {
+  min-width: 0;
+  border: 0;
+  border-right: 1px solid var(--ap-hairline);
+  background: transparent;
+  color: var(--ap-text-muted);
+  cursor: pointer;
+  font: inherit;
+  padding: 6px 5px;
+}
+
+.spark-authorui .ap-segment:last-child {
+  border-right: 0;
+}
+
+.spark-authorui .ap-segment[aria-pressed="true"] {
+  background: var(--ap-accent-soft);
+  color: var(--ap-accent);
+  font-weight: 700;
+}
+
+.spark-authorui .ap-chip {
+  display: inline-flex;
+  max-width: 100%;
+  align-items: center;
+  border: 1px solid var(--ap-hairline);
+  border-radius: 999px;
+  background: var(--ap-surface-raised);
+  color: var(--ap-text-muted);
+  font-size: 10px;
+  padding: 2px 7px;
+}
+
+.spark-authorui .ap-chip[data-tone="accent"] {
+  border-color: var(--ap-accent);
+  background: var(--ap-accent-soft);
+  color: var(--ap-accent);
+}
+
+.spark-authorui .ap-chip[data-tone="danger"] {
+  border-color: var(--ap-danger);
+  background: var(--ap-danger-soft);
+  color: var(--ap-danger);
+}
+
+.spark-authorui .ap-btn {
+  display: inline-flex;
+  min-width: 28px;
+  height: 28px;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 1px solid var(--ap-hairline);
+  border-radius: 7px;
+  background: var(--ap-surface);
+  color: var(--ap-text);
+  cursor: pointer;
+  font: inherit;
+  padding: 0 8px;
+}
+
+.spark-authorui .ap-btn[data-tone="accent"] {
+  border-color: var(--ap-accent);
+  background: var(--ap-accent);
+  color: var(--ap-accent-ink);
+}
+
+.spark-authorui .ap-btn[data-tone="danger"] {
+  border-color: var(--ap-danger);
+  background: var(--ap-danger-soft);
+  color: var(--ap-danger);
+}
+
+.spark-authorui .ap-icon {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  flex: 0 0 auto;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2;
+}
+
+.spark-authorui .ap-switch {
+  position: relative;
+  width: 36px;
+  height: 20px;
+  border: 1px solid var(--ap-hairline);
+  border-radius: 999px;
+  background: var(--ap-surface-raised);
+  cursor: pointer;
+  padding: 0;
+}
+
+.spark-authorui .ap-switch::after {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--ap-text-muted);
+  content: "";
+  transition: transform 120ms ease, background 120ms ease;
+}
+
+.spark-authorui .ap-switch[aria-checked="true"] {
+  border-color: var(--ap-accent);
+  background: var(--ap-accent-soft);
+}
+
+.spark-authorui .ap-switch[aria-checked="true"]::after {
+  background: var(--ap-accent);
+  transform: translateX(16px);
+}
+
+.spark-authorui .ap-collapsible {
+  overflow: hidden;
+  border: 1px solid var(--ap-hairline);
+  border-radius: 8px;
+  background: var(--ap-surface);
+}
+
+.spark-authorui .ap-collapsible-summary {
+  display: grid;
+  width: 100%;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  border: 0;
+  background: transparent;
+  color: var(--ap-text);
+  cursor: pointer;
+  font: inherit;
+  padding: 8px 9px;
+  text-align: left;
+}
+
+.spark-authorui .ap-collapsible-summary:focus-visible {
+  outline: 2px solid var(--ap-accent);
+  outline-offset: -2px;
+}
+
+.spark-authorui .ap-collapsible-summary .ap-icon {
+  color: var(--ap-text-muted);
+  transition: transform 120ms ease;
+}
+
+.spark-authorui .ap-collapsible-summary[aria-expanded="true"] .ap-icon {
+  transform: rotate(180deg);
+}
+
+.spark-authorui .ap-collapsible-summary-content {
+  min-width: 0;
+}
+
+.spark-authorui .ap-item-summary {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.spark-authorui .ap-hotspot-summary {
+  justify-content: flex-start;
+}
+
+.spark-authorui .ap-hotspot-summary-id {
+  min-width: 0;
+  flex: 0 0 auto;
+}
+
+.spark-authorui .ap-item-title {
+  overflow: hidden;
+  min-width: 0;
+  flex: 1 1 auto;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.spark-authorui .ap-stop-camera-meta {
+  overflow: hidden;
+  flex: 0 1 auto;
+  color: var(--ap-text-muted);
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.spark-authorui .ap-collapsible-body {
+  border-top: 1px solid var(--ap-hairline);
+  padding: 10px;
+}
+
+.spark-authorui .ap-status-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.spark-authorui .ap-status-icon[data-tone="positive"] {
+  color: var(--ap-positive);
+}
+
+.spark-authorui .ap-status-icon[data-tone="warning"] {
+  color: var(--ap-warning);
+}
+
+.spark-authorui .ap-gizmo-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.spark-authorui .ap-gizmo-segments {
+  display: grid;
+  grid-auto-columns: minmax(0, 1fr);
+  grid-auto-flow: column;
+  min-width: 0;
+  flex: 1 1 0;
+  overflow: hidden;
+  border: 1px solid var(--ap-hairline);
+  border-radius: 7px;
+  background: var(--ap-surface-raised);
+}
+
+.spark-authorui .ap-gizmo-segment {
+  display: inline-flex;
+  min-width: 0;
+  height: 28px;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  border: 0;
+  border-right: 1px solid var(--ap-hairline);
+  background: transparent;
+  color: var(--ap-text-muted);
+  cursor: pointer;
+  font: inherit;
+  padding: 0 6px;
+}
+
+.spark-authorui .ap-gizmo-segment:last-child {
+  border-right: 0;
+}
+
+.spark-authorui .ap-gizmo-segment:hover {
+  background: var(--ap-accent-soft);
+  color: var(--ap-accent);
+}
+
+.spark-authorui .ap-gizmo-segment[aria-disabled="true"] {
+  cursor: default;
+  opacity: 0.45;
+  pointer-events: none;
+}
+
+.spark-authorui .ap-gizmo-segment[aria-disabled="true"]:hover {
+  background: transparent;
+  color: var(--ap-text-muted);
+}
+
+.spark-authorui .ap-gizmo-segment:focus-visible {
+  outline: 2px solid var(--ap-accent);
+  outline-offset: -2px;
+}
+
+/* ─── Block registry (Text tab) ─────────────────────────── */
+
+.spark-authorui .ap-registry-filters {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+.spark-authorui .ap-select {
+  cursor: pointer;
+}
+
+.spark-authorui .ap-registry-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.spark-authorui .ap-registry-main {
+  display: grid;
+  min-width: 0;
+  flex: 1 1 auto;
+  gap: 3px;
+  border: 1px solid var(--ap-hairline);
+  border-radius: 8px;
+  background: var(--ap-surface);
+  color: var(--ap-text);
+  cursor: pointer;
+  font: inherit;
+  padding: 8px 9px;
+  text-align: left;
+}
+
+.spark-authorui .ap-registry-main:hover {
+  border-color: var(--ap-accent);
+  background: var(--ap-accent-soft);
+}
+
+.spark-authorui .ap-registry-main:focus-visible {
+  outline: 2px solid var(--ap-accent);
+  outline-offset: -2px;
+}
+
+.spark-authorui .ap-registry-line {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.spark-authorui .ap-registry-meta {
+  overflow: hidden;
+  color: var(--ap-text-muted);
+  font-family: var(--ap-font-mono);
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.spark-authorui .ap-badges {
+  display: flex;
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-items: center;
+}
+
+/* ─── Inspector (inspect mode) ──────────────────────────── */
+
+.spark-authorui .ap-inspector-header {
+  border-bottom: 1px solid var(--ap-hairline);
+  background: var(--ap-surface);
+  padding: 8px 10px;
+}
+
+.spark-authorui .ap-inspector-headrow {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.spark-authorui .ap-inspector-back {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+.spark-authorui .ap-inspector-title {
+  display: grid;
+  min-width: 0;
+  flex: 1 1 auto;
+  gap: 6px;
+}
+
+.spark-authorui .ap-inspector-label {
+  font-weight: 700;
+}
+
+.spark-authorui .ap-inspector-style {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 6px;
+  align-items: center;
+}
+
+.spark-authorui .ap-inspector-body {
+  gap: 12px;
+}
+
+.spark-authorui .ap-essentials {
+  display: grid;
+  gap: 10px;
+}
+
+/* Content editor (DD3): the block's actual words, pinned at the top of the
+   block inspector. Full-width textarea for a string block; a read-only echo for
+   styled runs. */
+.spark-authorui .ap-content-block {
+  gap: 6px;
+}
+
+.spark-authorui .ap-content-editor {
+  width: 100%;
+  min-height: 54px;
+  resize: vertical;
+}
+
+.spark-authorui .ap-content-echo {
+  white-space: pre-wrap;
+}
+
+/* Align + Color share one row (DD2): two ORDINARY .ap-ctrl blocks side by side,
+   each keeping its own tier dot / label / clear / disabled reason. */
+.spark-authorui .ap-essentials-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+}
+
+/* Domain-group sub-tab bar (DD1): a fixed 2-row pill bar replacing the nine
+   stacked accordions — ONE group's controls show in the pane below. */
+.spark-authorui .ap-groups {
+  gap: 8px;
+}
+
+.spark-authorui .ap-subtabs {
+  display: grid;
+  gap: 4px;
+}
+
+.spark-authorui .ap-subtab-row {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  gap: 4px;
+}
+
+.spark-authorui .ap-subtab {
+  min-width: 0;
+  height: 28px;
+  padding: 0 6px;
+  border: 1px solid var(--ap-hairline);
+  border-radius: 7px;
+  background: var(--ap-surface);
+  color: var(--ap-text-muted);
+  cursor: pointer;
+  font: inherit;
+  font-size: 11px;
+  line-height: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.spark-authorui .ap-subtab[aria-selected="true"] {
+  border-color: var(--ap-accent);
+  background: var(--ap-accent-soft);
+  color: var(--ap-accent);
+}
+
+/* Fully-excluded group (every control greyed by the lane): muted but still
+   activatable — the pane shows read-only echoes with the lane's reason. */
+.spark-authorui .ap-subtab-muted {
+  opacity: 0.55;
+}
+
+.spark-authorui .ap-subtab:focus-visible {
+  outline: 2px solid var(--ap-accent);
+  outline-offset: -2px;
+}
+
+.spark-authorui .ap-group-pane {
+  border: 1px solid var(--ap-hairline);
+  border-radius: 8px;
+  background: var(--ap-surface-raised);
+  padding: 9px;
+}
+
+.spark-authorui .ap-ctrl {
+  display: grid;
+  gap: 4px;
+}
+
+.spark-authorui .ap-ctrl-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.spark-authorui .ap-ctrl-head .ap-field-label {
+  flex: 1 1 auto;
+}
+
+/* Tier dot — where the resolved value comes from (cascade legibility, P7c) */
+.spark-authorui .ap-tier-dot {
+  width: 8px;
+  height: 8px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: var(--ap-text-muted);
+}
+
+.spark-authorui .ap-tier-dot[data-tier="token"] {
+  background: #9aa0a6;
+}
+
+.spark-authorui .ap-tier-dot[data-tier="style"] {
+  background: #6b8fd6;
+}
+
+.spark-authorui .ap-tier-dot[data-tier="variant"] {
+  background: var(--ap-warning);
+}
+
+.spark-authorui .ap-tier-dot[data-tier="override"] {
+  background: var(--ap-accent);
+}
+
+.spark-authorui .ap-tier-dot[data-tier="none"] {
+  background: transparent;
+  border: 1px solid var(--ap-hairline);
+}
+
+/* Clear-to-inherited button (P7c) */
+.spark-authorui .ap-ctrl-clear {
+  display: inline-flex;
+  width: 18px;
+  height: 18px;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--ap-hairline);
+  border-radius: 5px;
+  background: var(--ap-surface);
+  color: var(--ap-text-muted);
+  cursor: pointer;
+  font-size: 13px;
+  line-height: 1;
+  padding: 0;
+}
+
+.spark-authorui .ap-ctrl-clear:hover {
+  border-color: var(--ap-danger);
+  color: var(--ap-danger);
+}
+
+.spark-authorui .ap-ctrl-clear:focus-visible {
+  outline: 2px solid var(--ap-accent);
+  outline-offset: 1px;
+}
+
+/* Scope bar + variant condition editor (P7c) */
+.spark-authorui .ap-scope-bar {
+  display: grid;
+  gap: 8px;
+  border: 1px solid var(--ap-hairline);
+  border-radius: 8px;
+  background: var(--ap-surface-raised);
+  padding: 8px 9px;
+}
+
+.spark-authorui .ap-scope-editing,
+.spark-authorui .ap-scope-add {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 6px;
+  align-items: center;
+}
+
+.spark-authorui .ap-condition-editor {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.spark-authorui .ap-condition-editor .ap-input[type="number"] {
+  width: 96px;
+  flex: 0 0 auto;
+}
+
+.spark-authorui .ap-condition-editor .ap-select {
+  flex: 1 1 auto;
+}
+
+.spark-authorui .ap-ctrl-slider {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.spark-authorui .ap-ctrl-slider .ap-range {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.spark-authorui .ap-ctrl-number {
+  flex: 0 0 74px;
+  width: 74px;
+  text-align: right;
+}
+
+.spark-authorui .ap-ctrl-vector {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.spark-authorui .ap-ctrl-inline {
+  display: flex;
+  align-items: center;
+}
+
+.spark-authorui .ap-ctrl-disabled {
+  opacity: 0.6;
+}
+
+.spark-authorui .ap-ctrl-reason {
+  color: var(--ap-text-muted);
+  font-size: 10px;
+  font-style: italic;
+}
+
+.spark-authorui .ap-ctrl-static {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.spark-authorui .ap-ctrl-static .ap-icon {
+  width: 13px;
+  height: 13px;
+  color: var(--ap-text-muted);
+}
+
+.spark-authorui .ap-binding-summary {
+  border-top: 1px solid var(--ap-hairline);
+  padding-top: 8px;
+}
+
+.spark-authorui .ap-binding-value {
+  color: var(--ap-text);
+  font-family: var(--ap-font-mono);
+  font-size: 11px;
+}
+
+/* ─── Entity panes (Plan 14 selection panes) ─────────────── */
+
+.spark-authorui .ap-pane-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.spark-authorui .ap-pane-row-label {
+  flex: 0 0 110px;
+  width: 110px;
+}
+
+.spark-authorui .ap-pane-row .ap-ctrl-slider {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.spark-authorui .ap-pane-row .ap-input:not(.ap-ctrl-number) {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.spark-authorui .ap-pane-headrow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.spark-authorui .ap-breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  font-size: 12px;
+}
+
+.spark-authorui .ap-breadcrumb-list,
+.spark-authorui .ap-breadcrumb-sep {
+  color: var(--ap-text-muted);
+}
+
+.spark-authorui .ap-breadcrumb-item {
+  color: var(--ap-text);
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.spark-authorui .ap-breadcrumb-spacer {
+  flex: 1 1 auto;
+}
+
+.spark-authorui .ap-browse-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--ap-hairline);
+  border-radius: 8px;
+  background: var(--ap-surface);
+  color: var(--ap-text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.spark-authorui .ap-browse-row:hover {
+  border-color: var(--ap-accent);
+  background: var(--ap-accent-soft, var(--ap-surface));
+}
+
+.spark-authorui .ap-browse-row-title {
+  font-size: 12.5px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.spark-authorui .ap-browse-row-chip {
+  flex: 0 0 auto;
+}
+
+.spark-authorui .ap-browse-row-spacer {
+  flex: 1 1 auto;
+}
+
+.spark-authorui .ap-browse-row > svg:last-child {
+  transform: rotate(-90deg); /* chevron-down asset → points right */
+  flex: 0 0 auto;
+}
+
+.spark-authorui .ap-space-segments {
+  flex: 0 0 auto;
+}
+
+.spark-authorui .ap-space-segment {
+  padding: 5px 8px;
+}
+
+.spark-authorui .ap-color-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.spark-authorui .ap-color-row .ap-color-hex {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-family: var(--ap-font-mono);
+}
+
+.spark-authorui .ap-stop-row {
+  padding: 0;
+  gap: 4px;
+}
+
+.spark-authorui .ap-stop-row-main {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 10px 12px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.spark-authorui .ap-stop-row .ap-btn {
+  flex: 0 0 auto;
+  margin-right: 6px;
+}
+
+.spark-authorui .ap-load-panel {
+  padding: 8px 12px 4px;
+  border-bottom: 1px solid var(--ap-hairline);
+}
+
+.spark-authorui .ap-load-textarea {
+  width: 100%;
+  font-family: var(--ap-font-mono);
+  font-size: 11px;
+}
+
+.spark-authorui .ap-load-error {
+  color: var(--ap-danger, #c0392b);
+  font-size: 11px;
+  margin: 4px 0;
+}

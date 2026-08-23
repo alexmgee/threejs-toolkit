@@ -28,14 +28,14 @@ import type { EffectChannel } from "./Channels";
 
 /** The trigger vocabulary — the single source RuleTrigger derives from, so the
  *  validated list and the type can never drift as entries grow (ADR-0001). */
-const KNOWN_TRIGGERS = ["activate"] as const;
+export const KNOWN_TRIGGERS = ["activate"] as const;
 
 export type RuleTrigger = (typeof KNOWN_TRIGGERS)[number];
 
 /** The engagement vocabulary, as conditions see it. This is the single source
  *  for BOTH the validated list and SiteRuntime's `EngagementState`, so a
  *  condition can never name a state the runtime cannot be in. */
-const KNOWN_STATES = ["disengaged", "tour", "explore"] as const;
+export const KNOWN_STATES = ["disengaged", "tour", "explore"] as const;
 
 export type RuleEngagementState = (typeof KNOWN_STATES)[number];
 
@@ -97,8 +97,12 @@ export interface RuleWhen {
 }
 
 /** Typed against RuleWhen so a key that isn't a real condition leg is a compile
- *  error; each new condition leg adds its entry here (ADR-0001 growth rule). */
-const KNOWN_CONDITION_KEYS: readonly (keyof RuleWhen)[] = ["state", "stop", "flag", "visited"];
+ *  error; each new condition leg adds its entry here (ADR-0001 growth rule).
+ *
+ *  EXPORTED for the Rules pane (ticket 10), which iterates it to build one chip
+ *  editor per leg. That is what makes "a new condition leg appears in the
+ *  authoring UI" automatic rather than a second edit someone can forget. */
+export const KNOWN_CONDITION_KEYS: readonly (keyof RuleWhen)[] = ["state", "stop", "flag", "visited"];
 
 /**
  * The seed spec for a display effect's default template block — the "standard
@@ -142,6 +146,40 @@ export function displayTemplatePrefix(annotationId: string): string {
   return `annotation-${annotationId}-effect-`;
 }
 
+/** The discrete `until` endings a lifetime may name (ticket 13). The single
+ *  source for the type and the pre-flight membership check, like every other
+ *  leg vocabulary in this file. */
+export const KNOWN_UNTIL_ENDINGS = ["re-activation", "travel", "dismiss"] as const;
+
+export type LifetimeUntil = (typeof KNOWN_UNTIL_ENDINGS)[number];
+
+/**
+ * When shown content ends ON ITS OWN (ticket 13). Three authored forms, pinned
+ * by the author ("all of the above"), mutually exclusive by the union itself:
+ *
+ * - `"forever"` — never ends on its own. Not immunity: takeover (where on) and
+ *   the visitor's Escape still remove it, because neither is the content ending
+ *   by itself.
+ * - `{ until }` — one discrete ending. `re-activation`: activating the same
+ *   marker again closes it. `travel`: gone on arrival at a stop. `dismiss`:
+ *   nothing else ends it — only the visitor's Escape (A3).
+ * - `{ while }` — a stay-while condition in the rule `when` vocabulary,
+ *   re-evaluated as context changes (author decision 2026-08-11, for lifetime
+ *   only — not a general opening of continuous data-binding).
+ *
+ * Absent = the default: behaves as `until: "re-activation"` — the same lifetime
+ * the copy floor's conjured box carries, by the same mechanism, so a bare
+ * marker and an effect stating nothing behave identically by construction.
+ */
+export type EffectLifetime =
+  | "forever"
+  | { until: LifetimeUntil }
+  | { while: RuleWhen };
+
+/** The unauthored default, applied where a claim is made — never materialized
+ *  into the config ("absent" stays a representable state, §17a/I3). */
+export const DEFAULT_LIFETIME: EffectLifetime = Object.freeze({ until: "re-activation" as const });
+
 export interface ShowBlocksEffect {
   kind: "show-blocks";
   /** Ids of blocks to show. Any existing block is a legal target — the display
@@ -160,6 +198,10 @@ export interface ShowBlocksEffect {
    *  otherwise. Never touches content this SAME annotation is showing: one
    *  annotation's several effects each hold their own claim. */
   takeover?: boolean;
+  /** When this effect's shown content ends on its own (ticket 13). Absent =
+   *  `until: "re-activation"`. Governs SELF-ending only: takeover and Escape
+   *  are not endings and are not shielded by any value here. */
+  lifetime?: EffectLifetime;
 }
 
 export interface SetFlagEffect {
@@ -235,7 +277,7 @@ const KNOWN_WAYPOINT_KEYS: readonly (keyof SequenceWaypoint)[] = ["stop", "annot
  *  `return` glides back to the composed still; `stay` leaves the camera at the
  *  last waypoint — the frozen frame is now a different photograph. Equal
  *  citizens: neither is a default, the author always writes one. */
-const KNOWN_SEQUENCE_TERMINALS = ["return", "stay"] as const;
+export const KNOWN_SEQUENCE_TERMINALS = ["return", "stay"] as const;
 
 export type SequenceTerminal = (typeof KNOWN_SEQUENCE_TERMINALS)[number];
 
@@ -374,7 +416,7 @@ export interface EffectValidationContext {
 export const EFFECT_KINDS: Readonly<Record<RuleEffect["kind"], EffectKindSpec>> = {
   "show-blocks": {
     channels: ["blocks"],
-    validate(effect, { at, annotationId, blockIds, claimedTemplates }) {
+    validate(effect, { at, annotationId, blockIds, stopIds, annotationIds, claimedTemplates }) {
       const ids = effect.blocks;
       if (!Array.isArray(ids) || ids.length === 0 || ids.some((id) => typeof id !== "string")) {
         throw new Error(`SiteConfig: ${at} show-blocks needs a non-empty "blocks" array of block ids`);
@@ -388,6 +430,13 @@ export const EFFECT_KINDS: Readonly<Record<RuleEffect["kind"], EffectKindSpec>> 
         throw new Error(
           `SiteConfig: ${at} show-blocks "takeover" must be true or false (got ${JSON.stringify(takeover)})`,
         );
+      }
+      // The authored lifetime (ticket 13). Anything outside the union is
+      // REJECTED at load, never ignored — an unevaluable lifetime would
+      // silently degrade to the default, which reads to the author as "my
+      // `until: travel` does nothing". Same doctrine as every other leg.
+      if (effect.lifetime !== undefined) {
+        validateLifetime(at, effect.lifetime, stopIds, annotationIds);
       }
       // The template BEFORE the references: a malformed seed spec is why the
       // block it should have created is missing, so reporting the reference
@@ -560,8 +609,10 @@ export const EFFECT_KINDS: Readonly<Record<RuleEffect["kind"], EffectKindSpec>> 
 };
 
 /** DERIVED from the registry, never written twice: the list an unknown kind is
- *  checked against, and the one the author is shown. */
-const KNOWN_EFFECT_KINDS = Object.keys(EFFECT_KINDS) as readonly RuleEffect["kind"][];
+ *  checked against, and the one the author is shown — literally, since ticket
+ *  10: the Rules pane's "Add effect" picker is built from this array, so a kind
+ *  added to EFFECT_KINDS is authorable the moment it exists. */
+export const KNOWN_EFFECT_KINDS = Object.keys(EFFECT_KINDS) as readonly RuleEffect["kind"][];
 
 /** Minimal structural view of a text block for rule validation — matches
  *  TextModel's TextBlock without importing it (keeps this module import-free).
@@ -748,6 +799,54 @@ function validateTemplate(
   claimed.set(id, at);
 }
 
+/** The lifetime vocabulary, as an author is shown it — one string for every
+ *  refusal, so the message always carries the whole union. */
+const lifetimeForms = (): string =>
+  `"forever", { "until": ${KNOWN_UNTIL_ENDINGS.map((e) => `"${e}"`).join(" | ")} }, or { "while": <conditions> }`;
+
+/**
+ * Pre-flight for a display effect's `lifetime` (ticket 13). Exactly the pinned
+ * union and nothing else: one form at a time (the union is mutually exclusive
+ * by construction, so an object naming both `until` and `while` is refused),
+ * `until` a member of the ending vocabulary, and `while` a `when` clause the
+ * resolver could actually evaluate — checked by the SAME validator rules and
+ * presence use, so a stay-while condition can never mean something a rule
+ * condition does not.
+ */
+function validateLifetime(
+  at: string,
+  lifetime: unknown,
+  stopIds: ReadonlySet<string>,
+  annotationIds: ReadonlySet<string>,
+): void {
+  if (lifetime === "forever") return;
+  if (typeof lifetime === "string") {
+    throw new Error(
+      `SiteConfig: ${at} lifetime "${lifetime}" is not a known form — write ${lifetimeForms()}`,
+    );
+  }
+  if (typeof lifetime !== "object" || lifetime === null || Array.isArray(lifetime)) {
+    throw new Error(`SiteConfig: ${at} lifetime must be ${lifetimeForms()}`);
+  }
+  const record = lifetime as Record<string, unknown>;
+  const keys = Object.keys(record);
+  if (keys.length !== 1 || (keys[0] !== "until" && keys[0] !== "while")) {
+    throw new Error(
+      `SiteConfig: ${at} lifetime must name exactly one of "until" or "while" — got ${JSON.stringify(keys)}; write ${lifetimeForms()}`,
+    );
+  }
+  if (keys[0] === "until") {
+    const until = record.until;
+    if (typeof until !== "string" || !(KNOWN_UNTIL_ENDINGS as readonly string[]).includes(until)) {
+      throw new Error(
+        `SiteConfig: ${at} lifetime has unknown ending "${String(until)}" — known endings: ${KNOWN_UNTIL_ENDINGS.join(", ")}`,
+      );
+    }
+    return;
+  }
+  validateWhen(`${at} lifetime "while"`, record.while, stopIds, annotationIds);
+}
+
 /**
  * Pre-flight for one `when` clause — the shared condition validator for rules
  * and for annotation presence. Rejects anything the resolver could not
@@ -871,6 +970,28 @@ export function validateAnnotationRules(
       }
       if (!Array.isArray(record.do) || record.do.length === 0) {
         throw new Error(`SiteConfig: ${at} needs a non-empty "do" array of effects`);
+      }
+      // Two show-blocks effects in ONE rule naming exactly the same ids are
+      // refused (ticket 13): the re-activation toggle keys on a live claim, so
+      // the second effect of the pair would CLOSE what the first just opened —
+      // the rule's first activation would visibly do nothing. The pair is
+      // authoring nonsense in every model (one claim shows the ids already);
+      // rejected at load, never silently cancelled (ADR-0001).
+      {
+        const seenShowLists = new Set<string>();
+        for (const effect of record.do as unknown[]) {
+          const candidate = effect as Record<string, unknown> | null;
+          if (candidate?.kind !== "show-blocks" || !Array.isArray(candidate.blocks)) continue;
+          // NUL-joined: no block id can contain it, so two distinct lists can
+          // never collide into one key.
+          const key = (candidate.blocks as unknown[]).join("\u0000");
+          if (seenShowLists.has(key)) {
+            throw new Error(
+              `SiteConfig: ${at} has two show-blocks effects naming exactly the same blocks — the second would close what the first opened; one effect shows them together`,
+            );
+          }
+          seenShowLists.add(key);
+        }
       }
       for (const effect of record.do as unknown[]) {
         if (typeof effect !== "object" || effect === null) {

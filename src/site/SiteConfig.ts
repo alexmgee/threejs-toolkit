@@ -432,6 +432,42 @@ export function seededCaptionBlock(
 const TEMPLATE_WORLD_PER_PX = 0.125 / 32;
 
 /**
+ * ONE shape for "a box floating at a marker" (ticket 13): the world caption
+ * plane, built here and nowhere else, whether a display template seeds it or
+ * the copy floor conjures it — one function, so the two can never diverge by
+ * a missed edit.
+ *
+ * The position is a COPY of the point handed in: an `at: "annotation"` template
+ * (or the floor) sharing the annotation's own anchor array would move the
+ * marker when the author drags the block. `billboard` is stated rather than
+ * left to PlaneLane's `?? "full"` default: the standard output must not read
+ * edge-on, and an author opening the inspector should find the knob set to
+ * what they are looking at rather than blank.
+ */
+function worldCaptionBlock(
+  id: string,
+  content: string,
+  position: readonly [number, number, number],
+): TextBlock {
+  return {
+    id,
+    content,
+    space: "world",
+    presentation: "plane",
+    styleId: "caption-body",
+    // EMPTY on purpose: the box is present because the display channel is
+    // showing it, never because a binding matched.
+    binding: {},
+    placement: {
+      position: [...position],
+      worldPerPx: TEMPLATE_WORLD_PER_PX,
+      billboard: "full",
+    },
+    transitionMs: 200,
+  };
+}
+
+/**
  * The default template block a display effect seeds — "the standard output",
  * before the author touches anything (story 29).
  *
@@ -449,23 +485,63 @@ export function seededDisplayTemplate(
   template: DisplayTemplate,
   anchor: [number, number, number],
 ): TextBlock {
-  const base = { id, content, styleId: "caption-body", binding: {}, transitionMs: 200 };
   if (template.space === "screen") {
     // "left" for the same reason as a seeded caption: the corner the engagement
     // chrome does not occupy, as a starting value the author owns.
-    return { ...base, space: "screen", presentation: "panel", placement: { slot: "left", order: 1 } };
+    return {
+      id,
+      content,
+      space: "screen",
+      presentation: "panel",
+      styleId: "caption-body",
+      binding: {},
+      placement: { slot: "left", order: 1 },
+      transitionMs: 200,
+    };
   }
-  const placement: WorldPlacement = {
-    // Copy the point: an `at: "annotation"` template sharing the annotation's
-    // own anchor array would move the marker when the author drags the block.
-    position: [...(template.position ?? anchor)],
-    worldPerPx: TEMPLATE_WORLD_PER_PX,
-    // Stated rather than left to PlaneLane's `?? "full"` default: the standard
-    // output must not read edge-on, and an author opening the inspector should
-    // find the knob set to what they are looking at rather than blank.
-    billboard: "full",
-  };
-  return { ...base, space: "world", presentation: "plane", placement };
+  return worldCaptionBlock(id, content, template.position ?? anchor);
+}
+
+/**
+ * The id the copy floor's conjured box carries for one annotation (ticket 13).
+ *
+ * RESERVED: pre-flight refuses an authored block here (see normalizeSiteConfig),
+ * because the conjured box never enters `site.blocks` — the runtime holds it and
+ * hands it to the text system beside the authored blocks, so an authored block
+ * at the same id would collide with it in every id-keyed map downstream.
+ */
+export function conjuredCopyId(annotationId: string): string {
+  return `annotation-${annotationId}-copy`;
+}
+
+/**
+ * The copy floor's conjured box (ticket 13): ONE world-anchored block holding
+ * whichever of the marker's title and body the author wrote, title on its own
+ * line (A1 — one box, one style; per-run styling reaches no renderer yet, so
+ * the title keeping `caption-title` styling inside the box stays on file as a
+ * wish, not a shape).
+ *
+ * The geometry is not invented — it is ticket 05's world template shape,
+ * auto-derived: a COPY of the annotation's anchor (never the same array —
+ * dragging the block must not move the marker), the seeded template's
+ * world-per-px, `billboard: "full"` (A6 — constant apparent size is parked),
+ * style `caption-body` with its derived measure. One shape for "a box floating
+ * at a marker", whether a template seeded it or the floor conjured it.
+ *
+ * NEVER stored: not in `site.blocks`, not serialized — the author's doctrine is
+ * "it goes in the box. the box contains the copy. they are one thing, not two"
+ * (A4). The box derives from `annotation.copy` at show time; edit the copy and
+ * the next show carries it.
+ *
+ * Returns null where there are no words to float — a floor with nothing to
+ * show shows nothing.
+ */
+export function conjuredCopyBlock(annotation: SiteAnnotation): TextBlock | null {
+  const title = annotation.copy?.title ?? "";
+  const body = annotation.copy?.body ?? "";
+  const content = title.length > 0 && body.length > 0 ? `${title}\n${body}` : title || body;
+  if (content.length === 0) return null;
+  return worldCaptionBlock(conjuredCopyId(annotation.id), content, annotation.anchor);
 }
 
 /** Remove `id` from every block's `key` binding; drop blocks whose ONLY reason
@@ -512,6 +588,13 @@ export function blocksShownByAnnotation(annotation: SiteAnnotation): string[] {
 
 /**
  * Make this annotation display `blockId` when activated.
+ *
+ * ⚠ STANDBY since ticket 13: its production caller (`upsertAnnotationBlock`,
+ * the panel path that minted copy blocks) was retired by A5, so nothing in the
+ * shipped toolkit calls this today. It stays because ticket 10's Rules pane is
+ * the next authoring surface that wires a block into a marker's rules, and the
+ * shadow-prevention contract below (pinned by lm-check §17e) is exactly what
+ * that path must not get wrong.
  *
  * Folded into an EXISTING unconditional activate rule where there is one, rather
  * than appended as a new rule. First match wins, so a new rule after an
@@ -1137,58 +1220,26 @@ export function normalizeSiteConfig(
     }
     delete stop.copy;
   }
-  // Annotations render through the block system too (same caption styles), so a
-  // marker's panel is styled/varied like any other block. copy stays on the
-  // annotation — markers still need it for accessible names.
+  // Annotation copy is NOT materialized as blocks any more (ticket 13). The
+  // load-time seeding that minted `annotation-<id>-title/-body` screen panels —
+  // the edge-panel default the author called "altogether terrible" — is gone,
+  // along with the recognizer that told those artifacts from squatters. copy
+  // stays on the annotation: markers need it for accessible names, and the copy
+  // floor floats it in a conjured world box at activation (`conjuredCopyBlock`).
+  // The old ids are ordinary block ids now; leftover panels in files written
+  // before this are ordinary authored blocks, shown by whatever rules name them
+  // (the binding→rule conversion below still covers the pre-17 shape).
   //
-  // ⚠ TWO SHAPES, both legitimate (ticket 17). This recognizer decides whether a
-  // block sitting on a reserved id is THIS annotation's copy or a stranger
-  // squatting the id, and the conversion below changes what that evidence looks
-  // like. A file written before it says so with a binding; a file this toolkit
-  // SAVED says so with a rule. Recognizing only the binding is a hard load
-  // failure on the second kind: normalize does not delete `annotation.copy` (as
-  // it does `stop.copy`), so this guard is reached on every reload and would
-  // throw "reserved … but is used by an unrelated block" at the author's own
-  // round-tripped file.
-  const annotationShowsBlock = (annotation: { rules?: unknown }, blockId: string): boolean =>
-    Array.isArray(annotation.rules)
-    && annotation.rules.some((rule) => {
-      const effects = (rule as { do?: unknown } | null)?.do;
-      return Array.isArray(effects) && effects.some((effect) => {
-        const record = effect as Record<string, unknown> | null;
-        return record?.kind === "show-blocks"
-          && Array.isArray(record.blocks)
-          && (record.blocks as unknown[]).includes(blockId);
-      });
-    });
-  const isAnnotationTextArtifact = (
-    candidate: TextBlock,
-    aid: string,
-    annotation: { rules?: unknown },
-  ): boolean =>
-    isSeededCopyArtifact(candidate, "annotations", aid)
-    || (candidate.space === "screen"
-      && isScreenPresentation(candidate.presentation)
-      && annotationShowsBlock(annotation, candidate.id));
+  // What IS reserved is the conjured box's own id: it never enters this list,
+  // so an authored block there would collide with it in every id-keyed map the
+  // moment that marker's floor fired — silently, in the text system. Refused at
+  // load like every other reserved id.
   for (const annotation of raw.annotations ?? []) {
-    const aid = annotation.id;
-    const titleId = `annotation-${aid}-title`;
-    const bodyId = `annotation-${aid}-body`;
-    for (const reservedId of [titleId, bodyId]) {
-      const holder = blocks.find((block) => block.id === reservedId);
-      if (holder && !isAnnotationTextArtifact(holder, aid, annotation)) {
-        throw new Error(
-          `SiteConfig: block id "${reservedId}" is reserved for annotation "${aid}" copy but is used by an unrelated block`,
-        );
-      }
-    }
-    const copy = annotation.copy;
-    if (typeof copy?.title === "string" && copy.title.length > 0
-      && !blocks.some((block) => block.id === titleId)) {
-      blocks.push(seededCaptionBlock("title", titleId, copy.title, { annotations: [aid] }));
-    }
-    if (copy && !blocks.some((block) => block.id === bodyId)) {
-      blocks.push(seededCaptionBlock("body", bodyId, copy.body ?? "", { annotations: [aid] }));
+    const conjuredId = conjuredCopyId(annotation.id);
+    if (blocks.some((block) => block.id === conjuredId)) {
+      throw new Error(
+        `SiteConfig: block id "${conjuredId}" is reserved for annotation "${annotation.id}"'s floating copy (the toolkit conjures that box at activation) — rename the block`,
+      );
     }
   }
   // Display-effect templates (D31). Seeded AFTER the copy blocks, so a template
@@ -1289,8 +1340,10 @@ export function normalizeSiteConfig(
   // what matches. It also keeps positional rule indices valid for anything that
   // asserts rule order.
   //
-  // ⚠ POSITION. After the copy seeding, or it misses the blocks the toolkit
-  // itself just minted. After the display-template pass, because that pass
+  // ⚠ POSITION. After the STOP-caption seeding, or it misses the blocks the
+  // toolkit itself just minted (annotation-copy seeding is gone — ticket 13 —
+  // so stop captions are the seeded blocks that remain). After the
+  // display-template pass, because that pass
   // identifies a template partly BY the absence of every binding leg — running
   // first would let a hand-authored annotation-bound block at an effect id be
   // silently adopted as somebody's template. Before the duplicate-id check and
@@ -1356,10 +1409,11 @@ export function normalizeSiteConfig(
     }
     blockIds.add(block.id);
   }
-  // Annotation rules validate AFTER all seeding: the copy blocks they reference
-  // (annotation-<id>-title/-body) exist only once the seeding above has run.
-  // Stops come through for the condition vocabulary's reference integrity — a
-  // rule or presence clause may only name a stop the site actually has.
+  // Annotation rules validate AFTER all seeding: a template block a rule
+  // references exists only once the template pass above has run (marker copy is
+  // no longer seeded at all — ticket 13). Stops come through for the condition
+  // vocabulary's reference integrity — a rule or presence clause may only name
+  // a stop the site actually has.
   validateAnnotationRules(raw.annotations ?? [], blocks, raw.stops ?? [], {
     audio: raw.audio ?? [],
     registeredHandlers: opts.registeredHandlers,
