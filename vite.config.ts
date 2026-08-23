@@ -36,6 +36,7 @@ export default defineConfig({
         grade: resolve(__dirname, "examples/grade/index.html"),
         "text-lab": resolve(__dirname, "examples/text-lab/index.html"),
         periphery: resolve(__dirname, "examples/periphery/index.html"),
+        diag: resolve(__dirname, "examples/diag/index.html"),
       },
     },
   },
