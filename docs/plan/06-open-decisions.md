@@ -236,6 +236,23 @@ cruised but unguarded (fixture code could become load-bearing); (c) vendor
 re-diff purity); (d) spikes/ is outside the cruise set entirely (spike ->
 vendor internals invisible). Detail: ticket 04 Comments.
 
+**D24 — DECIDED (2026-08-23, OWNER RULED at ticket 11's stop): the barrel
+exports `ThreeSplatScene` under its OWN name — no `SparkScene` alias.**
+This is the H-API-sanctioned divergence entry (doc 05: "divergences allowed
+only via doc 06 entries"). Grounds, from the evidence brief: (1) ZERO
+sparkjs consumers import `SparkScene` from the barrel — all 16 use the
+module path `core/SparkScene`, which Phase 2/3 re-types when copying
+regardless, so the barrel name reaches external consumers only; (2) an
+alias would misrepresent to those consumers 14 SparkScene-only config keys
+(pagedExtSplats, LOD/foveation knobs, …), 4 members (.spark,
+.registerPagedSplat, .throttleGate, .renderCount/.throttled), the
+.renderer/.clock type changes, and the sync-constructor-vs-`ready`
+execution model; (3) `SparkSceneConfig` is written down by zero consumers
+anywhere, so a config alias defends nobody. CONSEQUENCE: the sibling swap's
+one-line-dependency goal (D12) is carried by Phase 2's consumer re-typing;
+the external rename is a loud one-line edit, not a silent semantic trap.
+H-API's consumer fixture (Phase 2) records this divergence as expected.
+
 **sRGB constraint — ACCEPTED (2026-08-20, ticket 03 close):** with the doc 04
 sRGB working space set (core/colorSpace.ts), assigning
 `renderer.outputColorSpace` on a CLASSIC WebGLRenderer throws inside three —
