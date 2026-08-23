@@ -96,6 +96,10 @@ block, with the owner. Everything else here has no plausible blocker.
 **GATE resolved 2026-08-22: grade-parity-REACHED (H-GRADE approved on the
 ticket 10 evidence).**
 
+**Met 2026-08-23** — all 11 tickets of `.scratch/phase-1-foundation/`
+done (spec.md ticket map; per-ticket evidence in each issue file's
+Comments); GATE resolution above; barrel naming ruled D24 (doc 06).
+
 ## Phase 2 — Backend + production pager + load contract  ·  ≥114 adapt points  ·  GATE
 
 **Entry:** Phases 0–1. The spike's numbers are the bar to beat.
