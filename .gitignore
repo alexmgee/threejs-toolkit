@@ -13,3 +13,7 @@ spikes/native-rad/rad-three/pkg/
 # OS noise
 Thumbs.db
 .DS_Store
+
+# ticket 02: promoted crate + lib build outputs — generated, never history
+dist-lib/
+rad-three/pkg/

@@ -11,10 +11,10 @@ import { resolve } from "path";
  * build — the barrel is the lib surface, not the site entry. Later tickets
  * add pages to the same input map.
  *
- * WASM worker bundling is explicitly DEFERRED to Phase 2 (owner ruling,
- * ticket 01). When the Rust/WASM decode worker lands, take the proven
- * worker settings from the Phase 0 spike: spikes/native-rad/vite.config.ts
- * (`worker.format: "es"`, `build.target: "esnext"`).
+ * WASM worker bundling landed with Phase 2 ticket 02: the proven settings
+ * from the Phase 0 spike (spikes/native-rad/vite.config.ts) graduate here —
+ * `worker.format: "es"` + `build.target: "esnext"` — for the promoted
+ * decode worker (src/backend/rad-worker.ts + rad-three/pkg).
  */
 export default defineConfig({
   server: {
@@ -24,11 +24,20 @@ export default defineConfig({
     // increment reproduces the wrong-app confusion autoPort exists to end.
     port: Number(process.env.PORT) || 5173,
     strictPort: true,
+    fs: {
+      // Serve the golden .rad asset from read-only sparkjs-toolkit through
+      // /@fs (spike pattern) — vite's static server honors Range requests.
+      allow: [".", "D:/Projects/sparkjs-toolkit/examples/assets"],
+    },
+  },
+  worker: {
+    format: "es",
   },
   resolve: {
     alias: [{ find: "@toolkit", replacement: resolve(__dirname, "src") }],
   },
   build: {
+    target: "esnext",
     rollupOptions: {
       input: {
         rail: resolve(__dirname, "examples/rail/index.html"),
@@ -40,6 +49,7 @@ export default defineConfig({
         media: resolve(__dirname, "examples/media/index.html"),
         author: resolve(__dirname, "examples/author/index.html"),
         "rules-lab": resolve(__dirname, "examples/rules-lab/index.html"),
+        "decode-lab": resolve(__dirname, "examples/decode-lab/index.html"),
       },
     },
   },

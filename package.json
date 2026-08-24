@@ -5,13 +5,15 @@
   "type": "module",
   "description": "3D Gaussian-splat website toolkit on three.js native splat rendering",
   "scripts": {
-    "dev": "vite",
+    "dev": "npm run build:wasm && vite",
     "typecheck": "tsc --noEmit",
     "lint:boundaries": "depcruise src examples --config .dependency-cruiser.cjs",
-    "check": "npm run typecheck && npm run lint:boundaries && npm run build",
-    "build": "npm run build:site && npm run build:embed",
+    "check": "npm run build && npm run typecheck && npm run lint:boundaries",
+    "build": "npm run build:wasm && npm run build:site && npm run build:embed",
     "build:site": "vite build",
-    "build:embed": "vite build --config vite.embed.config.ts"
+    "build:embed": "vite build --config vite.embed.config.ts",
+    "build:lib": "vite build --config vite.lib.config.ts",
+    "build:wasm": "wasm-pack build rad-three --target web --release"
   },
   "dependencies": {
     "@chenglou/pretext": "0.0.8",

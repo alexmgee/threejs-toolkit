@@ -46,6 +46,26 @@ module.exports = {
       },
     },
     {
+      name: "lib-barrel-must-not-reach-inline-worker",
+      comment:
+        "Ticket 02 (D14 variant A): src/backend/decode.ts imports the decode " +
+        "worker `?worker&inline` — ~200 KB of untree-shakeable base64 wasm. " +
+        "That is the EMBED bundle's door only. The library barrel " +
+        "(src/index.ts) must never reach it, directly or transitively: a " +
+        "blanket `export * from './backend'` would silently land the inline " +
+        "worker in every dist-lib consumer, who want the URL-constructed " +
+        "worker instead. Machine-checks the guard comment in " +
+        "src/backend/index.ts.",
+      severity: "error",
+      from: {
+        path: "^src/index\\.ts$",
+      },
+      to: {
+        path: "^src/backend/decode\\.ts$",
+        reachable: true,
+      },
+    },
+    {
       name: "no-circular",
       comment:
         "Dependency cycles defeat the layering the module map describes and " +

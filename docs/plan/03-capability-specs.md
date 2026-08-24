@@ -28,7 +28,17 @@ with partial range uploads; the four storage buffers are reachable (via fork);
 - `chunksStart = 8 + roundup8(headerLength)` — **not** `8 + length`.
 - Scales are stored logarithmically and decoded back to **linear** before covariance
   construction (`rad.rs:1203-1224`, `:1693`); getting this wrong double-applies `exp()`.
-- Opacity is sigmoid-encoded; decode once, exactly once.
+- Opacity (alpha) is stored **linear** in `.rad` — f32/f16/r8, with no
+  NONLINEAR transform anywhere (`rad.rs:1640-1656` → `set_opacity`, stored
+  as-is; r8 still gets the ordinary affine min/max dequantization every r8
+  property gets). CORRECTED 2026-08-23 (ticket 02): this bullet previously
+  claimed sigmoid-encoding; an exhaustive grep of spark-lib's Rust found zero
+  sigmoid anywhere. The only sigmoid in Spark is the PLY reader converting raw
+  3DGS logit opacities at load (`reference/spark/src/ply.ts:553-555`,
+  `1/(1+exp(-opacity))`); ply.ts:673 is the INVERSE (write-side logit for
+  injectRgba) despite its comment saying "sigmoid". Consequence: the `.rad`
+  decoder does nothing; the monolithic **PLY** path (Phase 2 ticket 03) DOES
+  need the read-side sigmoid.
 - The LOD tree consumes: center, **a scalar size**, child count, child start
   (`lod_tree.rs:208-217`); size derives per `splat_encode.rs:480-491`. The first-pass
   design misidentified this datum — the corrected contract is the one implemented.

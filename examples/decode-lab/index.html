@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Decode Lab — WASM worker | threejs-toolkit</title>
+  <link rel="stylesheet" href="../shared/sandbox-styles.css" />
+  <style>
+    /* Same readability restore as the diag/rules-lab fixtures. */
+    html, body { overflow: auto; }
+    body { padding: 24px; color: #ccc; }
+    #out .assertion { margin: 4px 0; padding: 2px 8px; border-left: 3px solid #555; }
+    #out .pass { color: #4ade80; border-color: #4ade80; }
+    #out .fail { color: #f87171; border-color: #f87171; }
+    #out h2.pass { color: #4ade80; }
+    #out h2.fail { color: #f87171; }
+  </style>
+</head>
+<body>
+  <h1>decode-lab — promoted rad-three worker (Phase 2 ticket 02)</h1>
+  <div id="out"></div>
+  <script type="module" src="./main.ts"></script>
+</body>
+</html>

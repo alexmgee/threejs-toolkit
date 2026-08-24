@@ -27,3 +27,14 @@ load-bearing in this ticket.
       the fork fails the gate.
 - [ ] The D18 placeholder's old exports are gone from the tree, not deprecated in
       place.
+
+## Comments
+
+**Note from ticket 02 (2026-08-23, citation corrected same day by review),
+binding on this ticket's PLY loader:** raw 3DGS `.ply` stores opacity as
+LOGITS — Spark's PLY reader applies the sigmoid at load:
+`reference/spark/src/ply.ts:553-555`, `op = 1/(1+exp(-opacity))` (no clamp).
+Do NOT copy ply.ts:673 — that is the INVERSE (write-side logit for
+injectRgba) despite its "sigmoid" comment; applying it at load turns
+opacity 2 into NaN. The `.rad` container is linear-alpha (doc 03 A1,
+corrected); the read-side sigmoid belongs HERE, applied exactly once.

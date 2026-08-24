@@ -42,10 +42,27 @@ Spark exposed 18 tunables; upstream exposes one. Which knobs earn re-creation in
 fork (splat scale? falloff? radius cap?) — each is fork surface. *Assumption: none
 until a fixture shows a visual need; add by evidence, not nostalgia.*
 
-**D14 — Embed bundle + WASM: inline or side-load?** [Phase 2]
-The single-file embed build must carry the decoder. Inline = bigger file, zero extra
-requests; side-load = extra request, cacheable. *Assumption: side-load with
-integrity hash; revisit with real size numbers.*
+**D14 — DECIDED (2026-08-23, OWNER RULED at ticket 02's measurement stop):
+the embed bundle INLINES the WASM — variant A, everything in one file.**
+Grounds: the embed's contract IS single-file self-containment (sparkjs's own
+embed config externalizes nothing; Spark ships its wasm as inline base64 for
+the same reason); A's costs are trivial at these sizes while C's failure
+mode — sidecar files stranded from the embed that needs them — is structural
+and lands on every future embedding. The standing side-load assumption is
+superseded by these numbers. Measurement (ticket 02, real builds, logs in
+.collab-logs/d14/; raw wasm 152,881 B):
+
+| Variant | Embed file delta | Extra requests | Separate assets (raw / gzip) |
+|---|---|---|---|
+| A inline (RULED) | +212,906 B raw / +93,995 B gzip | 0 | — |
+| B worker side-loaded, wasm inlined in worker | +~200 B | 1 | worker 212,191 / 93,640 |
+| C worker + wasm both separate | +~200 B | 2 | worker 5,820 / 1,965 + wasm 152,881 / 71,185 |
+
+Vite fact that shaped the field: LIBRARY mode always inlines assets, so C
+would need the worker as a second build artifact; B falls out of lib mode
+free. POST-PARITY REVISIT CANDIDATE: C's independent caching and streaming
+compile (instantiateStreaming needs a real .wasm response) become material
+only if embed size grows — revisit then, with these numbers as baseline.
 
 **D15 — DECIDED (2026-08-15): alexgee.online switches first.** Owner note: order is
 inconsequential to the build plan. Standing task unchanged: one-pass survey of each

@@ -19,16 +19,22 @@ import { resolve } from "path";
  * is explicit: an external "three" would leave a bare import no browser can
  * resolve.
  *
- * WASM worker bundling is explicitly DEFERRED to Phase 2 (owner ruling,
- * ticket 01). When the Rust/WASM decode worker lands, take the proven
- * worker settings from the Phase 0 spike: spikes/native-rad/vite.config.ts
- * (`worker.format: "es"`, `build.target: "esnext"`).
+ * WASM worker settings graduated from the Phase 0 spike with ticket 02
+ * (`worker.format: "es"`, `build.target: "esnext"`). D14 RULED 2026-08-23
+ * (doc 06): variant A — the embed entry imports the decode worker INLINE
+ * (src/backend/decode.ts `?worker&inline`), wasm as base64 inside the one
+ * file. Single-file self-containment is the embed's contract; do not
+ * split assets out of it without re-opening D14.
  */
 export default defineConfig({
   resolve: {
     alias: [{ find: "@toolkit", replacement: resolve(__dirname, "src") }],
   },
+  worker: {
+    format: "es",
+  },
   build: {
+    target: "esnext",
     outDir: "dist-embed",
     lib: {
       entry: resolve(__dirname, "src/backend/index.ts"),
