@@ -49,7 +49,19 @@ embed config externalizes nothing; Spark ships its wasm as inline base64 for
 the same reason); A's costs are trivial at these sizes while C's failure
 mode — sidecar files stranded from the embed that needs them — is structural
 and lands on every future embedding. The standing side-load assumption is
-superseded by these numbers. Measurement (ticket 02, real builds, logs in
+superseded by these numbers. SCOPE (recorded 2026-08-27, external audit): this ruling governs the eventual
+PRODUCT embed (`src/embed/register.ts` → `<splat-site>`), which R2 defers to a
+later Phase 2 ticket. The artifact `npm run build:embed` produces TODAY is the
+ticket-01 SCAFFOLD: its lib entry is `src/backend/index.ts` (vite.embed.config.ts,
+labelled SCAFFOLD ENTRY) and it exports only `createDecodeWorker`. The numbers
+below are unaffected — they were measured with dedicated worker-only entries
+(.collab-logs/d14/entry-{inline,sideload}.ts), and the wasm is a fixed size
+independent of what else the bundle carries (152,881 B as measured here; it
+grows only when the CRATE changes — e.g. 154,880 B after the 2026-08-27
+decoder-guard pass), so the real entry changes the embed's TOTAL size, not the
+A-vs-B-vs-C difference the ruling turns on.
+
+Measurement (ticket 02, real builds, logs in
 .collab-logs/d14/; raw wasm 152,881 B):
 
 | Variant | Embed file delta | Extra requests | Separate assets (raw / gzip) |

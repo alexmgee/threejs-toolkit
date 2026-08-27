@@ -31,14 +31,31 @@ with partial range uploads; the four storage buffers are reachable (via fork);
 - Opacity (alpha) is stored **linear** in `.rad` — f32/f16/r8, with no
   NONLINEAR transform anywhere (`rad.rs:1640-1656` → `set_opacity`, stored
   as-is; r8 still gets the ordinary affine min/max dequantization every r8
-  property gets). CORRECTED 2026-08-23 (ticket 02): this bullet previously
-  claimed sigmoid-encoding; an exhaustive grep of spark-lib's Rust found zero
-  sigmoid anywhere. The only sigmoid in Spark is the PLY reader converting raw
-  3DGS logit opacities at load (`reference/spark/src/ply.ts:553-555`,
-  `1/(1+exp(-opacity))`); ply.ts:673 is the INVERSE (write-side logit for
-  injectRgba) despite its comment saying "sigmoid". Consequence: the `.rad`
-  decoder does nothing; the monolithic **PLY** path (Phase 2 ticket 03) DOES
-  need the read-side sigmoid.
+  property gets). CORRECTED 2026-08-23 (ticket 02); grep claim RE-CORRECTED
+  2026-08-27 (external audit): this bullet previously claimed sigmoid-encoding.
+  The correction rests on the STRUCTURE of the format, not on a word search:
+  `enum RadAlphaEncoding` is exactly Auto|F32|F16|R8 with no sigmoid variant
+  (`rad.rs:56-62`); `resolve_alpha_encoding` only picks F16 vs R8 by
+  `max_alpha > 1.0` (`:347-364`); and the R8 encoder quantizes the range
+  [0.0, max_alpha] (`:638`) — a logit range, unbounded and routinely negative,
+  could not survive it. The earlier note that `grep -ri sigmoid` over
+  spark-lib's Rust returned zero hits was true about the STRING but FALSE as a
+  claim about the code: Spark's Rust writes its sigmoids as the formula.
+  Searching the form `1.0 / (1.0 + (-x).exp())` across `reference/spark/rust`
+  finds exactly two, both outside `.rad` — `spark-lib/src/ply.rs:116` (raw-3DGS
+  PLY opacity, the property literally named `opacity` at `:858`; the Rust twin
+  of `ply.ts:553-555`) and `spark-lib/src/sogs.rs:436` (SOGS **v1** sh0 alpha;
+  v2's `decode_sh0_v2` is linear `byte/255`, `:410-420`). The only inverse in
+  Rust is `ply.rs:1244` ("opacity -> logit(opacity)", clamped ±100); ply.ts:673
+  is likewise the INVERSE (write-side logit for injectRgba) despite its comment
+  saying "sigmoid". Consequence: the `.rad` decoder does nothing; the monolithic
+  **PLY** path (Phase 2 ticket 03) DOES need the read-side sigmoid.
+- **SOGS caveat for a future loader** (recorded 2026-08-27 with the above; no
+  ticket owns it yet): SOGS alpha is VERSION-DEPENDENT. `sogs.rs`'s
+  `decode_sh0_v1` (`:425-443`) affine-dequantizes alpha and then applies the
+  sigmoid at `:436`; `decode_sh0_v2` (`:410-420`) is linear `byte/255` with no
+  sigmoid. Carrying the `.rad` "alpha is linear" conclusion across to SOGS would
+  silently produce wrong opacity on every v1 asset — branch on version.
 - The LOD tree consumes: center, **a scalar size**, child count, child start
   (`lod_tree.rs:208-217`); size derives per `splat_encode.rs:480-491`. The first-pass
   design misidentified this datum — the corrected contract is the one implemented.

@@ -38,3 +38,9 @@ Do NOT copy ply.ts:673 — that is the INVERSE (write-side logit for
 injectRgba) despite its "sigmoid" comment; applying it at load turns
 opacity 2 into NaN. The `.rad` container is linear-alpha (doc 03 A1,
 corrected); the read-side sigmoid belongs HERE, applied exactly once.
+
+Confirmed independently in Spark's Rust (2026-08-27): `reference/spark/rust/spark-lib/src/ply.rs:115-116`
+applies the same `1/(1+exp(-x))` to the PLY property literally named `opacity`
+(`:858`); the write-side inverse is `ply.rs:1244` ("opacity -> logit(opacity)",
+clamped ±100) — the Rust twin of the ply.ts:673 trap. Two witnesses, both
+languages.

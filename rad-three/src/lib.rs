@@ -24,6 +24,12 @@ fn roundup8(n: usize) -> usize {
     (n + 7) & !7
 }
 
+/// `roundup8` that reports overflow instead of wrapping to 0. `(n + 7)` wraps
+/// for n near usize::MAX, and a 0 result silently defeats an extent check.
+fn roundup8_checked(n: usize) -> Option<usize> {
+    n.checked_add(7).map(|v| v & !7)
+}
+
 #[derive(Deserialize)]
 struct ChunkMeta {
     version: u32,
@@ -170,9 +176,30 @@ fn decode_chunk_impl(bytes: &[u8]) -> Result<DecodedChunk, String> {
     };
 
     for prop in &meta.properties {
-        let start = payload_start + prop.offset as usize;
-        let end = start + prop.bytes as usize;
-        if bytes.len() < start + roundup8(prop.bytes as usize) {
+        // CHECKED conversion + CHECKED arithmetic. `offset`/`bytes` are u64
+        // straight from the chunk's JSON, and `as usize` truncates on wasm32
+        // while `start + bytes` and `roundup8(bytes)` both WRAP: a declared
+        // `bytes` near u64::MAX made roundup8 return 0 (defeating the extent
+        // check) and `end` wrap BELOW `start`, so `&bytes[start..end]` panicked
+        // — the same trap-and-permanently-leak mechanism this pass closed in the
+        // decoders, reachable on 64-bit hosts too. Proven by adversarial review
+        // 2026-08-27 with a ~200-byte chunk declaring bytes=18446744073709551609.
+        let offset = usize::try_from(prop.offset)
+            .map_err(|_| format!("property {} offset too large", prop.property))?;
+        let len = usize::try_from(prop.bytes)
+            .map_err(|_| format!("property {} bytes too large", prop.property))?;
+        let start = payload_start
+            .checked_add(offset)
+            .ok_or_else(|| format!("property {} offset out of range", prop.property))?;
+        let end = start
+            .checked_add(len)
+            .ok_or_else(|| format!("property {} extent out of range", prop.property))?;
+        let padded_end = start
+            .checked_add(roundup8_checked(len).ok_or_else(|| {
+                format!("property {} padded extent out of range", prop.property)
+            })?)
+            .ok_or_else(|| format!("property {} out of range", prop.property))?;
+        if bytes.len() < padded_end {
             return Err(format!("property {} out of range", prop.property));
         }
         let raw = &bytes[start..end];
@@ -198,7 +225,7 @@ fn decode_chunk_impl(bytes: &[u8]) -> Result<DecodedChunk, String> {
                 out.alpha = match prop.encoding.as_str() {
                     "f32" => decode_f32(data, 1, count)?,
                     "f16" => decode_f16(data, 1, count)?,
-                    "r8" => decode_r8(data, 1, count, need(prop.min, "min")?, need(prop.max, "max")?),
+                    "r8" => decode_r8(data, 1, count, need(prop.min, "min")?, need(prop.max, "max")?)?,
                     e => return Err(format!("unsupported alpha encoding {e}")),
                 };
             }
@@ -206,7 +233,7 @@ fn decode_chunk_impl(bytes: &[u8]) -> Result<DecodedChunk, String> {
                 out.rgb = match prop.encoding.as_str() {
                     "f32" => decode_f32(data, 3, count)?,
                     "f16" => decode_f16(data, 3, count)?,
-                    "r8_delta" => decode_r8_delta(data, 3, count, need(prop.min, "min")?, need(prop.max, "max")?),
+                    "r8_delta" => decode_r8_delta(data, 3, count, need(prop.min, "min")?, need(prop.max, "max")?)?,
                     e => return Err(format!("unsupported rgb encoding {e}")),
                 };
             }
@@ -227,7 +254,7 @@ fn decode_chunk_impl(bytes: &[u8]) -> Result<DecodedChunk, String> {
                 out.sh1 = match prop.encoding.as_str() {
                     "f32" => decode_f32(data, 9, count)?,
                     "f16" => decode_f16(data, 9, count)?,
-                    "s8" => decode_s8(data, 9, count, need(prop.max, "max")?),
+                    "s8" => decode_s8(data, 9, count, need(prop.max, "max")?)?,
                     e => return Err(format!("unsupported sh1 encoding {e}")),
                 };
             }
@@ -268,8 +295,22 @@ fn need(v: Option<f32>, name: &str) -> Result<f32, String> {
 
 // ---- codecs: all transposed (dimension-major); see FORMAT.md table ----
 
+/// Bytes a decoder needs for `unit * dims * count`, computed with CHECKED
+/// multiplication.
+///
+/// `usize` is 32 bits on wasm32, so the plain product can WRAP: a declared
+/// count of 477,218,589 with dims 9 wraps to 5, and a 5-byte payload would then
+/// satisfy `data.len() < dims * count` and walk straight off the end. `count`
+/// is attacker-controlled (it comes from the chunk's JSON header), so every
+/// guard below routes through here. Adversarial review, 2026-08-27.
+fn required_len(unit: usize, dims: usize, count: usize) -> Result<usize, String> {
+    unit.checked_mul(dims)
+        .and_then(|v| v.checked_mul(count))
+        .ok_or_else(|| format!("declared extent {unit}*{dims}*{count} overflows usize"))
+}
+
 fn decode_f32(data: &[u8], dims: usize, count: usize) -> Result<Vec<f32>, String> {
-    if data.len() < 4 * dims * count {
+    if data.len() < required_len(4, dims, count)? {
         return Err("f32 data short".into());
     }
     let mut out = vec![0.0f32; dims * count];
@@ -284,7 +325,7 @@ fn decode_f32(data: &[u8], dims: usize, count: usize) -> Result<Vec<f32>, String
 }
 
 fn decode_f16(data: &[u8], dims: usize, count: usize) -> Result<Vec<f32>, String> {
-    if data.len() < 2 * dims * count {
+    if data.len() < required_len(2, dims, count)? {
         return Err("f16 data short".into());
     }
     let mut out = vec![0.0f32; dims * count];
@@ -299,7 +340,7 @@ fn decode_f16(data: &[u8], dims: usize, count: usize) -> Result<Vec<f32>, String
 }
 
 fn decode_f32_lebytes(data: &[u8], dims: usize, count: usize) -> Result<Vec<f32>, String> {
-    if data.len() < 4 * dims * count {
+    if data.len() < required_len(4, dims, count)? {
         return Err("f32_lebytes data short".into());
     }
     let stride = count * dims;
@@ -314,7 +355,20 @@ fn decode_f32_lebytes(data: &[u8], dims: usize, count: usize) -> Result<Vec<f32>
     Ok(out)
 }
 
-fn decode_r8(data: &[u8], dims: usize, count: usize, min: f32, max: f32) -> Vec<f32> {
+// The three byte-wide decoders below guard their length like every sibling
+// decoder does. Without the guard a SHORT INFLATED payload indexes past the
+// slice: on wasm32 `panic=abort`, so the trap runs no destructors and
+// permanently leaks the `vec![0.0f32; dims*count]` already allocated — a
+// 200-byte hostile chunk cost 0.75 MB of wasm heap per attempt, measured, and
+// wasm memory never shrinks. The chunk-level check (`bytes.len() < start +
+// roundup8(prop.bytes)`) validates the COMPRESSED extent only; inflation
+// happens afterwards and its result length was never examined. Two of the
+// eight properties in the production hero asset (rgb r8_delta, sh1 s8) come
+// through here. Found by external audit 2026-08-27; probe matrix below.
+fn decode_r8(data: &[u8], dims: usize, count: usize, min: f32, max: f32) -> Result<Vec<f32>, String> {
+    if data.len() < required_len(1, dims, count)? {
+        return Err("r8 data short".into());
+    }
     let mut out = vec![0.0f32; dims * count];
     for i in 0..count {
         let mut index = i;
@@ -323,10 +377,13 @@ fn decode_r8(data: &[u8], dims: usize, count: usize, min: f32, max: f32) -> Vec<
             index += count;
         }
     }
-    out
+    Ok(out)
 }
 
-fn decode_s8(data: &[u8], dims: usize, count: usize, max: f32) -> Vec<f32> {
+fn decode_s8(data: &[u8], dims: usize, count: usize, max: f32) -> Result<Vec<f32>, String> {
+    if data.len() < required_len(1, dims, count)? {
+        return Err("s8 data short".into());
+    }
     let mut out = vec![0.0f32; dims * count];
     for i in 0..count {
         let mut index = i;
@@ -335,10 +392,13 @@ fn decode_s8(data: &[u8], dims: usize, count: usize, max: f32) -> Vec<f32> {
             index += count;
         }
     }
-    out
+    Ok(out)
 }
 
-fn decode_r8_delta(data: &[u8], dims: usize, count: usize, min: f32, max: f32) -> Vec<f32> {
+fn decode_r8_delta(data: &[u8], dims: usize, count: usize, min: f32, max: f32) -> Result<Vec<f32>, String> {
+    if data.len() < required_len(1, dims, count)? {
+        return Err("r8_delta data short".into());
+    }
     // Delta runs along each dimension's row in the transposed layout
     // (encoder walks dim-major: rad.rs:1119-1132).
     let mut out = vec![0.0f32; dims * count];
@@ -350,7 +410,7 @@ fn decode_r8_delta(data: &[u8], dims: usize, count: usize, min: f32, max: f32) -
             out[i * dims + d] = (value as f32 / 255.0) * (max - min) + min;
         }
     }
-    out
+    Ok(out)
 }
 
 fn decode_ln_f16(data: &[u8], dims: usize, count: usize) -> Result<Vec<f32>, String> {
@@ -359,7 +419,7 @@ fn decode_ln_f16(data: &[u8], dims: usize, count: usize) -> Result<Vec<f32>, Str
 }
 
 fn decode_quat_oct88r8(data: &[u8], count: usize) -> Result<Vec<f32>, String> {
-    if data.len() < 3 * count {
+    if data.len() < required_len(3, 1, count)? {
         return Err("oct88r8 data short".into());
     }
     let mut out = vec![0.0f32; 4 * count];
@@ -386,7 +446,7 @@ fn decode_quat_oct88r8(data: &[u8], count: usize) -> Result<Vec<f32>, String> {
 }
 
 fn decode_u16(data: &[u8], dims: usize, count: usize) -> Result<Vec<u16>, String> {
-    if data.len() < 2 * dims * count {
+    if data.len() < required_len(2, dims, count)? {
         return Err("u16 data short".into());
     }
     let mut out = vec![0u16; dims * count];
@@ -401,7 +461,7 @@ fn decode_u16(data: &[u8], dims: usize, count: usize) -> Result<Vec<u16>, String
 }
 
 fn decode_u32(data: &[u8], dims: usize, count: usize) -> Result<Vec<u32>, String> {
-    if data.len() < 4 * dims * count {
+    if data.len() < required_len(4, dims, count)? {
         return Err("u32 data short".into());
     }
     let mut out = vec![0u32; dims * count];
@@ -468,6 +528,15 @@ fn covariance_from(scale: &[f32], quat: &[f32], count: usize) -> Vec<f32> {
 /// RGBA8 for the renderer's color attribute. Alpha clamps to [0,1] HERE ONLY —
 /// the un-clamped alpha array is preserved for LOD selection (lodOpacity nodes
 /// legitimately exceed 1.0; FORMAT.md).
+// NOTE on rounding: `.round()` (half-away-from-zero) is DELIBERATE here and is
+// NOT the ToUint8Clamp (ties-to-even) rule that governs `sh1_byte`. The two
+// differ because their contracts differ: sh1 bytes are also produced by JS
+// (the fork packs the same floats through a Uint8ClampedArray), so the Rust
+// must match bit-for-bit; color bytes have NO JS producer — every JS site only
+// consumes them as `color[i]/255` — so the reference implementation is the only
+// authority, and it uses this same rule (spark-lib antisplat.rs:218,
+// ksplat.rs:553, csplat.rs:22, rad.rs:1062/1125). Switching to f64+ties-even
+// would silently diverge from the reference. Verified 2026-08-27.
 fn color_from(rgb: &[f32], alpha: &[f32], count: usize) -> Vec<u8> {
     let mut out = vec![0u8; count * 4];
     for i in 0..count {
@@ -484,16 +553,90 @@ fn color_from(rgb: &[f32], alpha: &[f32], count: usize) -> Vec<u8> {
 mod tests {
     use super::*;
 
-    /// Golden test against chunk 0 of the real hero file. Run with:
-    ///   cargo test --release -- --nocapture
-    /// Requires the hero asset at the sparkjs-toolkit path (read-only).
+    /// Short-payload guard matrix — the falsifiable form of the length checks
+    /// on decode_r8 / decode_s8 / decode_r8_delta. Each previously PANICKED
+    /// (wasm32 `panic=abort` ⇒ trap + permanent heap leak). Without this test a
+    /// future edit silently reopens the hole. External audit, 2026-08-27.
     #[test]
-    fn decodes_hero_chunk0() {
-        let path = "D:/Projects/sparkjs-toolkit/examples/assets/lab-sh1-sparsity.rad";
-        let Ok(all) = std::fs::read(path) else {
-            eprintln!("hero asset not present; skipping");
-            return;
+    fn short_payloads_error_instead_of_panicking() {
+        // Declared count exceeds the payload — the hostile/truncated case.
+        assert!(decode_r8(&[0u8; 4], 1, 16, 0.0, 1.0).is_err(), "r8 short must Err");
+        assert!(decode_s8(&[0u8; 8], 9, 16, 1.0).is_err(), "s8 short must Err");
+        assert!(decode_r8_delta(&[0u8; 8], 3, 16, 0.0, 1.0).is_err(), "r8_delta short must Err");
+
+        // Exact boundary: dims*count bytes is enough, one fewer is not — proves
+        // the guard is not off by one in either direction.
+        assert!(decode_r8(&[0u8; 16], 1, 16, 0.0, 1.0).is_ok(), "r8 exact-fit must decode");
+        assert!(decode_r8(&[0u8; 15], 1, 16, 0.0, 1.0).is_err(), "r8 one-byte-short must Err");
+        // decode_r8 must also honour dims: covered because a guard regressed to
+        // required_len(1, 1, count) would pass every dims=1 case above.
+        assert!(decode_r8(&[0u8; 48], 3, 16, 0.0, 1.0).is_ok(), "r8 dims=3 exact-fit must decode");
+        assert!(decode_r8(&[0u8; 47], 3, 16, 0.0, 1.0).is_err(), "r8 dims=3 one-byte-short must Err");
+        assert!(decode_s8(&[0u8; 144], 9, 16, 1.0).is_ok(), "s8 exact-fit must decode");
+        assert!(decode_s8(&[0u8; 143], 9, 16, 1.0).is_err(), "s8 one-byte-short must Err");
+        assert!(decode_r8_delta(&[0u8; 48], 3, 16, 0.0, 1.0).is_ok(), "r8_delta exact-fit must decode");
+        assert!(decode_r8_delta(&[0u8; 47], 3, 16, 0.0, 1.0).is_err(), "r8_delta one-byte-short must Err");
+    }
+
+    /// A declared extent that OVERFLOWS usize must be rejected, not wrapped.
+    /// On wasm32 (usize = 32 bits) dims*count for count=477,218,589, dims=9
+    /// wraps to 5 — an unchecked guard would let a 5-byte payload through and
+    /// the walk would run off the end. Adversarial review, 2026-08-27.
+    #[test]
+    fn declared_extent_overflow_is_rejected() {
+        // Platform-independent: overflows usize at any width.
+        assert!(required_len(4, 9, usize::MAX / 8).is_err(), "overflowing extent must Err");
+        assert!(required_len(1, 1, usize::MAX).is_ok(), "exact-fit extent must not read as overflow");
+        // The wasm32 wrap case. On a 64-bit host the product does not wrap and
+        // the length check rejects it instead — Err either way is the invariant.
+        assert!(decode_s8(&[0u8; 5], 9, 477_218_589, 1.0).is_err(), "wrapping s8 extent must Err");
+        assert!(decode_r8(&[0u8; 5], 9, 477_218_589, 0.0, 1.0).is_err(), "wrapping r8 extent must Err");
+        assert!(decode_r8_delta(&[0u8; 5], 9, 477_218_589, 0.0, 1.0).is_err(), "wrapping r8_delta extent must Err");
+    }
+
+    /// A hostile per-property extent in the chunk header must Err, not panic.
+    /// A `bytes` near u64::MAX previously made `roundup8` wrap to 0 (defeating
+    /// the extent check) and `end` wrap below `start`, panicking in the slice.
+    /// Adversarial review, 2026-08-27.
+    #[test]
+    fn hostile_property_extent_errors_instead_of_panicking() {
+        let meta = r#"{"version":1,"base":0,"count":16,"payloadBytes":16,"properties":[{"offset":0,"bytes":18446744073709551609,"property":"alpha","encoding":"r8","min":0.0,"max":1.0}]}"#;
+        let mut chunk = Vec::new();
+        chunk.extend_from_slice(b"RADC");
+        chunk.extend_from_slice(&(meta.len() as u32).to_le_bytes());
+        chunk.extend_from_slice(meta.as_bytes());
+        chunk.resize(8 + roundup8(meta.len()) + 8 + 64, 0);
+        // Matched rather than expect_err: DecodedChunk is not Debug.
+        let e = match decode_chunk_impl(&chunk) {
+            Ok(_) => panic!("hostile extent must Err, not decode"),
+            Err(e) => e,
         };
+        assert!(e.contains("alpha"), "error should name the offending property, got: {e}");
+    }
+
+    /// Golden test against chunk 0 of the real hero file.
+    ///
+    /// #[ignore]d by default because the 213 MB asset lives in the read-only
+    /// sparkjs-toolkit sibling and is not on every machine: an absent asset now
+    /// prints "1 ignored" (visible) instead of masquerading as a pass, which is
+    /// what it did before — libtest swallows the eprintln and the summary read
+    /// "2 passed" either way.
+    ///
+    /// `npm run check` deliberately does NOT run this test: the gate must stay
+    /// green on a clean clone that has no sibling asset. Run it explicitly with
+    /// `npm run test:crate:golden` (`-- --include-ignored --nocapture`), where a
+    /// MISSING asset is a HARD FAILURE. Point RAD_HERO_ASSET at another copy to
+    /// run it elsewhere. Honest scope: #[ignore] does not manufacture coverage
+    /// off this machine — it only stops the absence from reading as green.
+    /// External audit + adversarial review, 2026-08-27.
+    #[test]
+    #[ignore = "needs the 213 MB hero asset; run with -- --include-ignored"]
+    fn decodes_hero_chunk0() {
+        let path = std::env::var("RAD_HERO_ASSET").unwrap_or_else(|_| {
+            "D:/Projects/sparkjs-toolkit/examples/assets/lab-sh1-sparsity.rad".to_string()
+        });
+        let all = std::fs::read(&path)
+            .unwrap_or_else(|e| panic!("hero asset {path} unreadable: {e}"));
         // header: FORMAT.md container layout
         let header_len = u32::from_le_bytes(all[4..8].try_into().unwrap()) as usize;
         let chunks_start = 8 + roundup8(header_len);

@@ -46,6 +46,35 @@ module.exports = {
       },
     },
     {
+      name: "rad-worker-value-import-only-from-decode",
+      comment:
+        "Ticket 02 (D14 variant A) — companion to " +
+        "lib-barrel-must-not-reach-inline-worker below, which an external " +
+        "audit showed guards a FILENAME, not a mechanism: dependency-cruiser " +
+        "STRIPS the `?worker&inline` query when resolving decode.ts's import, " +
+        "and 16.10.4 matches resolved paths only (no raw-specifier matcher), " +
+        "so the inline mechanism cannot be named directly. Pin it to ONE " +
+        "address instead: src/backend/decode.ts is the only module allowed a " +
+        "VALUE (non-type-only) dependency on src/backend/rad-worker.ts — " +
+        "~200 KB of untree-shakeable base64 wasm hangs off that edge. " +
+        "Type-only imports of the request/result types stay free (they erase; " +
+        "examples/decode-lab/main.ts relies on it and builds its worker from " +
+        "a URL, which is no dependency edge at all). HONEST SCOPE: this also " +
+        "forbids a future non-inline `?worker` import of the same file — " +
+        "deliberately, since a second door should be a config decision, not a " +
+        "drive-by import; it does NOT catch an inline import of a DUPLICATED " +
+        "worker source file.",
+      severity: "error",
+      from: {
+        path: "^(src|examples)/",
+        pathNot: "^src/backend/decode\\.ts$",
+      },
+      to: {
+        path: "^src/backend/rad-worker\\.ts$",
+        dependencyTypesNot: ["type-only"],
+      },
+    },
+    {
       name: "lib-barrel-must-not-reach-inline-worker",
       comment:
         "Ticket 02 (D14 variant A): src/backend/decode.ts imports the decode " +

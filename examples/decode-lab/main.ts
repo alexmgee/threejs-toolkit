@@ -63,13 +63,28 @@ const done = (async () => {
   const chunk = await fetchRange(chunksStart + c0.offset, chunksStart + c0.offset + c0.bytes - 1);
   assert("range-fetch", chunk.byteLength === c0.bytes, `chunk 0: ${chunk.byteLength} bytes via Range (206s only)`);
 
+  // try/finally, not a terminate on the success path only: a rejected decode
+  // otherwise leaks the worker and its wasm instance for the page's lifetime.
+  // Same hazard the review round fixed one level down (rad-worker.ts's
+  // try/finally around d.free()). Terminating here is safe because this fixture
+  // is SINGLE-SHOT — every output array was transferred at postMessage, so
+  // nothing below needs the worker alive. NOT a template for ticket 05's pool:
+  // four long-lived queued workers must NOT be terminated per decode (the next
+  // queued job would target a dead worker and re-initialize the WASM); the
+  // transferable pattern carries over, the lifecycle does not.
+  // External audit, 2026-08-27.
   const worker = new Worker(new URL("@toolkit/backend/rad-worker.ts", import.meta.url), { type: "module" });
-  const result = await new Promise<DecodeResult>((resolvePromise, reject) => {
-    worker.onmessage = (ev: MessageEvent<DecodeResult & { error?: string }>) =>
-      ev.data.error ? reject(new Error(ev.data.error)) : resolvePromise(ev.data);
-    worker.onerror = (e) => reject(new Error(`worker error: ${e.message}`));
-    worker.postMessage({ index: 0, bytes: chunk }, [chunk]);
-  });
+  let result: DecodeResult;
+  try {
+    result = await new Promise<DecodeResult>((resolvePromise, reject) => {
+      worker.onmessage = (ev: MessageEvent<DecodeResult & { error?: string }>) =>
+        ev.data.error ? reject(new Error(ev.data.error)) : resolvePromise(ev.data);
+      worker.onerror = (e) => reject(new Error(`worker error: ${e.message}`));
+      worker.postMessage({ index: 0, bytes: chunk }, [chunk]);
+    });
+  } finally {
+    worker.terminate();
+  }
 
   assert(
     "decode-shape",
@@ -125,7 +140,6 @@ const done = (async () => {
       : mismatches.map(([name, v]) => `${name}=${v} (want ${EXPECTED[name]})`).join("; "),
   );
 
-  worker.terminate();
   const heading = document.createElement("h2");
   heading.className = failed === 0 ? "pass" : "fail";
   heading.textContent = `decode-lab: ${passed} passed, ${failed} failed`;
