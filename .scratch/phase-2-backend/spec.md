@@ -44,7 +44,10 @@ authorized; each start is an explicit owner go.
 - **Rule-11 stops:** any decision the spec/docs leave unsettled → stop and ask the
   owner before building either reading. No time estimates, ever.
 - **Gate:** `npm run check` TRUE exit code (redirect to file, echo $?, never pipe);
-  iterate to fixpoint — tsc reports in waves.
+  iterate to fixpoint — tsc reports in waves. OWNER RULED 2026-08-28: on THIS
+  machine the standard gate for sessions is **`npm run check:full`** (check +
+  `test:crate:golden` — the hero asset is always present here); the portable
+  `check` remains the clean-clone contract and never grows an asset dependency.
 
 ## Entry-condition records (2026-08-23)
 

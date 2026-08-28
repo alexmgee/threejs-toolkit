@@ -10,6 +10,7 @@
     "typecheck": "tsc --noEmit",
     "lint:boundaries": "depcruise src examples --config .dependency-cruiser.cjs",
     "check": "npm run build && npm run test:crate && npm run typecheck && npm run lint:boundaries",
+    "check:full": "npm run check && npm run test:crate:golden",
     "build": "npm run build:site && npm run build:embed",
     "prebuild:site": "npm run build:wasm",
     "build:site": "vite build",

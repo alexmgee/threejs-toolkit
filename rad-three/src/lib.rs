@@ -157,7 +157,13 @@ fn decode_chunk_impl(bytes: &[u8]) -> Result<DecodedChunk, String> {
         return Err(format!("unsupported chunk version {}", meta.version));
     }
     let payload_start = meta_end + 8;
-    let count = meta.count as usize;
+    // OWNER RULED 2026-08-28: a count that cannot fit the platform is a
+    // REFUSAL with a named error, never a truncation — the same philosophy as
+    // doc 03 §F's capacity guard. (`as usize` truncated u64→u32 on wasm32,
+    // yielding a self-consistent decode at the wrong length: wrong data, not
+    // unsafe, but silently wrong.)
+    let count = usize::try_from(meta.count)
+        .map_err(|_| format!("declared count {} does not fit this platform", meta.count))?;
 
     let mut out = DecodedChunk {
         base: meta.base,
@@ -612,6 +618,22 @@ mod tests {
             Err(e) => e,
         };
         assert!(e.contains("alpha"), "error should name the offending property, got: {e}");
+    }
+
+    /// OWNER RULED 2026-08-28: an oversized declared count is a REFUSAL.
+    /// On wasm32 (usize = 32 bits) count 2^33 fails `usize::try_from` with the
+    /// named error; on a 64-bit host the same chunk is refused by the extent
+    /// guards instead ("data short") — Err either way is the invariant, same
+    /// pattern as declared_extent_overflow_is_rejected.
+    #[test]
+    fn oversized_declared_count_is_refused() {
+        let meta = r#"{"version":1,"base":0,"count":8589934592,"payloadBytes":16,"properties":[{"offset":0,"bytes":16,"property":"alpha","encoding":"r8","min":0.0,"max":1.0}]}"#;
+        let mut chunk = Vec::new();
+        chunk.extend_from_slice(b"RADC");
+        chunk.extend_from_slice(&(meta.len() as u32).to_le_bytes());
+        chunk.extend_from_slice(meta.as_bytes());
+        chunk.resize(8 + roundup8(meta.len()) + 8 + 64, 0);
+        assert!(decode_chunk_impl(&chunk).is_err(), "count 2^33 must be refused, not truncated");
     }
 
     /// Golden test against chunk 0 of the real hero file.

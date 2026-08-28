@@ -472,3 +472,18 @@ claim 5 in this same pass exists to keep a clean clone working, and enlarging
 what the gate requires is the harder-to-reverse choice. One-line change if you
 want the stricter gate: append `&& npm run test:crate:golden` to `check`.
 Flagging rather than deciding — what the gate may depend on is a policy call.
+
+### OWNER RULINGS ON THE TWO FLAGGED DECISIONS (2026-08-28)
+
+- **Gate/golden:** `check` stays clean-clone-portable (no golden test). New
+  `check:full` = check + `test:crate:golden` is the STANDARD GATE for sessions
+  on this machine (recorded in spec.md's standing rules); portable `check`
+  remains the clean-clone contract.
+- **meta.count:** hard error, not truncation — a count that cannot fit the
+  platform is a refusal with a named error, per doc 03 §F's capacity-guard
+  philosophy. Implemented via `usize::try_from` with the count in the message;
+  probe `oversized_declared_count_is_refused` added (count 2^33: refused by
+  try_from on wasm32, by the extent guards on 64-bit — Err either way).
+
+Verification: crate 5 passed / 1 ignored (default), gate `npm run check:full`
+EXIT=0 quoted below.
