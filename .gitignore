@@ -17,3 +17,4 @@ Thumbs.db
 # ticket 02: promoted crate + lib build outputs — generated, never history
 dist-lib/
 rad-three/pkg/
+.agenttrail/
