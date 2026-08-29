@@ -1,6 +1,6 @@
 # 03 — SplatBackend seam + ThreeGsBackend + monolithic SPZ/PLY path
 
-**Status:** ready-for-agent
+**Status:** done
 **Blocked by:** None — can start immediately.
 
 **What to build:** a small `.spz`/`.ply` scene loads and renders through the real
@@ -249,3 +249,5 @@ hidden pane (handoff trap 4) and would have passed vacuously — replaced with
 a 16 ms interval sampler that must OBSERVE phase "ready" (non-vacuous), plus
 one deterministic final sample to close the assert-vs-interval race seen
 when visibility flips.
+
+**Status change: done — all six ACs met with evidence above (2026-08-29, commit b9af209).**
