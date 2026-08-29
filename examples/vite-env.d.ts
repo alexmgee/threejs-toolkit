@@ -4,3 +4,9 @@
 // program — src/ gains these ambient types too. It lives in examples/ as an
 // intent signal only: src/ is the lib surface and should stay
 // bundler-agnostic (zero import.meta uses there today — keep it that way).
+
+// ?url asset import used by splat-lab (ticket 03); same media-page pattern.
+declare module "*.ply?url" {
+  const src: string;
+  export default src;
+}

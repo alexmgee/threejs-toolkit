@@ -40,9 +40,10 @@ links: [scene-core, diagnostics, embed-site, fixtures]
 - [x] Harden the WASM decoder against hostile chunks {#decoder-hardening}
   by: claude
   tech: commits `a1c076c` + `15f4211`; length+overflow guards on all 9 decoders (`checked_mul`), container-extent panic fixed, oversized count refused (owner ruling); golden test skip made visible, `check:full` gate; 6 crate tests
-- [ ] Load small SPZ/PLY through the real seam {#seam-monolithic}
+- [x] Load small SPZ/PLY through the real seam {#seam-monolithic}
+  by: claude
   from: roadmap
-  tech: ticket 03 — first end-to-end splat on production runtime; D18 placeholder deleted
+  tech: ticket 03 — SplatBackend seam (full doc 02 interface, named refusals) + ThreeGsBackend PLY path; `examples/splat-lab/` 21/21 on WebGPU + webgl2-fallback, dev AND built; D18 placeholder deleted (doc 06 D18 CLOSED); PLY-only (SPZ named gap → watch item 13); embed kept at 213 kB via decode-only embed-entry
 - [ ] Fetch byte ranges and run four decode workers {#fetch-decode-pool}
   from: roadmap
   tech: ticket 05; bounded retry; pages-unavailable semantics
@@ -197,6 +198,14 @@ links: [scene-core, render-stack, text-markers, site-rules, diagnostics, backend
 
 ## decisions
 
+- **Ticket 03 rulings (owner, 2026-08-29):** monolithic path is PLY-only this ticket —
+  SPZ is a NAMED GAP tied to watch item 13 (r186 ships SPZLoader; import then, never
+  vendor now); the `spz` branch of `load()` throws a named refusal citing that item.
+  Fixture asset is GENERATED — deterministic committed script + committed small `.ply`
+  with known-exact opacity logits so the sigmoid check is falsifiable in closed form.
+  The seam declares the FULL doc 02 interface now; unimplemented methods throw named
+  refusals citing their owning ticket (dispose→04, raycast→Phase 3 §B, setEdits→Phase 3
+  §C, setOptics→Phase 5).
 - **D14 ruled 2026-08-23:** embed WASM inline (variant A) — single-file embed carries
   worker+WASM inside the bundle; pages build uses URL-constructed workers.
 - **D24 ruled 2026-08-23:** `ThreeSplatScene` exports under its own name — no

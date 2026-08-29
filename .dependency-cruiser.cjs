@@ -95,6 +95,27 @@ module.exports = {
       },
     },
     {
+      name: "vendor-must-not-reach-src",
+      comment:
+        "Ticket 03 (owner D23 ruling, 2026-08-23, spec.md): the vendored " +
+        "fork is a LEAF — src/vendor/three-gs/ may depend on npm packages " +
+        "(three) but never on toolkit code. A vendor->src edge would make " +
+        "fork internals load-bearing on toolkit modules, so a re-diff " +
+        "against a new upstream release could silently change toolkit " +
+        "behavior through the back door, defeating the bounded blast " +
+        "radius vendor-seam-only exists to guarantee. If forked code needs " +
+        "toolkit logic, the logic moves into src/backend/ and is passed " +
+        "in — the dependency arrow always points vendor-ward.",
+      severity: "error",
+      from: {
+        path: "^src/vendor/",
+      },
+      to: {
+        path: "^src/",
+        pathNot: "^src/vendor/",
+      },
+    },
+    {
       name: "no-circular",
       comment:
         "Dependency cycles defeat the layering the module map describes and " +

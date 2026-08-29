@@ -96,6 +96,14 @@ Design rules for the seam:
    too — sparkjs-toolkit *is* the other implementation, in its own repo. The seam
    exists to concentrate coupling, not to promise pluggability.
 
+*Resolution note (2026-08-29, ticket 03):* the sketch above never pinned how the
+renderable reaches the caller. Owner-ruled: `SplatHandle` carries
+`readonly object: THREE.Object3D` and the caller composes it (`scene.add`);
+the interface stays at exactly the method set above. Rejected alternatives: a tenth
+`objectOf()` method (grows the specced interface for purity alone) and
+backend-side attach (fights three.js composition idiom and ticket 09's
+SceneComposer work).
+
 ## RadPager — the streaming loader (full spec: doc 03 §A)
 
 Pipeline: `RadHeader` (parse; `chunksStart = 8 + roundup8(headerLength)` — the format

@@ -8,8 +8,10 @@ import { resolve } from "path";
  * <splat-site> file (sparkjs-toolkit's vite.embed.config.ts shape) — the
  * embed set is DEFERRED to Phase 2 by owner ruling R2
  * (.scratch/phase-1-foundation/spec.md). Until then this lib-builds
- * src/backend/index.ts — an existing, compiling module — so the second
- * build path is proven without a placeholder entry.
+ * src/backend/embed-entry.ts — the decode-only surface. It was the backend
+ * barrel until ticket 03 gave the barrel runtime exports (ThreeGsBackend →
+ * three/webgpu + vendored mesh), which ballooned embed.js 213 kB → ~1.1 MB;
+ * the dedicated entry restores the ticket-02 artifact contract.
  *
  * Self-contained by definition (sibling repo's reasoning, carried forward):
  * this config exists separately BECAUSE the main config becomes a multi-page
@@ -37,7 +39,7 @@ export default defineConfig({
     target: "esnext",
     outDir: "dist-embed",
     lib: {
-      entry: resolve(__dirname, "src/backend/index.ts"),
+      entry: resolve(__dirname, "src/backend/embed-entry.ts"),
       formats: ["es"],
       fileName: () => "embed.js",
     },

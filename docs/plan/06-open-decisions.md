@@ -105,6 +105,13 @@ vendored files, 2026-08-20; `src/core/index.ts` — replaced by ticket 04 with
 the real core files, 2026-08-20) are replaced
 by Phase 1 tickets; this one alone outlives Phase 1 — whoever builds the Phase 2
 seam deletes and replaces it, never leaves it beside the real code.
+**CLOSED (2026-08-29, Phase 2 ticket 03):** the placeholder types
+(`BackendMeshOptions`, the vendored-mesh type re-export) are deleted; the
+barrel now carries the real seam (`SplatBackend` types + `ThreeGsBackend`)
+plus the ticket-02 decode export, which lives on per this decision's own
+terms. The embed build gets its own decode-only entry
+(`src/backend/embed-entry.ts`) so the barrel's new runtime exports never
+enter the embed artifact.
 
 **D19 — DECIDED (2026-08-19): `ui/SplatTextMesh` ships in Phase 1 as an
 API-preserving typed STUB** inside the text cluster ticket, so
@@ -337,6 +344,14 @@ Events that shrink or delete our work — prefer deleting our code when one land
     boundary after it lands ("before Phase 1" is moot — Phase 1 is underway),
     and apply item 12's rename at publish (detail in FORK.md's drift list).
     **Checked 2026-08-19: NOT published** (`npm view three version` → 0.185.1).
+    **NAMED GAP tied to this item (ticket 03, owner-ruled 2026-08-29): SPZ
+    monolithic loading.** three 0.185.1 ships no SPZLoader (verified: only
+    PLYLoader.js in examples/jsm/loaders); SPZLoader arrives with r186. The
+    seam's `load()` is typed for `spz` but that branch throws a named refusal
+    citing this item. When r186 lands, SPZ becomes a plain
+    `three/addons/loaders/SPZLoader.js` import in ThreeGsBackend — never a
+    vendored copy (rejected: permanent fork surface for a format with no
+    current consumer, obsolete within one upstream release).
     The vendored dev-branch `GaussianSplatMesh` addon stays as-is, and doc 03's
     citations stand against 0.185.1. Re-check from this point at the next phase
     boundary — not from scratch.
