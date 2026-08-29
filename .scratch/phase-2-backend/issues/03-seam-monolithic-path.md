@@ -13,19 +13,19 @@ two definitions must not be invented twice.
 Standing rules bind (spec.md). Owner D23 ruling applies here: the seam becomes
 load-bearing in this ticket.
 
-- [ ] A fixture loads a small static asset via `backend.load()` and renders it on
+- [x] A fixture loads a small static asset via `backend.load()` and renders it on
       WebGPU and `?webgl=1`; screenshots at a pinned pose in Comments.
-- [ ] `counts()` and `bounds()` match an independent CPU read of the same asset
+- [x] `counts()` and `bounds()` match an independent CPU read of the same asset
       (bounds per-point, not 8-corner `applyMatrix4`).
-- [ ] `whenReady()` resolves after first paint; `progress()` is monotonic across
+- [x] `whenReady()` resolves after first paint; `progress()` is monotonic across
       the load.
-- [ ] Boundary guards (owner D23 ruling): the vendor→src / fork-internals rule is
+- [x] Boundary guards (owner D23 ruling): the vendor→src / fork-internals rule is
       added to the boundary config and a deliberate violation fails the gate;
       src→examples and spikes-uncruised are recorded accepted-unguarded with
       reasons in Comments; examples→src/backend recorded open-by-design.
-- [ ] The existing seam rule still holds: a deliberate outside-the-seam import of
+- [x] The existing seam rule still holds: a deliberate outside-the-seam import of
       the fork fails the gate.
-- [ ] The D18 placeholder's old exports are gone from the tree, not deprecated in
+- [x] The D18 placeholder's old exports are gone from the tree, not deprecated in
       place.
 
 ## Comments
