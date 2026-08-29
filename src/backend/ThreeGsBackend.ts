@@ -6,6 +6,11 @@ import {
   createGaussianSplatGeometryFromPLYGeometry,
   getGaussianSplatPLYPropertyMapping,
 } from "../vendor/three-gs/GaussianSplatUtils.js";
+import { assertStorageWithinLimit } from "../vendor/three-gs/patches/capacity-guard.js";
+import {
+  ForkPatchError,
+  disposeGaussianSplatMesh,
+} from "../vendor/three-gs/patches/dispose.js";
 import {
   HANDLE_BRAND,
   SplatBackendError,
@@ -29,8 +34,23 @@ interface HandleState {
   bounds: THREE.Box3;
   total: number;
   boundsReady: boolean;
-  readySignaled: boolean;
   failure: SplatBackendError | null;
+  disposed: boolean;
+  /** The splat mesh, held directly — handle.object is the PUBLIC group and
+   *  consumers may parent helpers into it, so children[0] is not the mesh
+   *  by contract (review finding). */
+  mesh: GaussianSplatMesh | null;
+  /** Aborts the in-flight fetch on dispose — without it a cancelled load
+   *  keeps downloading the whole body (review finding). */
+  readonly abort: AbortController;
+}
+
+export interface ThreeGsBackendOptions {
+  renderer?: unknown;
+  /** TEST-ONLY seam (owner ruling 2026-08-29): overrides the queried
+   *  device limit so the over-capacity refusal is drillable at fixture
+   *  scale. Never set in production code. */
+  maxStorageBufferBindingSizeOverride?: number;
 }
 
 const handles = new WeakMap<SplatHandle, HandleState>();
@@ -133,6 +153,19 @@ function validateSplatPlyHeader(header: string): void {
   }
 }
 
+function parseVertexCount(header: string): number {
+  // Line-anchored: an unanchored regex would match "element vertex N"
+  // inside a comment line and mis-size the capacity guard (review finding).
+  for (const line of header.split(/\r?\n/)) {
+    const match = /^element vertex (\d+)\s*$/.exec(line.trim());
+    if (match !== null) return Number(match[1]);
+  }
+  throw new SplatBackendError(
+    "invalid-ply-header",
+    "PLY header missing element vertex count",
+  );
+}
+
 function detectSphericalHarmonicsDegree(header: string): number {
   const restCount = header
     .split(/\r?\n/)
@@ -182,7 +215,21 @@ function updateFetchProgress(
   };
 }
 
+/**
+ * Monolithic PLY backend over vendored GaussianSplatMesh (ticket 03).
+ * dispose() is real as of ticket 04; remaining refusal stubs: raycast,
+ * setEdits, setMeshColor, setOptics, and non-PLY formats.
+ */
 export class ThreeGsBackend implements SplatBackend {
+  private readonly renderer: unknown;
+  private readonly maxStorageBufferBindingSizeOverride: number | undefined;
+
+  constructor(options: ThreeGsBackendOptions = {}) {
+    this.renderer = options.renderer;
+    this.maxStorageBufferBindingSizeOverride =
+      options.maxStorageBufferBindingSizeOverride;
+  }
+
   load(source: SplatSource): SplatHandle {
     const format = inferFormat(source);
     if (format === "spz") {
@@ -230,8 +277,10 @@ export class ThreeGsBackend implements SplatBackend {
       bounds: new THREE.Box3(),
       total: 0,
       boundsReady: false,
-      readySignaled: false,
       failure: null,
+      disposed: false,
+      mesh: null,
+      abort: new AbortController(),
     };
     // A failure that lands before any consumer calls whenReady() must not
     // fire the browser's unhandledrejection — later whenReady() callers
@@ -247,9 +296,23 @@ export class ThreeGsBackend implements SplatBackend {
     return handle;
   }
 
+
+  private checkDisposed(state: HandleState): boolean {
+    if (!state.disposed) return false;
+    if (state.failure === null && state.progress.phase !== "ready") {
+      fail(
+        state,
+        "handle-disposed",
+        "handle was disposed before load completed",
+      );
+    }
+    return true;
+  }
+
   private async runPlyPipeline(url: string, state: HandleState): Promise<void> {
     try {
-      const response = await fetch(url);
+      const response = await fetch(url, { signal: state.abort.signal });
+      if (this.checkDisposed(state)) return;
       if (!response.ok) {
         fail(
           state,
@@ -276,6 +339,7 @@ export class ThreeGsBackend implements SplatBackend {
 
       while (true) {
         const { done, value } = await reader.read();
+        if (this.checkDisposed(state)) return;
         if (done) break;
         chunks.push(value);
         bytesLoaded += value.byteLength;
@@ -300,11 +364,42 @@ export class ThreeGsBackend implements SplatBackend {
       const header = readPlyHeader(arrayBuffer);
       validateSplatPlyHeader(header);
       const degree = detectSphericalHarmonicsDegree(header);
+      const vertexCount = parseVertexCount(header);
+      const limit =
+        this.maxStorageBufferBindingSizeOverride ??
+        (this.renderer as { backend?: { device?: { limits?: { maxStorageBufferBindingSize?: number } } } })
+          ?.backend?.device?.limits?.maxStorageBufferBindingSize;
+      if (typeof limit === "number") {
+        try {
+          assertStorageWithinLimit(vertexCount, degree, limit);
+        } catch (error) {
+          if (error instanceof ForkPatchError) {
+            fail(state, error.reason, error.message);
+            return;
+          }
+          throw error;
+        }
+      }
+      if (this.checkDisposed(state)) return;
       const loader = new PLYLoader();
       loader.setCustomPropertyNameMapping(
         getGaussianSplatPLYPropertyMapping(degree),
       );
-      const plyGeometry = loader.parse(arrayBuffer);
+      let plyGeometry: THREE.BufferGeometry;
+      try {
+        plyGeometry = loader.parse(arrayBuffer);
+      } catch (error) {
+        // Parsing allocates the file-sized attribute arrays — an allocation
+        // RangeError here is the same over-capacity surface as conversion /
+        // construction (adversarial-review finding).
+        const detail = error instanceof Error ? error.message : String(error);
+        if (error instanceof RangeError) {
+          fail(state, "over-capacity", `allocation failed — ${detail}`);
+        } else {
+          fail(state, "ply-parse-failed", `PLY parse failed — ${detail}`);
+        }
+        return;
+      }
       state.total = plyGeometry.getAttribute("position")?.count ?? 0;
 
       let splatGeometry;
@@ -315,11 +410,19 @@ export class ThreeGsBackend implements SplatBackend {
         splatGeometry = createGaussianSplatGeometryFromPLYGeometry(plyGeometry);
       } catch (error) {
         const detail = error instanceof Error ? error.message : String(error);
-        fail(
-          state,
-          "ply-decode-failed",
-          `PLY decode failed — ${detail}`,
-        );
+        if (error instanceof RangeError) {
+          fail(
+            state,
+            "over-capacity",
+            `allocation failed — ${detail}`,
+          );
+        } else {
+          fail(
+            state,
+            "ply-decode-failed",
+            `PLY decode failed — ${detail}`,
+          );
+        }
         return;
       }
 
@@ -331,17 +434,24 @@ export class ThreeGsBackend implements SplatBackend {
         mesh = new GaussianSplatMesh(splatGeometry);
       } catch (error) {
         const detail = error instanceof Error ? error.message : String(error);
-        fail(
-          state,
-          "mesh-construct-failed",
-          `GaussianSplatMesh construction failed — ${detail}`,
-        );
+        if (error instanceof RangeError) {
+          fail(
+            state,
+            "over-capacity",
+            `allocation failed — ${detail}`,
+          );
+        } else {
+          fail(
+            state,
+            "mesh-construct-failed",
+            `GaussianSplatMesh construction failed — ${detail}`,
+          );
+        }
         return;
       }
 
       mesh.onAfterRender = () => {
-        if (state.readySignaled) return;
-        state.readySignaled = true;
+        if (state.progress.phase === "ready") return;
         state.progress = {
           ...state.progress,
           phase: "ready",
@@ -350,6 +460,8 @@ export class ThreeGsBackend implements SplatBackend {
         state.resolveReady();
       };
 
+      if (this.checkDisposed(state)) return;
+      state.mesh = mesh;
       state.group.add(mesh);
     } catch (error) {
       // Named refusals thrown by helpers (header scan, SH-degree detect) and
@@ -358,6 +470,12 @@ export class ThreeGsBackend implements SplatBackend {
       // in "constructing" forever (adversarial-review finding, 2026-08-29).
       if (error instanceof SplatBackendError) {
         fail(state, error.reason, error.message);
+        return;
+      }
+      // dispose() aborts the fetch; the DOMException must land as the
+      // handle-disposed refusal, not a generic pipeline failure.
+      if (state.disposed && error instanceof DOMException && error.name === "AbortError") {
+        this.checkDisposed(state);
         return;
       }
       const detail = error instanceof Error ? error.message : String(error);
@@ -391,17 +509,40 @@ export class ThreeGsBackend implements SplatBackend {
   counts(handle: SplatHandle): SplatCounts {
     const state = requireHandle(handle, "counts");
     // Monolithic path: once ready, everything is resident and selected.
-    const resident = state.readySignaled ? state.total : 0;
+    const resident = state.progress.phase === "ready" ? state.total : 0;
     return { total: state.total, resident, selected: resident };
   }
 
-  dispose(_handle: SplatHandle): void {
-    requireHandle(_handle, "dispose");
-    // Named-refusal stub — ticket 04 owns disposal.
-    throw new SplatBackendError(
-      "dispose-not-implemented",
-      "dispose refused — ticket 04",
-    );
+  dispose(handle: SplatHandle): void {
+    const state = requireHandle(handle, "dispose");
+    if (this.renderer === undefined || this.renderer === null) {
+      throw new SplatBackendError(
+        "dispose-needs-renderer",
+        "dispose cannot free GPU memory without the renderer that owns it",
+      );
+    }
+    state.disposed = true;
+    state.abort.abort();
+    const mesh = state.mesh;
+    try {
+      if (mesh !== null) {
+        disposeGaussianSplatMesh(mesh, this.renderer);
+      }
+    } catch (error) {
+      if (error instanceof ForkPatchError) {
+        throw new SplatBackendError(error.reason, error.message);
+      }
+      throw error;
+    } finally {
+      // Guaranteed even when the patch throws (adversarial-review finding:
+      // a reshape must never leave the mesh attached and the handle live —
+      // the GPU memory may be unfreeable then, but the scene detach and
+      // handle invalidation are unconditional).
+      if (mesh !== null) state.group.remove(mesh);
+      state.mesh = null;
+      this.checkDisposed(state);
+      handles.delete(handle);
+    }
   }
 
   raycast(_handle: SplatHandle, _ray: THREE.Ray): SplatHit | null {

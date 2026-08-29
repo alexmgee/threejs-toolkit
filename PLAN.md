@@ -15,9 +15,10 @@ links: [backend-pager, scene-core]
 - [x] Vendor fork at delta zero with FORK.md scaffold {#fork-delta-zero}
   by: phase-1 ticket 02
   tech: commit `e4aca4e`; `src/vendor/three-gs/{GaussianSplatMesh,CountingSort,GaussianSplatUtils}.js` byte-identical to spike vendor snapshot (`diff` empty); `FORK.md` governs divergence; seam rule holds with real fork
-- [ ] Add dispose() and capacity guard {#fork-dispose-capacity}
+- [x] Add dispose() and capacity guard {#fork-dispose-capacity}
+  by: claude
   from: roadmap
-  tech: Phase 2 ticket 04; first real fork deltas; H-LIFE at fixture scope
+  tech: Phase 2 ticket 04; D20 proven as pure .ts sibling patches (vendored JS byte-identical, digests unchanged); patches/{dispose,capacity-guard}.ts; H-LIFE 10-cycle union-counter gate exactly flat both backends (28/28 splat-lab); over-capacity named refusal (16384 vs injected 256); embed-size tripwire in `check`, drilled both ways
 - [ ] Add per-splat edit-mask lanes in fork {#fork-edit-masks}
   from: roadmap
   tech: Phase 3 §C route 2; `colorRead` compute path
@@ -198,13 +199,27 @@ links: [scene-core, render-stack, text-markers, site-rules, diagnostics, backend
 
 ## decisions
 
+- **Ticket 04 rulings (owner, 2026-08-29):** D20's shape = PURE .ts sibling patches
+  (`src/vendor/three-gs/patches/`) — vendored JS byte-identical, digests unchanged,
+  H-FORK identity by construction; FORK.md entries must name every internal
+  field/path a patch reaches and the re-diff gains a re-verify step for them.
+  dispose() frees GPU buffers via the renderer's internal `_attributes.delete`
+  (the path upstream's own geometry disposal uses) WITH a runtime existence
+  assertion — absent/reshaped internals throw a named error, never silent.
+  Capacity guard: pre-check `device.limits.maxStorageBufferBindingSize` on WebGPU;
+  WebGL2 has no such limit — the SAME named error surfaces at allocation-failure
+  time (catch-and-name, no invented threshold); injectable limit override is a
+  documented TEST-ONLY seam. H-LIFE pass = renderer.info.memory EXACTLY at baseline
+  after each of 10 cycles; JS heap recorded with one structural assertion (series
+  not strictly increasing); each cycle proves the load happened (counts + pixel)
+  before flatness counts.
 - **Ticket 03 rulings (owner, 2026-08-29):** monolithic path is PLY-only this ticket —
   SPZ is a NAMED GAP tied to watch item 13 (r186 ships SPZLoader; import then, never
   vendor now); the `spz` branch of `load()` throws a named refusal citing that item.
   Fixture asset is GENERATED — deterministic committed script + committed small `.ply`
   with known-exact opacity logits so the sigmoid check is falsifiable in closed form.
   The seam declares the FULL doc 02 interface now; unimplemented methods throw named
-  refusals citing their owning ticket (dispose→04, raycast→Phase 3 §B, setEdits→Phase 3
+  refusals citing their owning ticket (dispose→04 — REAL since ticket 04, raycast→Phase 3 §B, setEdits→Phase 3
   §C, setOptics→Phase 5).
 - **D14 ruled 2026-08-23:** embed WASM inline (variant A) — single-file embed carries
   worker+WASM inside the bundle; pages build uses URL-constructed workers.
