@@ -229,3 +229,9 @@ allocation for the pager — tickets 05/06 material, deliberately NOT promoted
 here. This ticket's capacity GUARD (limit refusal) is a different mechanism.
 
 **Status change: done — all five ACs met with evidence above (2026-08-29; H-FORK identity by construction: vendored JS byte-identical + pixel readbacks equal ticket 03's pinned values).**
+
+**Residual re-assigned (owner ruling 2026-09-02, ticket 05 start):** the
+SH-degree 1–3 dispose-path gap (F7 residual above) moves to **ticket 06** —
+ticket 05 ends before any paged mesh exists, so the assertion (dispose with
+SH bands + contribution buffer live, union counters exactly back to
+baseline) lands with the first SH-carrying upload in 06.

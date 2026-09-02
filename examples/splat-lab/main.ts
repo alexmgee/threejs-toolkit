@@ -457,7 +457,7 @@ const done = (async () => {
   // silent no-op goes red.
   const refusalCases: Array<[string, () => void, string, string]> = [
     ["spz", () => backend.load({ url: "x.spz" }), "spz-refused", "watch item 13"],
-    ["rad", () => backend.load({ url: "x.rad" }), "rad-refused", "tickets 05/06"],
+    ["rad", () => backend.load({ url: "x.rad" }), "rad-refused", "ticket 06"],
     ["raycast", () => backend.raycast(handle, new THREE.Ray()), "raycast-not-implemented", "Phase 3 §B"],
     ["setEdits", () => backend.setEdits(handle, []), "set-edits-not-implemented", "Phase 3 §C"],
     ["setMeshColor", () => backend.setMeshColor(handle, [1, 1, 1, 1]), "set-mesh-color-not-implemented", "Phase 4"],

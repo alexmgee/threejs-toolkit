@@ -51,6 +51,7 @@ export default defineConfig({
         "rules-lab": resolve(__dirname, "examples/rules-lab/index.html"),
         "decode-lab": resolve(__dirname, "examples/decode-lab/index.html"),
         "splat-lab": resolve(__dirname, "examples/splat-lab/index.html"),
+        "rad-lab": resolve(__dirname, "examples/rad-lab/index.html"),
       },
     },
   },

@@ -30,3 +30,30 @@ export {
   type SplatSource,
 } from "./SplatBackend.js";
 export { ThreeGsBackend } from "./ThreeGsBackend.js";
+// Ticket 05 — fetch + decode pool (none of these value-import the worker;
+// the pool takes a worker factory, keeping the inline-worker rules intact).
+export {
+  parseRadHeader,
+  readRadHeaderEnd,
+  roundup8,
+  type RadChunkRange,
+  type RadHeaderInfo,
+} from "./RadHeader.js";
+export {
+  HEADER_PROBE_BYTES,
+  MAX_ATTEMPTS,
+  RadFetcher,
+  type ChunkUnavailable,
+  type ChunkUnavailableReason,
+  type FetchStats,
+  type FetchedChunk,
+  type RadFetcherOptions,
+} from "./RadFetcher.js";
+export {
+  DECODE_POOL_SIZE,
+  DecodeFailedError,
+  DecodePool,
+  type DecodeJobRecord,
+  type DecodePoolOptions,
+} from "./DecodePool.js";
+export { RadPager, type RadLoadReport, type RadPagerOptions } from "./RadPager.js";

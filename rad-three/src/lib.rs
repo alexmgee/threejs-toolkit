@@ -20,6 +20,9 @@ use wasm_bindgen::prelude::*;
 
 const RAD_CHUNK_MAGIC: u32 = 0x4344_4152; // 'RADC'
 
+/// Unchecked padding helper — TEST-ONLY (chunk builders in `tests`). The
+/// decode path uses `roundup8_checked` everywhere (built-in review, 2026-09-02).
+#[cfg(test)]
 fn roundup8(n: usize) -> usize {
     (n + 7) & !7
 }
@@ -146,13 +149,27 @@ fn decode_chunk_impl(bytes: &[u8]) -> Result<DecodedChunk, String> {
     if magic != RAD_CHUNK_MAGIC {
         return Err(format!("bad RADC magic 0x{magic:08x}"));
     }
+    // CHECKED, like the property loop below: on wasm32 `usize` is 32-bit,
+    // so a declared meta length of 0xFFFF_FFFF made `8 + roundup8(len)`
+    // wrap to 8 (passing the truncation check) and `8 + len` wrap to 7,
+    // building `&bytes[8..7]` — an unconditional slice-order panic, i.e. a
+    // trap that poisons the wasm instance. Native tests never saw it (64-bit
+    // usize does not wrap here). Built-in review, 2026-09-02.
     let meta_len = u32::from_le_bytes(bytes[4..8].try_into().unwrap()) as usize;
-    let meta_end = 8 + roundup8(meta_len);
-    if bytes.len() < meta_end + 8 {
+    let meta_json_end = 8usize
+        .checked_add(meta_len)
+        .ok_or_else(|| "chunk meta length out of range".to_string())?;
+    let meta_end = 8usize
+        .checked_add(roundup8_checked(meta_len).ok_or_else(|| "chunk meta length out of range".to_string())?)
+        .ok_or_else(|| "chunk meta length out of range".to_string())?;
+    let needed = meta_end
+        .checked_add(8)
+        .ok_or_else(|| "chunk meta length out of range".to_string())?;
+    if bytes.len() < needed {
         return Err("chunk truncated before payloadBytes".into());
     }
     let meta: ChunkMeta =
-        serde_json::from_slice(&bytes[8..8 + meta_len]).map_err(|e| format!("chunk meta JSON: {e}"))?;
+        serde_json::from_slice(&bytes[8..meta_json_end]).map_err(|e| format!("chunk meta JSON: {e}"))?;
     if meta.version != 1 {
         return Err(format!("unsupported chunk version {}", meta.version));
     }
@@ -588,6 +605,28 @@ mod tests {
     /// On wasm32 (usize = 32 bits) dims*count for count=477,218,589, dims=9
     /// wraps to 5 — an unchecked guard would let a 5-byte payload through and
     /// the walk would run off the end. Adversarial review, 2026-08-27.
+    /// Chunk-header twin of `declared_extent_overflow_is_rejected`: a
+    /// declared meta length of u32::MAX must Err, never panic. On a 64-bit
+    /// host the checked adds cannot overflow and the truncation check
+    /// catches it; on wasm32 the checked adds are what stop the wrap — the
+    /// wasm32 path is exercised by examples/rad-lab's crafted-header drill
+    /// through the real worker.
+    #[test]
+    fn hostile_meta_length_errors_instead_of_panicking() {
+        let mut chunk = Vec::new();
+        chunk.extend_from_slice(&RAD_CHUNK_MAGIC.to_le_bytes());
+        chunk.extend_from_slice(&u32::MAX.to_le_bytes());
+        chunk.extend_from_slice(&[0u8; 64]);
+        let err = match decode_chunk_impl(&chunk) {
+            Ok(_) => panic!("u32::MAX meta length must be refused"),
+            Err(e) => e,
+        };
+        assert!(
+            err.contains("out of range") || err.contains("truncated"),
+            "unexpected refusal text: {err}"
+        );
+    }
+
     #[test]
     fn declared_extent_overflow_is_rejected() {
         // Platform-independent: overflows usize at any width.

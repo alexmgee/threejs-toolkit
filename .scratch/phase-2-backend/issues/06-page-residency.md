@@ -23,3 +23,23 @@ everything resident is shown.
       cycle — sampled as a tripwire and satisfied by construction.
 - [ ] Revisiting the initial pose under `?pages=32` restores the same visible
       result (eviction correctness), both backends.
+
+## Comments
+
+**Inherited from ticket 05 (owner rulings 2026-09-02):**
+- This ticket REPLACES the `rad-refused` named refusal in ThreeGsBackend
+  with the real paged path (correction to handoff 006, recorded in ticket
+  05's Comments) — the fetch+decode slice arrives as `RadPager` +
+  `DecodePool` + `RadFetcher` from 05.
+- **SH-degree dispose gap (ticket 04 F7 residual) lands HERE:** once a paged
+  mesh with SH bands is uploaded, place the assertion — dispose with SH
+  bands + contribution buffer live, union counters exactly back to baseline.
+- Reveal-policy question deferred from 05: whether a load with EVERY chunk
+  unavailable counts as failed at the seam (05's pager resolves with the
+  shortfall report either way).
+- **DecodePool contract for reuse (ticket 05 built-in review, 2026-09-02):**
+  `pool.jobs` is unbounded evidence — bound or snapshot it before session-
+  length re-decode reuse; a pool whose `broken` getter is non-null has
+  terminated its workers and rejects every decode with that error — the
+  owner recreates it (no self-heal by design). A worker `fatal` reply
+  (WASM init failure or a trap) is a pool failure, never a page failure.

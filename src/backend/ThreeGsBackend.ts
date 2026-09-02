@@ -247,7 +247,7 @@ export class ThreeGsBackend implements SplatBackend {
     if (format === "rad") {
       throw new SplatBackendError(
         "rad-refused",
-        "rad refused — paged path lands with tickets 05/06",
+        "rad refused — paged path lands with ticket 06 (fetch + decode pool landed in ticket 05 as RadPager)",
       );
     }
     // Exhaustiveness: when SplatFormat grows, this line makes the compiler

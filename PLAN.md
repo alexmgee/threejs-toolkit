@@ -45,9 +45,9 @@ links: [scene-core, diagnostics, embed-site, fixtures]
   by: claude
   from: roadmap
   tech: ticket 03 — SplatBackend seam (full doc 02 interface, named refusals) + ThreeGsBackend PLY path; `examples/splat-lab/` 21/21 on WebGPU + webgl2-fallback, dev AND built; D18 placeholder deleted (doc 06 D18 CLOSED); PLY-only (SPZ named gap → watch item 13); embed kept at 213 kB via decode-only embed-entry
-- [ ] Fetch byte ranges and run four decode workers {#fetch-decode-pool}
-  from: roadmap
-  tech: ticket 05; bounded retry; pages-unavailable semantics
+- [x] Fetch byte ranges and run four decode workers {#fetch-decode-pool}
+  by: claude
+  tech: ticket 05 — `src/backend/{RadHeader,RadFetcher,DecodePool,RadPager}.ts`; prefetch-all Range + 206-or-die, 3 immediate attempts then per-chunk unavailable, 4 queued workers (worker-side concurrency evidence), resolve-with-shortfall; `examples/rad-lab/` 19/19 on the real hero; crate chunk-header wrap panic (wasm32) found by review and fixed; `load("rad")` refusal stays until 06
 - [ ] Manage page budget, LRU, and GPU uploads {#page-residency}
   from: roadmap
   tech: ticket 06; progress = completed work, never residency
@@ -199,6 +199,17 @@ links: [scene-core, render-stack, text-markers, site-rules, diagnostics, backend
 
 ## decisions
 
+- **Ticket 05 rulings (owner, 2026-09-02):** decode pool size 4, spec-inherited (doc 03
+  A3), constructor-parameterized, utilization recorded for a future data-backed change.
+  Retry: 3 attempts total (anchor: `@smithy/core` 3.33.3 `DEFAULT_MAX_ATTEMPTS = 3`,
+  verified from the npm artifact), IMMEDIATE — no backoff timer, because Chrome's
+  hidden-tab timer throttling would wedge loads. Failure taxonomy: 200-where-206
+  = whole-load `range-unsupported`; 5xx/network/short-body retry; 4xx and decode
+  errors terminal per page; the load resolves with an unavailable-chunks report,
+  never rejects. `load("rad")` stays a named refusal until ticket 06 (handoff 006
+  corrected in the ticket). Injected `fetch` is the test-only failure seam.
+  Determinism = pool-4 vs pool-1 on the promoted worker + chunk-0 golden checksums.
+  SH-degree dispose gap re-assigned 04 → 06.
 - **Ticket 04 rulings (owner, 2026-08-29):** D20's shape = PURE .ts sibling patches
   (`src/vendor/three-gs/patches/`) — vendored JS byte-identical, digests unchanged,
   H-FORK identity by construction; FORK.md entries must name every internal

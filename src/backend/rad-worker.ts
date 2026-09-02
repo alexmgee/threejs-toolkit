@@ -40,6 +40,13 @@ export interface DecodeResult {
   childCount: Uint16Array;
   childStart: Uint32Array;
   decodeMs: number;
+  /** Worker-side decode interval as epoch milliseconds
+   *  (performance.timeOrigin + performance.now()) — comparable across
+   *  workers and the main thread, unlike a worker's own performance.now().
+   *  Ticket 05's pool records these so worker concurrency is evidenced
+   *  from inside the workers, not inferred from main-thread timing. */
+  decodeStart: number;
+  decodeEnd: number;
 }
 
 const ready = init();
@@ -47,8 +54,21 @@ const ready = init();
 self.onmessage = async (ev: MessageEvent<DecodeRequest>) => {
   const { index, bytes } = ev.data;
   try {
-    await ready;
+    try {
+      await ready;
+    } catch (e) {
+      // WASM init failure is a WORKER failure, not a property of these
+      // bytes — reply `fatal` so the pool surfaces it as a pool failure
+      // instead of 122 "deterministic" decode-failed pages (adversarial
+      // review, 2026-09-02).
+      (self as unknown as Worker).postMessage(
+        { index, error: `wasm init failed: ${String(e)}`, bytes, fatal: true },
+        [bytes],
+      );
+      return;
+    }
     const t0 = performance.now();
+    const decodeStart = performance.timeOrigin + t0;
     const d = decode_chunk(new Uint8Array(bytes));
     let out: DecodeResult;
     try {
@@ -67,6 +87,8 @@ self.onmessage = async (ev: MessageEvent<DecodeRequest>) => {
         childCount: d.take_child_count(),
         childStart: d.take_child_start(),
         decodeMs: performance.now() - t0,
+        decodeStart,
+        decodeEnd: performance.timeOrigin + performance.now(),
       };
     } finally {
       // A throwing take_* must still free the wasm-side object — the ticket-05
@@ -81,7 +103,15 @@ self.onmessage = async (ev: MessageEvent<DecodeRequest>) => {
       out.childCount.buffer, out.childStart.buffer,
     ]);
   } catch (e) {
+    // A WebAssembly.RuntimeError is a TRAP (Rust panic -> `unreachable` on
+    // wasm32, where there is no unwinding): the instance's allocator/stack
+    // state is undefined afterwards, so it must never decode another
+    // chunk. Reply `fatal` so the pool retires this worker instead of
+    // reporting the trap — and every later chunk on this worker — as a
+    // deterministic per-chunk decode failure (built-in review, 2026-09-02).
+    // A returned decoder Err arrives as a plain Error and stays per-chunk.
+    const fatal = e instanceof WebAssembly.RuntimeError;
     // Return the transferred request bytes even on failure so the caller's cache survives.
-    (self as unknown as Worker).postMessage({ index, error: String(e), bytes }, [bytes]);
+    (self as unknown as Worker).postMessage({ index, error: String(e), bytes, fatal }, [bytes]);
   }
 };
