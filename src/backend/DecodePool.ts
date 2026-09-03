@@ -81,8 +81,13 @@ type WorkerReply =
 
 export class DecodePool {
   readonly size: number;
-  /** Every finished job, in completion order — the utilization evidence. */
+  /** Finished jobs in completion order — the utilization evidence. Bounded
+   *  by `jobLimit` (oldest dropped): a pool reused for re-decodes over a
+   *  session must not grow this forever (ticket 05 review; owner ruling
+   *  06-S7: the bound is the ASSET's chunk count, set by the pager). */
   readonly jobs: DecodeJobRecord[] = [];
+  /** Max retained job records; Infinity until the owner sets it. */
+  jobLimit = Number.POSITIVE_INFINITY;
   /** High-water mark of the wait queue. */
   queuedMax = 0;
 
@@ -175,11 +180,16 @@ export class DecodePool {
       const job = slot.job;
       slot.job = null;
       if (job !== null) {
-        this.jobs.push({ index: job.index, worker: slot.id, dispatchedAt: slot.dispatchedAt, completedAt: performance.now(), decodeMs: 0, decodeStart: 0, decodeEnd: 0, ok: false });
+        this.recordJob({ index: job.index, worker: slot.id, dispatchedAt: slot.dispatchedAt, completedAt: performance.now(), decodeMs: 0, decodeStart: 0, decodeEnd: 0, ok: false });
         job.reject(error);
       }
     }
     for (const job of this.queue.splice(0)) job.reject(error);
+  }
+
+  private recordJob(record: DecodeJobRecord): void {
+    this.jobs.push(record);
+    while (this.jobs.length > this.jobLimit) this.jobs.shift();
   }
 
   private pump(): void {
@@ -215,13 +225,13 @@ export class DecodePool {
       if (job === null) return; // reply after dispose/replacement — nothing to settle
       const reply = ev.data;
       if (reply.index !== job.index) {
-        this.jobs.push({ index: job.index, worker: slot.id, dispatchedAt: slot.dispatchedAt, completedAt, decodeMs: 0, decodeStart: 0, decodeEnd: 0, ok: false });
+        this.recordJob({ index: job.index, worker: slot.id, dispatchedAt: slot.dispatchedAt, completedAt, decodeMs: 0, decodeStart: 0, decodeEnd: 0, ok: false });
         job.reject(new SplatBackendError(
           "decode-protocol-error",
           `worker ${slot.id} replied for chunk ${reply.index} while decoding chunk ${job.index}`,
         ));
       } else if ("error" in reply) {
-        this.jobs.push({ index: job.index, worker: slot.id, dispatchedAt: slot.dispatchedAt, completedAt, decodeMs: 0, decodeStart: 0, decodeEnd: 0, ok: false });
+        this.recordJob({ index: job.index, worker: slot.id, dispatchedAt: slot.dispatchedAt, completedAt, decodeMs: 0, decodeStart: 0, decodeEnd: 0, ok: false });
         if (reply.fatal === true) {
           // Worker-level failure (WASM init, or a trap that poisoned the
           // instance) — NOT a property of the bytes. Breaks the whole pool
@@ -238,7 +248,7 @@ export class DecodePool {
           job.reject(new DecodeFailedError(job.index, reply.error, reply.bytes));
         }
       } else {
-        this.jobs.push({ index: job.index, worker: slot.id, dispatchedAt: slot.dispatchedAt, completedAt, decodeMs: reply.decodeMs, decodeStart: reply.decodeStart, decodeEnd: reply.decodeEnd, ok: true });
+        this.recordJob({ index: job.index, worker: slot.id, dispatchedAt: slot.dispatchedAt, completedAt, decodeMs: reply.decodeMs, decodeStart: reply.decodeStart, decodeEnd: reply.decodeEnd, ok: true });
         job.resolve(reply);
       }
       this.pump();

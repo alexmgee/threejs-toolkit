@@ -29,6 +29,12 @@ import type { DecodeResult } from "./rad-worker.js";
 export interface RadLoadReport {
   header: RadHeaderInfo;
   decoded: number;
+  /** Chunks fetched and cached but NOT decoded because the admission gate
+   *  refused them (ticket 06 residency: outside the protected set). Sorted. */
+  deferred: number[];
+  /** Raw chunk bytes held in the pager's cache (owner ruling 06-S4; Phase 0
+   *  optimization item 3 keeps this heap residency on the open list). */
+  cachedBytes: number;
   /** Sorted by chunk index. */
   unavailable: ChunkUnavailable[];
   /** Per chunk index: attempts it took to land (0 = never landed). */
@@ -47,10 +53,45 @@ export interface RadPagerOptions extends RadFetcherOptions {
   poolSize?: number;
 }
 
+export interface RadLoadHooks {
+  /** Fires once the header is parsed, before any chunk request — the
+   *  caller sizes its residency (budget, capacity, mesh) here. */
+  onHeader?: (header: RadHeaderInfo) => void;
+  /** Admission gate (owner ruling 06-S2): a chunk answered `false` is
+   *  fetched and cached but not decoded; `decodeCached` admits it later. */
+  admit?: (index: number) => boolean;
+  onChunk: (result: DecodeResult) => void;
+  onDeferred?: (index: number) => void;
+  /** Fires as each chunk is given up on (fetch exhausted / rejected /
+   *  decode failed) — live, like onDeferred, not only in the final report
+   *  (built-in review, 2026-09-03). */
+  onUnavailable?: (unavailable: ChunkUnavailable) => void;
+}
+
+/** Live completed-work terms (owner ruling 06-S5 feeds progress from these). */
+export interface RadPagerProgress {
+  bytesLanded: number;
+  allChunkBytes: number;
+  decoded: number;
+  chunkCount: number;
+}
+
 export class RadPager {
   private pool: DecodePool | null = null;
   private loading = false;
   private disposed = false;
+  private header: RadHeaderInfo | null = null;
+  private fetcher: RadFetcher | null = null;
+  /** Unique chunks decoded at least once (the progress "decoded" term) —
+   *  a deferred chunk's first decode through decodeCached counts; a
+   *  re-decode after eviction does not (adversarial review, 2026-09-03). */
+  private decodedCount = 0;
+  private decodedOnce: Uint8Array = new Uint8Array(0);
+  /** Raw chunk bytes, every chunk that ever landed (owner ruling 06-S4):
+   *  the re-decode source after eviction. Bytes are TRANSFERRED to a worker
+   *  for a decode and restored from the result — a chunk mid-decode is
+   *  absent from the map until its result returns. */
+  private readonly cache = new Map<number, ArrayBuffer>();
   /** dispose() aborts this — it covers the header fetch and every chunk
    *  request, so a dispose during the header phase cannot be followed by
    *  a pool being created (adversarial review, 2026-09-02). */
@@ -63,11 +104,67 @@ export class RadPager {
     this.abort = linkAbortSignal(options.signal);
   }
 
+  /** Live completed-work terms; zeros before the header is known. */
+  get progress(): RadPagerProgress {
+    return {
+      bytesLanded: this.fetcher?.stats.bytesLanded ?? 0,
+      allChunkBytes: this.header?.allChunkBytes ?? 0,
+      decoded: this.decodedCount,
+      chunkCount: this.header?.chunks.length ?? 0,
+    };
+  }
+
+  private markDecoded(index: number): void {
+    if (index >= 0 && index < this.decodedOnce.length && this.decodedOnce[index] === 0) {
+      this.decodedOnce[index] = 1;
+      this.decodedCount++;
+    }
+  }
+
+  /** Bytes currently held in the raw cache. */
+  get cachedBytes(): number {
+    let total = 0;
+    for (const bytes of this.cache.values()) total += bytes.byteLength;
+    return total;
+  }
+
   /**
-   * `onChunk` fires per decoded chunk in arrival order, with the request
-   * bytes transferred back on `result.bytes` (the caller owns any cache).
+   * Re-decode a cached chunk (admission after deferral, or re-admission
+   * after eviction — owner ruling 06-S4). The bytes leave the cache for the
+   * decode and come back with the result. Rejects `chunk-not-cached`,
+   * `pool-disposed`, or the pool's worker-level failure.
    */
-  async load(onChunk: (result: DecodeResult) => void): Promise<RadLoadReport> {
+  async decodeCached(index: number): Promise<DecodeResult> {
+    const bytes = this.cache.get(index);
+    if (bytes === undefined) {
+      throw new SplatBackendError("chunk-not-cached", `chunk ${index} has no cached bytes`);
+    }
+    const pool = this.pool;
+    if (pool === null) {
+      throw new SplatBackendError("pool-disposed", `chunk ${index}: pager has no live pool`);
+    }
+    this.cache.delete(index);
+    try {
+      const result = await pool.decode(index, bytes);
+      this.cache.set(index, result.bytes);
+      this.markDecoded(index);
+      return result;
+    } catch (error) {
+      if (error instanceof DecodeFailedError) this.cache.set(index, error.bytes);
+      throw error;
+    }
+  }
+
+  /**
+   * `onChunk` fires per decoded chunk in arrival order; the request bytes
+   * are back in the pager's cache before the callback runs (consumers must
+   * not hold `result.bytes`). A bare function means `{ onChunk }`.
+   */
+  async load(
+    hooksOrOnChunk: RadLoadHooks | ((result: DecodeResult) => void),
+  ): Promise<RadLoadReport> {
+    const hooks: RadLoadHooks =
+      typeof hooksOrOnChunk === "function" ? { onChunk: hooksOrOnChunk } : hooksOrOnChunk;
     if (this.loading || this.pool !== null) {
       throw new SplatBackendError("pager-reused", "RadPager.load called twice — one load per pager");
     }
@@ -79,16 +176,25 @@ export class RadPager {
       throw new SplatBackendError("fetch-aborted", "pager disposed during header fetch");
     }
     const header = parseRadHeader(headerBytes);
+    this.header = header;
+    this.decodedOnce = new Uint8Array(header.chunks.length);
+    hooks.onHeader?.(header);
+    if (this.disposed) {
+      throw new SplatBackendError("fetch-aborted", "pager disposed during header hook");
+    }
     const fetcher = new RadFetcher(this.url, header, fetchOptions);
+    this.fetcher = fetcher;
     const pool = new DecodePool({
       createWorker: this.options.createWorker,
       size: this.options.poolSize,
     });
+    // Owner ruling 06-S7: the job log is bounded by the asset's chunk count.
+    pool.jobLimit = header.chunks.length;
     this.pool = pool;
 
     const unavailable: ChunkUnavailable[] = [];
+    const deferred: number[] = [];
     const attempts = new Array<number>(header.chunks.length).fill(0);
-    let decoded = 0;
     const decodes: Promise<void>[] = [];
     // First pool-level failure (a broken worker). Fail FAST: abort the
     // fetches instead of downloading the rest of the asset for a decode
@@ -101,15 +207,23 @@ export class RadPager {
       await fetcher.prefetchAll(
         (chunk) => {
           attempts[chunk.index] = chunk.attempts;
+          if (hooks.admit !== undefined && !hooks.admit(chunk.index)) {
+            this.cache.set(chunk.index, chunk.bytes);
+            deferred.push(chunk.index);
+            hooks.onDeferred?.(chunk.index);
+            return;
+          }
           decodes.push(
             pool.decode(chunk.index, chunk.bytes).then(
               (result) => {
-                decoded++;
-                onChunk(result);
+                this.markDecoded(result.index);
+                this.cache.set(result.index, result.bytes);
+                hooks.onChunk(result);
               },
               (error: unknown) => {
                 if (error instanceof DecodeFailedError) {
-                  unavailable.push({
+                  this.cache.set(error.index, error.bytes);
+                  const given: ChunkUnavailable = {
                     index: error.index,
                     reason: "decode-failed",
                     // The fetch attempts that produced these bytes — a
@@ -117,7 +231,9 @@ export class RadPager {
                     // attempts 3, not 1 (adversarial review, 2026-09-02).
                     attempts: chunk.attempts,
                     detail: error.message,
-                  });
+                  };
+                  unavailable.push(given);
+                  hooks.onUnavailable?.(given);
                   return;
                 }
                 if (poolFailure === null && error instanceof SplatBackendError) {
@@ -131,6 +247,7 @@ export class RadPager {
         },
         (given) => {
           unavailable.push(given);
+          hooks.onUnavailable?.(given);
         },
       );
       await Promise.all(decodes);
@@ -146,13 +263,17 @@ export class RadPager {
     }
 
     unavailable.sort((a, b) => a.index - b.index);
+    deferred.sort((a, b) => a - b);
     return {
       header,
-      decoded,
+      decoded: this.decodedCount,
+      deferred,
+      cachedBytes: this.cachedBytes,
       unavailable,
       attempts,
       fetch: fetcher.stats,
-      jobs: pool.jobs,
+      // A snapshot: the pool keeps appending for later re-decodes.
+      jobs: pool.jobs.slice(),
       poolSize: pool.size,
       queuedMax: pool.queuedMax,
       startedAt,
@@ -167,5 +288,6 @@ export class RadPager {
     this.abort.abort();
     this.pool?.dispose();
     this.pool = null;
+    this.cache.clear();
   }
 }

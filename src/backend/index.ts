@@ -56,4 +56,19 @@ export {
   type DecodeJobRecord,
   type DecodePoolOptions,
 } from "./DecodePool.js";
-export { RadPager, type RadLoadReport, type RadPagerOptions } from "./RadPager.js";
+export {
+  RadPager,
+  type RadLoadHooks,
+  type RadLoadReport,
+  type RadPagerOptions,
+  type RadPagerProgress,
+} from "./RadPager.js";
+// Ticket 06 — page residency.
+export {
+  PagePool,
+  indexOrder,
+  type ChunkPriority,
+  type PageBounds,
+  type PagePoolOptions,
+} from "./PagePool.js";
+export type { PageBudget, PagerDiagnostics } from "./ThreeGsBackend.js";

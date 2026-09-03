@@ -23,3 +23,14 @@ Standing rules bind (spec.md).
       changes cost, never content).
 - [ ] FORK.md titled patch entry in the same change; H-FORK re-run stays
       pixel-identical with the new features off.
+
+## Comments
+
+**Swap point from ticket 06 (owner ruling S2, 2026-09-03):** ticket 06's
+residency takes its priority ORDER from a `ChunkPriority` interface
+(ordered wanted chunks → protected set = the first `pages` of them; the
+rest evictable oldest-first; admission gate = protected ∩ missing). 06
+implements it as static chunk-index order; THIS ticket replaces that
+ordering with the LOD traversal's wanted order (the spike's
+`touchedList`), not the mechanism. AC4's pose-driven half (revisiting a
+pose restores the same selection/residency) re-runs here.

@@ -142,12 +142,59 @@ named errors.
   re-verify the value at every re-diff). Depends on vendor export
   `SH_BAND_WORDS`.
 
+- **`[paged]`** (ticket 06, 2026-09-03): `patches/paged.ts` — the spike's
+  `[capacity]` + `[uploadPage]` + `[invalidate]` promoted as ONE pure .ts
+  sibling (`[selection]` — the `center.w` lane — is NOT promoted; ticket 07
+  decides it). `createPagedMesh(capacity, pageSize, shDegree)` builds a
+  zero-filled source geometry of `capacity` splats so the UNMODIFIED
+  constructor allocates the storage buffers at capacity (a zero row renders
+  nothing: zero covariance → alphaScale 0, zero color alpha), validates
+  every internal surface BEFORE the first write (loud coupling), then
+  releases the source covariance/color/SH arrays (40 B/splat the mesh never
+  reads again; `position` stays as the CPU mirror `_sortCPU` reads).
+  `uploadPage(slot, page)` writes rows into the storage arrays +
+  `addUpdateRange` + `needsUpdate` (partial path; SH1 words copied as
+  packed u32 straight from the worker); `clearPage(slot)` zeroes an evicted
+  slot; `invalidate()` resets the two private flags so the next
+  `onBeforeRender` re-sorts and re-dispatches SH under a motionless camera
+  (doc 03 §A4, H-LOAD 9–10); `setBounds` keeps `splatGeometry.boundingSphere`
+  (the sort's depth range) over the resident pages. Partial-path health is
+  asserted RACE-FREE per render: `onBeforeRender` snapshots the identity of
+  each attribute's first pending range object, `onAfterRender` checks
+  whether it survived (the backends clear `updateRanges` after writing;
+  ranges pushed between the two hooks append behind it) — a survivor flips
+  `partialUploadBroken` and falls back LOUDLY to full-buffer uploads
+  (console.warn + the backend's diagnostics). The first render only
+  PRIMES (buffer creation uploads the whole array and never clears ranges).
+  Internal surfaces reached (re-verify each at re-diff):
+  `mesh._buffers.{centerRead,covarianceARead,covarianceBRead,colorRead}.value`
+  (StorageBufferAttribute: `.array` Float32Array[capacity*4], written
+  in-place — re-read per call because the WebGL2 PBO setup REPLACES
+  `attribute.array` with a padded copy, GLSLNodeBuilder.js setupPBO);
+  `mesh._buffers.sphericalHarmonics1Attribute` (`.array`
+  Uint32Array[capacity*SH_BAND_WORDS[1]]); `attribute.updateRanges` /
+  `addUpdateRange` / `clearUpdateRanges` / `needsUpdate` (public
+  BufferAttribute API, consumed by WebGPUBackend/WebGLBackend
+  `updateAttribute`); `attribute.pbo.needsUpdate` (WebGL2 PBO DataTexture —
+  whole-texture re-upload, no partial path on the fallback);
+  `mesh._positionAttribute.array` (the source `position` BufferAttribute
+  captured at construction, read by `_sortCPU` on WebGL2 — kept as the CPU
+  mirror); `mesh._sortInitialized` and `mesh._sphericalHarmonicsInitialized`
+  (booleans gating `updateSort` / `updateSphericalHarmonics`);
+  `mesh.onBeforeRender` (the vendored constructor installs its own — the
+  patch WRAPS it, calling the original after its snapshot) and
+  `mesh.onAfterRender`; `mesh.splatGeometry.boundingSphere` (public; read
+  by `_updateSortUniforms`); the color storage buffer is Float32 vec4 with
+  bytes/255 (createStorageBuffers) — the upload converts the worker's
+  RGBA bytes the same way. Depends on vendor exports `SH_BAND_WORDS`,
+  `createPackedSphericalHarmonicsBand` (neutral word 0x80808080).
+
 Future functional patches land as titled entries here, per doc 03 §F's
 capability list (§F is the policy home; no enumeration here). The Phase 0
-spike's proven fork (`spikes/native-rad/src/GaussianSplatMesh.fork.js`,
-Phase 2 material) carries the concrete incoming set under its own titles:
-**`[capacity]` `[uploadPage]` `[selection]` `[invalidate]`** — reconcile
-against §F's list when Phase 2 promotes the fork; do not assume they match.
+spike's `[selection]` patch (`spikes/native-rad/src/GaussianSplatMesh.fork.js`)
+remains un-promoted — ticket 07 decides whether the `center.w` lane needs a
+JS edit or a sibling; `[capacity]`/`[uploadPage]`/`[invalidate]` landed as
+`[paged]` above (reconciled against §F 2026-09-03).
 
 ## Known upstream drift — as of 2026-08-20 (retire/re-date at each re-diff)
 

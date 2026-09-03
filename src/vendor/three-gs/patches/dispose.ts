@@ -29,11 +29,18 @@ interface ComputeDisposable {
   dispose(): void;
 }
 
-function forkInternalsMissing(what: string): never {
+/** Shared by every sibling patch: ONE definition of the loud-coupling
+ *  refusal so a re-diff fix lands once (review, ticket 04; reused by
+ *  [paged], ticket 06). `patch` names the FORK.md entry to re-verify. */
+export function forkInternalsMissingIn(patch: string, what: string): never {
   throw new ForkPatchError(
     "fork-internals-missing",
-    `${what} not found — vendored three internals changed; re-verify the [dispose] patch (FORK.md)`,
+    `${what} not found — vendored three internals changed; re-verify the [${patch}] patch (FORK.md)`,
   );
+}
+
+function forkInternalsMissing(what: string): never {
+  return forkInternalsMissingIn("dispose", what);
 }
 
 function requireStorageAttribute(node: unknown, label: string): object {

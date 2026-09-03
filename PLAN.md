@@ -48,9 +48,10 @@ links: [scene-core, diagnostics, embed-site, fixtures]
 - [x] Fetch byte ranges and run four decode workers {#fetch-decode-pool}
   by: claude
   tech: ticket 05 — `src/backend/{RadHeader,RadFetcher,DecodePool,RadPager}.ts`; prefetch-all Range + 206-or-die, 3 immediate attempts then per-chunk unavailable, 4 queued workers (worker-side concurrency evidence), resolve-with-shortfall; `examples/rad-lab/` 19/19 on the real hero; crate chunk-header wrap panic (wasm32) found by review and fixed; `load("rad")` refusal stays until 06
-- [ ] Manage page budget, LRU, and GPU uploads {#page-residency}
+- [!] Manage page budget, LRU, and GPU uploads {#page-residency}
+  by: claude
   from: roadmap
-  tech: ticket 06; progress = completed work, never residency
+  tech: ticket 06 — `patches/paged.ts` sibling patch (fixed capacity, partial uploads, invalidation), `src/backend/PagePool.ts` (priority-protected residency, admission gate), paged `load("rad")` path + `pagerDiagnostics`; `examples/pager-lab/` 18/18 on WebGL2 in both regimes, both review rounds landed. STUCK on WebGPU evidence: the harness browser lost its WebGPU adapter this session — owner runs pager-lab (default + ?pages=32) on WebGPU, then ticks the ACs
 - [ ] Traverse LOD tree and cull by selection {#lod-culling}
   from: roadmap
   tech: ticket 07; `center.w` flags + `setBinNode`; explicit sort/SH invalidation
@@ -199,6 +200,16 @@ links: [scene-core, render-stack, text-markers, site-rules, diagnostics, backend
 
 ## decisions
 
+- **Ticket 06 rulings (owner, 2026-09-03):** budget = ADR 0003 formula exactly (device
+  limits → capacity guard on WebGPU, MAX_TEXTURE_SIZE formula on WebGL2, asset, override);
+  "device memory class" stays unpinned pending mobile measurement. Eviction: static
+  chunk-index priority + admission gate behind the interface ticket 07's traversal
+  swaps into. AC4 here = evict/re-admit/pixel-identical machinery proof; the
+  pose-driven half re-runs in 07. Re-decode from cached raw bytes (Phase 0 item 3 open;
+  re-fetch is its likely answer). Progress = equal-weight mean of bytes/decoded/
+  first-uploaded ratios (null weighting; all three spec terms); fraction rises after
+  paint-observed ready. Zero pages uploaded → `no-pages-available`. Job-log bound =
+  chunk count. Object handed over unrotated (X-flip is SiteConfig's, ticket 09).
 - **Ticket 05 rulings (owner, 2026-09-02):** decode pool size 4, spec-inherited (doc 03
   A3), constructor-parameterized, utilization recorded for a future data-backed change.
   Retry: 3 attempts total (anchor: `@smithy/core` 3.33.3 `DEFAULT_MAX_ATTEMPTS = 3`,
