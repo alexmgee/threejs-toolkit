@@ -556,38 +556,72 @@ const done = (async () => {
   );
 
   const P0 = await meteredCapture();
-  const slot0 = diag.slotOf(0);
-  diag.evictChunk(0);
-  scene3.renderer.render(scene3.scene, scene3.camera);
-  const P1 = await meteredCapture();
-  let gridChanged = false;
-  for (const name of CAPTURE_POINT_NAMES.slice(0, 9)) {
-    if (!pixelsEqual(px(P0, name), px(P1, name))) {
-      gridChanged = true;
-      break;
+  // Sort-nondeterminism CONTROL (doc 05 H-LOAD criterion 4: "within-bin
+  // sort order may reorder equal-depth splats — record the measured diff
+  // band, never a silent pass"). With NO residency change, force the
+  // vendored mesh's re-sort alone and measure how far the sampled pixels
+  // move: on the WebGPU backend the GPU counting sort's within-bin order is
+  // nondeterministic (measured live 2026-09-12: 1–11 channel units at the
+  // same points a plain re-render leaves pixel-exact); the WebGL2 CPU sort
+  // is deterministic (band 0). The evict/re-admit criterion below is
+  // "within this measured band" — derived from this run, not invented.
+  const SORT_CONTROL_RUNS = 5;
+  const meshRec = diag.mesh as unknown as Record<string, unknown>;
+  let sortBand = 0;
+  for (let i = 0; i < SORT_CONTROL_RUNS; i++) {
+    meshRec._sortInitialized = false;
+    scene3.renderer.render(scene3.scene, scene3.camera);
+    const Pc = await meteredCapture();
+    for (const name of CAPTURE_POINT_NAMES) {
+      sortBand = Math.max(sortBand, maxChannelDiff(px(P0, name), px(Pc, name)));
     }
   }
-  await diag.admitChunk(0);
+  // Evict chunks in index order, one at a time, until the sampled pixels
+  // move by MORE than the sort band — the drill must be able to tell an
+  // eviction from sort noise before "restored" means anything (at full
+  // residency a single 65,536-splat chunk moved the ten points by 6 with a
+  // band of 13; measured 2026-09-12). The count is whatever the band
+  // demands, bounded by the resident pages — nothing pinned.
+  const evictedChunks: number[] = [];
+  const slotsBefore = new Map<number, number>();
+  let evictedMax = 0;
+  for (let chunk = 0; chunk < Math.min(budgetPages, 122) && evictedMax <= sortBand; chunk++) {
+    slotsBefore.set(chunk, diag.slotOf(chunk));
+    if (!diag.evictChunk(chunk)) break;
+    evictedChunks.push(chunk);
+    scene3.renderer.render(scene3.scene, scene3.camera);
+    const P1 = await meteredCapture();
+    for (const name of CAPTURE_POINT_NAMES.slice(0, 9)) {
+      evictedMax = Math.max(evictedMax, maxChannelDiff(px(P0, name), px(P1, name)));
+    }
+  }
+  const gridChanged = evictedMax > sortBand;
+  // Re-admission restores RESIDENCY, not slot identity: with several slots
+  // free the pool hands out the first free one, so multi-chunk re-admits
+  // land in a permutation of the freed slots (observed live 2026-09-12;
+  // the rendered result is slot-independent). The count of chunks that
+  // came back to their old slot is reported, never asserted.
+  let allResident = true;
+  let sameSlot = 0;
+  for (const chunk of evictedChunks) {
+    await diag.admitChunk(chunk);
+    if (!diag.isResident(chunk)) allResident = false;
+    if (diag.slotOf(chunk) === slotsBefore.get(chunk)) sameSlot++;
+  }
   scene3.renderer.render(scene3.scene, scene3.camera);
   const P2 = await meteredCapture();
-  let evictReadmitOk = gridChanged && diag.slotOf(0) === slot0;
+  let readmitMax = 0;
   const diffDetails: string[] = [];
-  if (evictReadmitOk) {
-    for (const name of CAPTURE_POINT_NAMES) {
-      if (!pixelsEqual(px(P0, name), px(P2, name))) {
-        evictReadmitOk = false;
-        diffDetails.push(`${name} maxDiff=${maxChannelDiff(px(P0, name), px(P2, name))}`);
-      }
-    }
+  for (const name of CAPTURE_POINT_NAMES) {
+    const d = maxChannelDiff(px(P0, name), px(P2, name));
+    if (d > 0) diffDetails.push(`${name}=${d}`);
+    readmitMax = Math.max(readmitMax, d);
   }
+  const evictReadmitOk = gridChanged && allResident && readmitMax <= sortBand;
   assert(
     "evict-readmit-pixel-identical",
     evictReadmitOk,
-    gridChanged
-      ? diffDetails.length > 0
-        ? diffDetails.join("; ")
-        : `slot0=${slot0} slotAfter=${diag.slotOf(0)}`
-      : "evict drill blind — no grid point changed after evictChunk(0)",
+    `backend=${scene3.backend} evicted ${evictedChunks.length} chunk(s) [${evictedChunks.join(",")}], all resident again=${allResident} (${sameSlot} in their original slot); sort-only control band=${sortBand} over ${SORT_CONTROL_RUNS} re-sorts; evicted max diff=${evictedMax} (${gridChanged ? "above band" : "NOT above band — drill blind"}); re-admit max diff=${readmitMax}${diffDetails.length > 0 ? ` [${diffDetails.join(", ")}]` : " (exact)"} — ${readmitMax <= sortBand ? "within" : "OUTSIDE"} the measured band`,
   );
 
   // The partial-path flag is LIVE; `diag` above is a snapshot taken at

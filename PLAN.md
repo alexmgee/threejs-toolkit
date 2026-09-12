@@ -48,10 +48,9 @@ links: [scene-core, diagnostics, embed-site, fixtures]
 - [x] Fetch byte ranges and run four decode workers {#fetch-decode-pool}
   by: claude
   tech: ticket 05 — `src/backend/{RadHeader,RadFetcher,DecodePool,RadPager}.ts`; prefetch-all Range + 206-or-die, 3 immediate attempts then per-chunk unavailable, 4 queued workers (worker-side concurrency evidence), resolve-with-shortfall; `examples/rad-lab/` 19/19 on the real hero; crate chunk-header wrap panic (wasm32) found by review and fixed; `load("rad")` refusal stays until 06
-- [!] Manage page budget, LRU, and GPU uploads {#page-residency}
+- [x] Manage page budget, LRU, and GPU uploads {#page-residency}
   by: claude
-  from: roadmap
-  tech: ticket 06 — `patches/paged.ts` sibling patch (fixed capacity, partial uploads, invalidation), `src/backend/PagePool.ts` (priority-protected residency, admission gate), paged `load("rad")` path + `pagerDiagnostics`; `examples/pager-lab/` 18/18 on WebGL2 in both regimes, both review rounds landed. STUCK on WebGPU evidence: the harness browser lost its WebGPU adapter this session — owner runs pager-lab (default + ?pages=32) on WebGPU, then ticks the ACs
+  tech: ticket 06 — `patches/paged.ts` sibling patch (fixed capacity, partial uploads, invalidation), `src/backend/PagePool.ts` (priority-protected residency, admission gate — ChunkPriority is 07's swap point), paged `load("rad")` path + `pagerDiagnostics`; `examples/pager-lab/` 18/18 on WebGPU and WebGL2 in both regimes (10 H-LIFE cycles, SH band live); GPU sort within-bin nondeterminism measured per run as the pixel-drill band
 - [ ] Traverse LOD tree and cull by selection {#lod-culling}
   from: roadmap
   tech: ticket 07; `center.w` flags + `setBinNode`; explicit sort/SH invalidation

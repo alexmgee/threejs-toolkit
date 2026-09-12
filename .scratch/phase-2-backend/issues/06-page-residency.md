@@ -1,6 +1,6 @@
 # 06 — Page residency: budget, LRU, uploads, invalidations
 
-**Status:** needs-info
+**Status:** done
 **Blocked by:** 05 — fetch + decode pool.
 
 **What to build:** decoded pages become resident and visible under a device-classed
@@ -14,15 +14,18 @@ first-uploaded — monotonic by construction, NEVER residency).
 Standing rules bind (spec.md). LOD selection is ticket 07 — in this slice
 everything resident is shown.
 
-- [ ] Page budget derives from a device memory class at runtime and holds exactly
+- [x] Page budget derives from a device memory class at runtime and holds exactly
       at 32 under the `?pages=32` measurement regime; no allocation failure in
       either regime, both backends.
-- [ ] A page arriving under a motionless camera becomes visible, with sort and SH
+- [x] A page arriving under a motionless camera becomes visible, with sort and SH
       explicitly re-dispatched — the invalidation path shown, not assumed.
-- [ ] Progress is computed from completed work, monotonic through a full eviction
+- [x] Progress is computed from completed work, monotonic through a full eviction
       cycle — sampled as a tripwire and satisfied by construction.
-- [ ] Revisiting the initial pose under `?pages=32` restores the same visible
-      result (eviction correctness), both backends.
+- [x] Revisiting the initial pose under `?pages=32` restores the same visible
+      result (eviction correctness), both backends. (Owner ruling S3: THIS
+      ticket proves the machinery half — evict, re-admit from cached bytes,
+      pixels restored; the POSE-DRIVEN half re-runs in ticket 07 with the
+      traversal.)
 
 ## Comments
 
@@ -195,87 +198,70 @@ own surface and leave the door read-only; `refreshPriority()` is
 O(chunks) per call with a fresh `order()` array — fine per load, revisit
 before per-frame use.
 
-**WebGPU runs: NOT EXECUTED THIS SESSION — BLOCKER.** The harness browser
-pane returned `navigator.gpu.requestAdapter()` = null for every option set
-(default / high-performance / forceFallbackAdapter) in two fresh tabs; the
-Claude-in-Chrome extension was not connected. Ticket 04's WebGPU evidence
-was gathered in this same pane on 2026-08-29, so the adapter loss is an
-environment change, not a code change. The both-backends rule is UNMET
-until `examples/pager-lab/` (default and `?pages=32`) is run on WebGPU:
-expected there — `uploadPath=partial` with `rangesConsumed>0`, `sh≥1` in
-`invalidation-shown`, storage counters (not textures) moving in H-LIFE.
+**WebGPU runs (2026-09-12, the owner's real Chrome 152 via Claude-in-Chrome,
+RTX 3090 Ti; `scene3.backend === "webgpu"` read from the page):** the
+2026-09-03 blocker (no adapter in the harness pane) is cleared. On first
+try the pixel drill failed by 9 and 2 channel units at two grid points.
+Diagnosed, not tuned: a CONTROL of five plain re-renders with no mutation
+was pixel-exact, a control of five re-SORTS alone (no eviction) moved the
+same points by 1–11 — the GPU counting sort's within-bin order is
+nondeterministic (doc 05 H-LOAD criterion 4's recorded mechanism; the
+WebGL2 CPU sort is exact). The fixture now measures that band ITSELF each
+run (sort-only control, five re-sorts) and requires the evict → re-admit
+diff to lie inside it, evicts chunks in index order until the change
+exceeds the band (at full residency one chunk moved 6 against a band of
+13 — invisible), and asserts residency, not slot identity (multi-chunk
+re-admits land in a permutation of the freed slots by design). A batch of
+four concurrent fixture runs across two browsers hit the shared capture
+helper's 5 s readback timeout on WebGPU; run one at a time they pass.
 
-**Adversarial review round (gpt5.6-sol, effort=high, read-only;
-`.collab-logs/codex-review-t06.md`; each finding re-verified in source):
-6 findings — 5 CONFIRMED and fixed, 1 REFUTED as a defect.**
-- F1 (re-decodes never counted toward the decoded term — caps progress once
-  07 admits deferred chunks) → unique-decode tracking; `decodeCached`'s
-  first decode counts, re-decodes do not.
-- F2 (a chunk declaring `count: 0` counted as a first upload → ready with
-  nothing visible) → ready and `no-pages-available` gate on uploaded
-  SPLATS, not pages.
-- F3 REFUTED as a defect: the index/base disagreement refusal
-  (`rad-chunk-order-mismatch`) is the spike's deliberate loud failure,
-  carried over and documented — accepted limitation (the hero is
-  base-contiguous; a general mapping is a future item).
-- F4 (fixture read a stale snapshot for the partial-path flag after the
-  drills) → `partial-path-healthy-after-drills` re-reads live.
-- F5 (automatic oldest-unprotected eviction never exercised — every
-  statically-admitted chunk is protected) → `automatic-eviction-oldest-
-  unprotected` drill under `?pages=32`: full pool refuses an unprotected
-  chunk, it takes a freed slot, re-admitting the protected chunk evicts it
-  and takes its slot; the one deliberate refusal is exactly what the
-  `refused` log shows.
-- F6 (upload-path label could stay "partial" on WebGL2 when all pages land
-  before the first render) → classified at priming too.
+Default regime (122 pages): `pager-lab: 18 passed, 0 failed` —
+`budget-derived: {"pages":122,"pLimits":122,"pAsset":122,"override":null,
+"source":"device limit (bind 128 MiB / buf 256 MiB)","backend":"webgpu"}`
+· `no-allocation-failure: … storageAttributes=10 storageAttributesSize=
+799571968` · `invalidation-shown: backend=webgpu evict sort=1 sh=1; admit
+sort=1 sh=1` (SH compute re-dispatched under the motionless camera) ·
+`partial-upload-path-hit: uploadPath=partial pushed=610 consumed=605` ·
+`evict-readmit-pixel-identical: evicted 4 chunk(s) [0,1,2,3], all resident
+again=true (0 in their original slot); sort-only control band=7 over 5
+re-sorts; evicted max diff=9 (above band); re-admit max diff=3 [p00=3,
+p10=2] — within the measured band` · `dispose-cycles-gpu-flat-with-sh` ×10
+exactly `storage 10/799571968B, textures 0/0B` (the ten storage
+attributes: 4 vec4 + SH1 band + SH contribution + the sort's four) ·
+heaps oscillating 2.30–2.71 GB · `dispose-main-restores-baseline0` to true
+zero · `no-unhandled-rejections: 0`.
 
-**Built-in /code-review round (high, 8 angles + 4 verifiers; every finding
-re-verified): 10 reported, 9 fixed, 1 recorded as an optimization item
-(above). Fixed:** `admitChunk` now honours `Promise<boolean>` (catches
-pool-disposed/decode-failed/chunk-not-cached/worker failure → false; a
-decode failure joins the unavailable set; given-up chunks are never
-retried through the door — S3); `onChunk`, `evictChunk`, `admitChunk`
-refuse on a FAILED handle (fail() never sets disposed); the `Math.max`
-fraction clamp removed (each term is exactly non-decreasing; the clamp
-could only hide a regression from the tripwire); `onUnavailable` hook so
-diagnostics' `unavailable` is live like `deferred`; zero residency after
-ready → `bounds()` refuses `no-resident-pages` and the sort sphere
-collapses instead of lingering; fixture re-reads diagnostics before the
-post-drill assertions; the loud-coupling refusal helper is shared from
-dispose.ts (`forkInternalsMissingIn`); duplicate decoded counter and
-unread `chunkCount` removed; `report.jobs` is a snapshot; the `>= 5`
-SH-band-live threshold derived in place (4 vec4 attributes + the SH1
-band). H-LIFE cycles raised from 3 to 10 (ticket 04's ratified series
-length): three-sample heap triples flipped between rising and falling on
-GC timing alone.
+`?pages=32`: `pager-lab: 18 passed, 0 failed` — budget holds at 32
+(`source":"override (32)"`), `residentPages=32/32 deferred=90`,
+progress `(1 + 32/122 + 32/122)/3 = 0.5082` rising from 0.3607 at ready,
+`partial pushed=160 consumed=155`, `evict-readmit-pixel-identical: evicted
+1 chunk(s) [0] … band=1 … evicted max diff=60 … re-admit max diff=1
+[p22=1] — within the measured band`, `automatic-eviction-oldest-
+unprotected` full-pool refusal / freed slot / evict-into-slot all true,
+H-LIFE ×10 flat at `storage 10/209747968B`, `no-unhandled-rejections: 0`.
 
-**Post-review fixture evidence — WebGL2 fallback, `?pages=32`: `pager-lab:
-18 passed, 0 failed`.** `dispose-cycles-gpu-flat-with-sh` ×10: after-dispose
-union counters exactly `textures 14/168820736B` (main handle 6 + capture
-leak 8) every cycle, SH band live each load; `heap-not-strictly-
-increasing: heaps=[918295558, 918515434, 918524430, 871440994, 918290134,
-871673250, 894584922, 1049376402, 918253554, 1000862959]` (oscillating,
-not rising); `automatic-eviction-oldest-unprotected` as above;
-`no-pages-available`, `no-unhandled-rejections: 0`. Gate `npm run
-check:full` EXIT=0 (`.collab-logs/gate-t06-run2.log`): embed 216,527 B
-(unchanged — the paged path is not in the embed entry), 157 modules / 476
-deps cruised, crate 7/7 with golden. Vendored digests unchanged (no .js
-touched). rad-lab 19/19 and splat-lab 28/28 (WebGL2) still green after the
-RadPager hooks change and the rad-refusal replacement (splat-lab's case is
-now `rad-without-worker-factory-named-refusal`).
+WebGL2 fallback on the same final fixture code (2026-09-12, the owner's
+Chrome 152 via `?webgl=1` — the harness pane's Chromium disabled WebGL for
+the session after repeated "WebGL Device Lost" events under GPU pressure
+from concurrent runs; `isContextLost() === true`, then `getContext` null):
+default regime `18 passed, 0 failed` — `budget … "device limit
+(MAX_TEXTURE_SIZE 16384)"`, `uploadPath=pbo-texture pboUploads=610`,
+`evict-readmit-pixel-identical: evicted 1 chunk(s) [0] … band=0 …
+evicted max diff=4 (above band); re-admit max diff=0 (exact)`, H-LIFE ×10
+exactly `textures 24/641990656B` (main handle 6 + the shared capture
+module's metered timeout leak), heaps oscillating 2.76–6.15 GB, `no-
+unhandled-rejections: 0`; `?pages=32` `18 passed, 0 failed` — `evicted
+max diff=50 … re-admit max diff=0 (exact)`, `automatic-eviction-oldest-
+unprotected` all true, H-LIFE ×10 flat at `textures 24/170131456B`.
+One WebGL2 default attempt in a tab that had just carried a 2.3 GB
+WebGPU run hit `THREE.WebGLProgram: Shader Error 0 - VALIDATE_STATUS
+false` then "WebGL Device Lost" right after load (nothing drew); a fresh
+tab passed 18/18 — recorded as GPU-process pressure, not reproduced.
+Fixture runs are ONE AT A TIME from here: four concurrent runs hit the
+shared capture helper's 5 s WebGPU readback timeout and the pane's context
+loss. Gate `npm run check:full` EXIT=0 on the final tree
+(`.collab-logs/gate-t06-run4.log`; embed 216,527 B).
 
-**Post-review fixture evidence — WebGL2 fallback, default regime (122
-pages): `pager-lab: 18 passed, 0 failed`.** `dispose-cycles-gpu-flat-with-sh`
-×10 exactly flat at `textures 14/640679936B`; `heap-not-strictly-increasing:
-heaps=[2151033851, 2151355359, 2310876607, 2263325807, 2157838911,
-2352920875, 2157240231, 2151467719, 2151966799, 2151974207]` (oscillating
-around 2.15 GB — the main handle's ~1 GB of CPU arrays + raw cache stays
-live during the cycles by design); `automatic-eviction-oldest-unprotected`
-correctly reports not-applicable (no unprotected chunk exists at 122
-pages; proven under `?pages=32`); `no-unhandled-rejections: 0`.
-
-**AC status (2026-09-03):** every AC is met on the WebGL2 fallback in both
-regimes and UNMET on WebGPU for lack of an adapter in this session's
-browser (see the blocker above) — boxes stay open until the WebGPU runs
-are quoted here. Status `needs-info`: the missing information is the two
-WebGPU runs of `examples/pager-lab/` (default and `?pages=32`).
+**Status change: done — all four ACs met on BOTH backends in BOTH regimes
+(WebGL2 2026-09-03/12, WebGPU 2026-09-12; evidence above). AC4's
+pose-driven half re-runs in ticket 07 per ruling S3.**
