@@ -14,8 +14,11 @@
  * alpha), so empty slots are invisible without the spike's `center.w`
  * selection lane — selection is ticket 07's concern. After construction the
  * source covariance/color/SH arrays are released (40 B/splat the mesh never
- * reads again); the source `position` array stays as the CPU mirror the
- * WebGL2 sort path reads (`_sortCPU` → `_positionAttribute`).
+ * reads again); the source `position` array stays referenced by the
+ * vendored `_positionAttribute` but is NOT maintained: the paged mesh always
+ * carries the [selection] patch, whose instance-level `_sortCPU` reads the
+ * vec4 center storage array's xyz + w instead (ticket 07 review removed
+ * the dead per-page mirror copy).
  *
  * Partial uploads: pages are written into the storage attributes' arrays
  * and pushed as `addUpdateRange` + `needsUpdate` — the partial path that
@@ -140,7 +143,6 @@ export class PagedMesh {
   private readonly covBAttr: RangeAttribute;
   private readonly colorAttr: RangeAttribute;
   private readonly sh1Attr: RangeAttribute | null;
-  private readonly positionMirror: Float32Array;
   private readonly meshRecord: Record<string, unknown>;
   private snapshot: PendingSnapshot[] = [];
   private primed = false;
@@ -170,6 +172,10 @@ export class PagedMesh {
     } else {
       this.sh1Attr = null;
     }
+    // `_positionAttribute` is validated (the vendored `_sortCPU` would read
+    // it) but never written: patches/selection.ts replaces `_sortCPU` on the
+    // instance with a center-storage reader, so a mirror copy per upload
+    // would be dead work (built-in review, 2026-09-12).
     const positionAttribute = record._positionAttribute as { array?: unknown } | undefined;
     if (
       positionAttribute === undefined || positionAttribute === null ||
@@ -178,16 +184,23 @@ export class PagedMesh {
     ) {
       forkInternalsMissing("mesh._positionAttribute.array (Float32Array[capacity*3])");
     }
-    this.positionMirror = positionAttribute.array;
     if (typeof record._sortInitialized !== "boolean") forkInternalsMissing("mesh._sortInitialized");
     if (typeof record._sphericalHarmonicsInitialized !== "boolean") forkInternalsMissing("mesh._sphericalHarmonicsInitialized");
     const splatGeometry = (mesh as unknown as { splatGeometry?: BufferGeometry }).splatGeometry;
     if (splatGeometry === undefined || splatGeometry.boundingSphere === null) forkInternalsMissing("mesh.splatGeometry.boundingSphere");
     this.boundingSphere = splatGeometry.boundingSphere;
 
+    const geometrySphere = (mesh as unknown as { geometry?: { boundingSphere: Sphere | null } }).geometry;
+    if (geometrySphere === undefined) forkInternalsMissing("mesh.geometry");
+    this.drawGeometry = geometrySphere as { boundingSphere: Sphere | null; instanceCount: number };
+
     // ── Hook the render cycle for the race-free partial-path assertion ──
+    // The caller's beforeRender (ticket 07: LOD traversal + selection) runs
+    // FIRST so the vendored onBeforeRender's sort/SH updates see the new
+    // selection lane and any invalidation it requested.
     const previousBefore = mesh.onBeforeRender;
     mesh.onBeforeRender = (...args) => {
+      this.beforeRender?.(args[0], args[2]);
       this.snapshotPendingRanges();
       previousBefore.apply(mesh, args);
     };
@@ -202,6 +215,41 @@ export class PagedMesh {
 
   /** Caller hook after each render (the backend flips ready here). */
   afterRender: (() => void) | null = null;
+  /** Caller hook BEFORE the vendored onBeforeRender (ticket 07: the LOD
+   *  driver traverses, writes selection, sets the draw count here). Only
+   *  runs when three decided to draw the mesh (a frustum-culled mesh gets
+   *  no onBeforeRender — so a culled mesh also skips traversal, and three
+   *  un-culls it by its bounding sphere the moment it re-enters view). */
+  beforeRender: ((renderer: unknown, camera: unknown) => void) | null = null;
+  private readonly drawGeometry: { boundingSphere: Sphere | null; instanceCount: number };
+
+  /** [selection] Rewrite one page's `center.w` selection lane (1 = draw,
+   *  0 = deselected; the sort's reserved bin catches 0 — patches/selection.ts). */
+  setSelection(slot: number, flags: Uint8Array): void {
+    if (!Number.isInteger(slot) || slot < 0 || slot >= this.pageCount) {
+      throw new ForkPatchError("page-slot-out-of-range", `setSelection: slot ${slot} outside 0..${this.pageCount - 1}`);
+    }
+    if (flags.length !== this.pageSize) {
+      throw new ForkPatchError("selection-length", `setSelection: ${flags.length} flags for a ${this.pageSize}-splat page`);
+    }
+    const base = slot * this.pageSize;
+    const centerData = this.centerAttr.array;
+    for (let i = 0; i < this.pageSize; i++) centerData[(base + i) * 4 + 3] = flags[i]!;
+    this.pushRange(this.centerAttr, base * 4, this.pageSize * 4);
+  }
+
+  /** [selection] Instances drawn = selected rows; the sort put every
+   *  deselected row behind them (public InstancedBufferGeometry API). */
+  setDrawCount(selectedCount: number): void {
+    if (!Number.isInteger(selectedCount) || selectedCount < 0 || selectedCount > this.capacity) {
+      throw new ForkPatchError("draw-count", `setDrawCount: ${selectedCount} outside 0..${this.capacity}`);
+    }
+    this.drawGeometry.instanceCount = selectedCount;
+  }
+
+  get drawCount(): number {
+    return this.drawGeometry.instanceCount;
+  }
 
   /** Write one decoded page into slot `slot` (rows past `count` zeroed —
    *  a short last chunk safely replaces a full evicted one). */
@@ -251,10 +299,6 @@ export class PagedMesh {
     covBData.fill(0, tailStart, tailEnd);
     colorData.fill(0, tailStart, tailEnd);
 
-    // CPU mirror for the WebGL2 sort path.
-    this.positionMirror.set(center.subarray(0, count * 3), base * 3);
-    this.positionMirror.fill(0, (base + count) * 3, (base + this.pageSize) * 3);
-
     this.pushRange(this.centerAttr, base * 4, this.pageSize * 4);
     this.pushRange(this.covAAttr, base * 4, this.pageSize * 4);
     this.pushRange(this.covBAttr, base * 4, this.pageSize * 4);
@@ -295,6 +339,14 @@ export class PagedMesh {
     const radius = 0.5 * Math.hypot(max[0] - min[0], max[1] - min[1], max[2] - min[2]);
     this.boundingSphere.center.copy(center);
     this.boundingSphere.radius = Math.max(radius, Number.EPSILON);
+    // Frustum culling (doc 03 §F, ticket 07): three's own per-frame test
+    // reads the DRAW geometry's bounding sphere (Renderer.js
+    // frustum.intersectsObject → geometry.boundingSphere × matrixWorld).
+    // Keep it over the resident pages' AABB union so `frustumCulled = true`
+    // culls the mesh from the pager's AABBs through public API.
+    if (this.drawGeometry.boundingSphere === null) this.drawGeometry.boundingSphere = new Sphere();
+    this.drawGeometry.boundingSphere.center.copy(center);
+    this.drawGeometry.boundingSphere.radius = Math.max(radius, Number.EPSILON);
   }
 
   private pushRange(attribute: RangeAttribute, start: number, count: number): void {
@@ -408,8 +460,9 @@ export function createPagedMesh(
   const paged = new PagedMesh(mesh, capacity, pageSize, shDegree);
 
   // Release the source arrays the vendored mesh copied at construction and
-  // never reads again (covariance/color/SH: 40 B/splat). `position` stays —
-  // the WebGL2 CPU sort reads it through mesh._positionAttribute.
+  // never reads again (covariance/color/SH: 40 B/splat). `position` stays
+  // referenced by the vendored mesh (`_positionAttribute`); the [selection]
+  // patch's CPU sort reads the center storage array instead.
   geometry.deleteAttribute("covariance");
   geometry.deleteAttribute("color");
   if (shDegree === 1) geometry.deleteAttribute("sphericalHarmonics1");

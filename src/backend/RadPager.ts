@@ -121,6 +121,12 @@ export class RadPager {
     }
   }
 
+  /** Whether a chunk's raw bytes are in the cache right now (false while
+   *  it is mid-decode or never landed). */
+  hasCached(index: number): boolean {
+    return this.cache.has(index);
+  }
+
   /** Bytes currently held in the raw cache. */
   get cachedBytes(): number {
     let total = 0;

@@ -16,8 +16,14 @@ import {
   disposeGaussianSplatMesh,
 } from "../vendor/three-gs/patches/dispose.js";
 import { createPagedMesh, type PagedMesh } from "../vendor/three-gs/patches/paged.js";
-import { DecodeFailedError } from "./DecodePool.js";
-import { PagePool, indexOrder } from "./PagePool.js";
+import {
+  SORT_DIRECTION_THRESHOLD,
+  SORT_POSITION_THRESHOLD,
+  installSelectionSort,
+} from "../vendor/three-gs/patches/selection.js";
+import { DECODE_POOL_SIZE, DecodeFailedError } from "./DecodePool.js";
+import { LodTraversal, type LodTuning, type TraverseResult } from "./LodTraversal.js";
+import { PagePool, indexOrder, type ChunkPriority } from "./PagePool.js";
 import { RadPager } from "./RadPager.js";
 import type { ChunkUnavailable } from "./RadFetcher.js";
 import type { RadHeaderInfo } from "./RadHeader.js";
@@ -88,6 +94,56 @@ interface PagedState {
    *  not the page count: a chunk declaring count 0 uploads nothing visible
    *  (adversarial review, 2026-09-03). */
   uploadedSplats: number;
+  /** Ticket 07 — LOD traversal, selection, culling. */
+  readonly lod: LodDriver;
+}
+
+/** ADR 0003 / owner ruling 07-S2: the projected-size threshold is derived
+ *  from the camera each traversal; this scale (default 1, the null value)
+ *  is ticket 13's knob. */
+export interface LodOptions extends Partial<LodTuning> {
+  lodRenderScale?: number;
+}
+
+/** The traversal's ORDER is the ChunkPriority swap point (06-S2): before the
+ *  first traversal the static index order stands (chunk 0 = the tree root
+ *  must land first anyway); after it, the last traversal's wanted order. */
+class TraversalPriority implements ChunkPriority {
+  private wanted: readonly number[] = [];
+  constructor(private readonly fallback: ChunkPriority) {}
+  set(wanted: readonly number[]): void {
+    this.wanted = wanted;
+  }
+  order(): readonly number[] {
+    return this.wanted.length > 0 ? this.wanted : this.fallback.order();
+  }
+}
+
+interface LodDriver {
+  readonly traversal: LodTraversal;
+  readonly priority: TraversalPriority;
+  lodRenderScale: number;
+  /** Set by residency changes / tuning changes; the next render traverses. */
+  dirty: boolean;
+  traversals: number;
+  lastTraversalMs: number;
+  lastResult: TraverseResult | null;
+  /** Camera pose in MESH-OBJECT space at the last traversal — 07-S5 hysteresis. */
+  readonly lastPosition: THREE.Vector3;
+  readonly lastDirection: THREE.Vector3;
+  lastPixelScaleLimit: number;
+  /** In-flight admissions (wanted-but-missing cached chunks re-decoding),
+   *  ONE promise per chunk shared by the driver and the diagnostics door —
+   *  a second admit of the same chunk awaits the first instead of racing
+   *  it for bytes that already left the cache (caught live, 2026-09-12). */
+  readonly admitting: Map<number, Promise<boolean>>;
+  /** Selection off = every resident splat drawn (the 06 behaviour; the
+   *  fixture's "features off" control). */
+  selectionEnabled: boolean;
+  /** Renders skipped because three frustum-culled the mesh cannot be
+   *  counted from inside (no onBeforeRender); this counts renders that
+   *  DID run, for the culling-off equality drill. */
+  rendersWithTraversalHook: number;
 }
 
 /** Ticket 12 (§G diagnostics) owns the final shape; this is the pager's
@@ -118,6 +174,9 @@ export interface PagerDiagnostics {
   /** The three completed-work ratios behind `progress().fraction`. */
   readonly progressTerms: { bytes: number; decoded: number; uploaded: number };
   isResident(chunk: number): boolean;
+  /** Raw bytes held for a later admission (false while resident-and-mid-
+   *  decode, or never landed). */
+  isCached(chunk: number): boolean;
   slotOf(chunk: number): number;
   /** Explicit eviction: the slot is zeroed on the GPU and freed. */
   evictChunk(chunk: number): boolean;
@@ -125,6 +184,31 @@ export interface PagerDiagnostics {
    *  eviction). Resolves false when the pool refuses a slot. */
   admitChunk(chunk: number): Promise<boolean>;
   readonly mesh: GaussianSplatMesh;
+  /** Ticket 07 — LOD / selection / culling counters and controls. */
+  readonly lod: {
+    readonly selectedCount: number;
+    readonly drawCount: number;
+    readonly fullQuality: boolean;
+    readonly traversals: number;
+    readonly lastTraversalMs: number;
+    readonly wantedChunks: readonly number[];
+    readonly changedSlotsLast: number;
+    readonly stats: TraverseResult["stats"] | null;
+    readonly tuning: Readonly<LodTuning>;
+    readonly lodRenderScale: number;
+    readonly selectionEnabled: boolean;
+    readonly cullingEnabled: boolean;
+    readonly admitting: number;
+    readonly admittingChunks: readonly number[];
+    /** Change the render-scale knob (07-S2); marks the traversal dirty. */
+    setLodRenderScale(scale: number): void;
+    /** Selection off draws every resident splat (the ticket-06 behaviour). */
+    setSelectionEnabled(enabled: boolean): void;
+    /** Frustum culling on/off (mesh.frustumCulled from the pager AABB sphere). */
+    setCullingEnabled(enabled: boolean): void;
+    /** Force a traversal on the next render (fixture drills). */
+    markDirty(): void;
+  };
 }
 
 export interface ThreeGsBackendOptions {
@@ -144,9 +228,20 @@ export interface ThreeGsBackendOptions {
   /** TEST-ONLY seam (owner ruling 05-S5 precedent): injected fetch for the
    *  paged path's fixtures. Never set in production code. */
   fetchImpl?: typeof fetch;
+  /** Ticket 07: LOD tuning (Spark's defaults as starting values — owner
+   *  rulings 07-S3/S4) and the render-scale knob (07-S2). */
+  lod?: LodOptions;
 }
 
 const handles = new WeakMap<SplatHandle, HandleState>();
+
+// Scratch objects for the per-render LOD driver (no allocation per frame).
+const _size = new THREE.Vector2();
+const _cameraPosition = new THREE.Vector3();
+const _cameraDirection = new THREE.Vector3();
+const _worldToObject = new THREE.Matrix4();
+const _camToObject = new THREE.Matrix4();
+const _allFlags = new Uint8Array(65536);
 
 function inferFormat(source: SplatSource): SplatFormat {
   if (source.format !== undefined) return source.format;
@@ -347,6 +442,7 @@ export class ThreeGsBackend implements SplatBackend {
   private readonly createDecodeWorker: (() => Worker) | undefined;
   private readonly pageBudgetOverride: number | undefined;
   private readonly fetchImpl: typeof fetch | undefined;
+  private readonly lodOptions: LodOptions;
 
   constructor(options: ThreeGsBackendOptions = {}) {
     this.renderer = options.renderer;
@@ -355,6 +451,7 @@ export class ThreeGsBackend implements SplatBackend {
     this.createDecodeWorker = options.createDecodeWorker;
     this.pageBudgetOverride = options.pageBudgetOverride;
     this.fetchImpl = options.fetchImpl;
+    this.lodOptions = options.lod ?? {};
   }
 
   load(source: SplatSource): SplatHandle {
@@ -526,11 +623,15 @@ export class ThreeGsBackend implements SplatBackend {
             (this.renderer as { backend?: { device?: { limits?: { maxStorageBufferBindingSize?: number } } } })
               ?.backend?.device?.limits?.maxStorageBufferBindingSize;
           if (typeof limit === "number") assertStorageWithinLimit(capacity, shDegree, limit);
+          // ChunkPriority is the swap point (06-S2): the traversal's order
+          // object goes straight into PagePool; before the first traversal
+          // it answers with the static index order.
+          const priority = new TraversalPriority(indexOrder(header.chunks.length));
           const pool = new PagePool({
             chunkCount: header.chunks.length,
             pageCount: budget.pages,
             pageSize,
-            priority: indexOrder(header.chunks.length),
+            priority,
           });
           pool.refreshPriority();
           let pagedMesh: PagedMesh;
@@ -542,6 +643,22 @@ export class ThreeGsBackend implements SplatBackend {
             }
             throw error;
           }
+          const { lodRenderScale, ...tuning } = this.lodOptions;
+          if (lodRenderScale !== undefined && !(lodRenderScale > 0)) {
+            throw new SplatBackendError("lod-tuning", `lodRenderScale must be > 0, got ${lodRenderScale}`);
+          }
+          const traversal = new LodTraversal(
+            { pageCount: budget.pages, chunkCount: header.chunks.length, slotOf: (chunk) => pool.slotOf(chunk) },
+            pageSize,
+            tuning,
+          );
+          // Fork patch 2: selection-aware sort (07-S1) — before the first render.
+          installSelectionSort(pagedMesh.mesh);
+          // Frustum culling through public API: three tests the draw
+          // geometry's bounding sphere, which setBounds keeps over the
+          // resident pages' AABB union (doc 03 §F).
+          pagedMesh.mesh.frustumCulled = true;
+          pagedMesh.setDrawCount(0);
           paged = {
             pager,
             header,
@@ -554,6 +671,21 @@ export class ThreeGsBackend implements SplatBackend {
             unavailableSet: new Set<number>(),
             loadSettled: false,
             uploadedSplats: 0,
+            lod: {
+              traversal,
+              priority,
+              lodRenderScale: lodRenderScale ?? 1,
+              dirty: true,
+              traversals: 0,
+              lastTraversalMs: 0,
+              lastResult: null,
+              lastPosition: new THREE.Vector3(Infinity, Infinity, Infinity),
+              lastDirection: new THREE.Vector3(0, 0, -1),
+              lastPixelScaleLimit: 0,
+              admitting: new Map<number, Promise<boolean>>(),
+              selectionEnabled: true,
+              rendersWithTraversalHook: 0,
+            },
           };
           state.paged = paged;
           state.total = header.count;
@@ -566,6 +698,10 @@ export class ThreeGsBackend implements SplatBackend {
             if (paged === null || paged.uploadedSplats === 0) return;
             this.updatePagedProgress(state, "ready");
             state.resolveReady();
+          };
+          pagedMesh.beforeRender = (renderer, camera) => {
+            if (paged === null || state.disposed || state.failure !== null) return;
+            this.driveLod(state, paged, renderer, camera);
           };
           this.updatePagedProgress(state, "constructing");
         },
@@ -647,6 +783,7 @@ export class ThreeGsBackend implements SplatBackend {
     if (paged.pool.firstUploadedCount > firstUploadsBefore) paged.uploadedSplats += result.count;
     try {
       paged.paged.uploadPage(slot, result);
+      paged.lod.traversal.setPage(slot, result);
     } catch (error) {
       if (error instanceof ForkPatchError) {
         fail(state, error.reason, error.message);
@@ -674,9 +811,153 @@ export class ThreeGsBackend implements SplatBackend {
       state.bounds.min.set(bounds.min[0], bounds.min[1], bounds.min[2]);
       state.bounds.max.set(bounds.max[0], bounds.max[1], bounds.max[2]);
       state.boundsReady = true;
-      paged.paged.setBounds(bounds.min, bounds.max);
+      // The seam's bounds() are the CENTER bounds (doc 03 §E contract). The
+      // CULLING sphere must also cover splat FOOTPRINTS: the vendored
+      // fragment kernel discards at r² > 4, i.e. a footprint radius of 2σ
+      // (GaussianSplatMesh.js:740) — inflate by 2 × the largest resident
+      // scale so a center just outside the frustum whose footprint overlaps
+      // it is never culled away (adversarial review, 2026-09-12: culling
+      // must change cost, never content).
+      const margin = 2 * paged.lod.traversal.maxResidentScale();
+      paged.paged.setBounds(
+        [bounds.min[0] - margin, bounds.min[1] - margin, bounds.min[2] - margin],
+        [bounds.max[0] + margin, bounds.max[1] + margin, bounds.max[2] + margin],
+      );
     }
     paged.paged.invalidate();
+    // Residency changed → the frontier must be re-derived at the next
+    // render (ticket 07); until then the new page stays deselected (w = 0
+    // from the upload) so nothing pops in unsorted.
+    paged.lod.dirty = true;
+  }
+
+  // ───────────────────────── ticket 07: LOD driver ─────────────────────────
+
+  /**
+   * Runs in the paged mesh's onBeforeRender, BEFORE the vendored sort/SH
+   * updates. Re-traverses when residency/tuning changed or the camera moved
+   * past the vendored sort's own motion thresholds (owner ruling 07-S5:
+   * mirrored constants, no new numbers), writes changed pages' selection
+   * lanes, sets the draw count, hands the wanted order to the pool
+   * (ChunkPriority swap point), kicks admission of wanted-but-missing cached
+   * chunks, and invalidates sort + SH (selection-change invalidation joins
+   * 06's two). With selection disabled every resident splat is selected.
+   */
+  private driveLod(state: HandleState, paged: PagedState, renderer: unknown, cameraIn: unknown): void {
+    const lod = paged.lod;
+    lod.rendersWithTraversalHook++;
+    const camera = cameraIn as THREE.PerspectiveCamera;
+    const mesh = paged.paged.mesh;
+    // Pixels are DRAWING-BUFFER pixels (Spark: renderer.getDrawingBufferSize
+    // → renderSize), not CSS pixels — at DPR 2 the CSS height would halve
+    // the refinement (adversarial review, 2026-09-12).
+    const size = (renderer as { getDrawingBufferSize(target: THREE.Vector2): THREE.Vector2 }).getDrawingBufferSize(_size);
+    const renderHeight = size.y;
+    if (!(renderHeight > 0) || typeof camera.fov !== "number") return; // hidden pane / non-perspective: leave dirty
+    // Spark's driveLod formula: world units per pixel at distance 1 (07-S2).
+    const pixelScaleLimit = ((2 * Math.tan((camera.fov * Math.PI) / 360)) / renderHeight) * lod.lodRenderScale;
+
+    // Camera in MESH-OBJECT space (the spike's runTraversal) — and the
+    // hysteresis compares THIS pose, so a moving mesh or parent re-triggers
+    // exactly like a moving camera (adversarial review, 2026-09-12: a
+    // world-pose comparison never saw the ticket-09 SiteConfig transforms).
+    camera.updateMatrixWorld();
+    mesh.updateWorldMatrix(true, false);
+    _worldToObject.copy(mesh.matrixWorld).invert();
+    _camToObject.multiplyMatrices(_worldToObject, camera.matrixWorld);
+    const c = _camToObject.elements;
+    const fLen = Math.hypot(c[8]!, c[9]!, c[10]!) || 1;
+    _cameraPosition.set(c[12]!, c[13]!, c[14]!);
+    _cameraDirection.set(-c[8]! / fLen, -c[9]! / fLen, -c[10]! / fLen);
+    const moved =
+      _cameraPosition.distanceToSquared(lod.lastPosition) > SORT_POSITION_THRESHOLD * SORT_POSITION_THRESHOLD ||
+      _cameraDirection.dot(lod.lastDirection) < SORT_DIRECTION_THRESHOLD;
+    if (!lod.dirty && !moved && pixelScaleLimit === lod.lastPixelScaleLimit) return;
+
+    const t0 = performance.now();
+    let selectedCount: number;
+    if (lod.selectionEnabled) {
+      const result = lod.traversal.traverse({
+        origin: [c[12]!, c[13]!, c[14]!],
+        forward: [-c[8]! / fLen, -c[9]! / fLen, -c[10]! / fLen],
+        pixelScaleLimit,
+      });
+      lod.lastResult = result;
+      for (const slot of result.changedSlots) {
+        paged.paged.setSelection(slot, lod.traversal.selectionOf(slot));
+      }
+      selectedCount = result.selectedCount;
+      lod.priority.set(result.wantedChunks);
+      paged.pool.refreshPriority();
+      // The spike touched every WANTED resident page per traversal so the
+      // oldest-first eviction among unprotected residents prefers pages the
+      // frontier no longer wants (spike PagePool.traverse: "eviction ages by
+      // this tick") — promoted verbatim.
+      for (const chunk of result.wantedChunks) paged.pool.touch(chunk);
+      this.kickAdmissions(state, paged);
+    } else {
+      // Selection off: every resident row drawn (06 behaviour).
+      selectedCount = 0;
+      for (let slot = 0; slot < paged.pool.pageCount; slot++) {
+        const count = paged.pool.pageCountAt(slot);
+        _allFlags.fill(0);
+        _allFlags.fill(1, 0, count);
+        paged.paged.setSelection(slot, _allFlags.subarray(0, paged.header.chunkSize));
+        selectedCount += count;
+      }
+      lod.lastResult = null;
+      // The lanes now hold "every occupied row selected": tell the traversal
+      // so its next diff rewrites every slot that differs from that.
+      lod.traversal.assumeAllSelected();
+    }
+    paged.paged.setDrawCount(selectedCount);
+    paged.paged.invalidate(); // selection changed → sort + SH re-dispatch (H-LOAD 9–10)
+    lod.lastTraversalMs = performance.now() - t0;
+    lod.traversals++;
+    lod.dirty = false;
+    lod.lastPosition.copy(_cameraPosition);
+    lod.lastDirection.copy(_cameraDirection);
+    lod.lastPixelScaleLimit = pixelScaleLimit;
+  }
+
+  /** Wanted-but-missing chunks whose bytes are cached re-decode through the
+   *  pool (owner ruling 06-S4); at most poolSize in flight. A chunk given up
+   *  on is never retried (S3). */
+  private kickAdmissions(state: HandleState, paged: PagedState): void {
+    const lod = paged.lod;
+    const limit = DECODE_POOL_SIZE; // one re-decode in flight per worker
+    for (const chunk of paged.pool.admissibleMissing()) {
+      if (lod.admitting.size >= limit) break;
+      if (lod.admitting.has(chunk) || paged.unavailableSet.has(chunk)) continue;
+      if (!paged.pager.hasCached(chunk)) continue; // still downloading — the load's own gate admits it
+      this.admit(state, paged, chunk);
+    }
+  }
+
+  /** One shared admission per chunk: re-decode from the cache, insert.
+   *  Resolves false when refused (slot, disposed/failed handle, decode
+   *  failure — which joins the unavailable set, S3). */
+  private admit(state: HandleState, paged: PagedState, chunk: number): Promise<boolean> {
+    const lod = paged.lod;
+    const existing = lod.admitting.get(chunk);
+    if (existing !== undefined) return existing;
+    const promise = paged.pager.decodeCached(chunk).then(
+      (result) => {
+        if (state.disposed || state.failure !== null) return false;
+        return this.insertPage(state, paged, result);
+      },
+      (error: unknown) => {
+        if (error instanceof DecodeFailedError) {
+          paged.unavailableSet.add(chunk);
+          paged.unavailable.push({ index: chunk, reason: "decode-failed", attempts: 1, detail: error.message });
+        }
+        return false;
+      },
+    ).finally(() => {
+      lod.admitting.delete(chunk);
+    });
+    lod.admitting.set(chunk, promise);
+    return promise;
   }
 
   /** Owner ruling 06-S5: fraction = equal-weight mean of the three
@@ -740,6 +1021,7 @@ export class ThreeGsBackend implements SplatBackend {
       loadSettled: paged.loadSettled,
       progressTerms: this.pagedProgressTerms(paged),
       isResident: (chunk) => paged.pool.isResident(chunk),
+      isCached: (chunk) => paged.pager.hasCached(chunk),
       slotOf: (chunk) => paged.pool.slotOf(chunk),
       // Both mutators refuse (false) on a disposed OR failed handle — a
       // handle whose whenReady rejected must never revive content, and a
@@ -750,33 +1032,53 @@ export class ThreeGsBackend implements SplatBackend {
         const slot = paged.pool.evict(chunk);
         if (slot === -1) return false;
         paged.paged.clearPage(slot);
+        paged.lod.traversal.clearPage(slot);
         backendRef.residencyChanged(state, paged);
         return true;
       },
-      admitChunk: async (chunk) => {
-        if (state.disposed || state.failure !== null) return false;
-        if (paged.pool.isResident(chunk)) return true;
+      admitChunk: (chunk) => {
+        if (state.disposed || state.failure !== null) return Promise.resolve(false);
+        if (paged.pool.isResident(chunk)) return Promise.resolve(true);
         // A chunk given up on stays given up on: a decode failure is
         // deterministic on the same bytes (S3) and a fetch failure left no
         // bytes to decode — never a retry through this door.
-        if (paged.unavailableSet.has(chunk)) return false;
-        let result: DecodeResult;
-        try {
-          result = await paged.pager.decodeCached(chunk);
-        } catch (error) {
-          // Promise<boolean> means boolean: pool-disposed (dispose landed
-          // mid-admit), decode-failed, chunk-not-cached, worker failure —
-          // all resolve false; a decode failure joins the unavailable set.
-          if (error instanceof DecodeFailedError) {
-            paged.unavailableSet.add(chunk);
-            paged.unavailable.push({ index: chunk, reason: "decode-failed", attempts: 1, detail: error.message });
-          }
-          return false;
-        }
-        if (state.disposed || state.failure !== null) return false;
-        return backendRef.insertPage(state, paged, result);
+        if (paged.unavailableSet.has(chunk)) return Promise.resolve(false);
+        if (!paged.pager.hasCached(chunk) && !paged.lod.admitting.has(chunk)) return Promise.resolve(false);
+        // Promise<boolean> means boolean: every failure inside resolves false.
+        return backendRef.admit(state, paged, chunk);
       },
       mesh: paged.paged.mesh,
+      lod: {
+        selectedCount: paged.lod.lastResult?.selectedCount ?? paged.paged.drawCount,
+        drawCount: paged.paged.drawCount,
+        fullQuality: paged.lod.lastResult?.fullQuality ?? false,
+        traversals: paged.lod.traversals,
+        lastTraversalMs: paged.lod.lastTraversalMs,
+        wantedChunks: paged.lod.lastResult?.wantedChunks ?? [],
+        changedSlotsLast: paged.lod.lastResult?.changedSlots.length ?? 0,
+        stats: paged.lod.lastResult?.stats ?? null,
+        tuning: paged.lod.traversal.tuning,
+        lodRenderScale: paged.lod.lodRenderScale,
+        selectionEnabled: paged.lod.selectionEnabled,
+        cullingEnabled: paged.paged.mesh.frustumCulled,
+        admitting: paged.lod.admitting.size,
+        admittingChunks: [...paged.lod.admitting.keys()],
+        setLodRenderScale: (scale) => {
+          if (!(scale > 0)) throw new SplatBackendError("lod-tuning", `lodRenderScale must be > 0, got ${scale}`);
+          paged.lod.lodRenderScale = scale;
+          paged.lod.dirty = true;
+        },
+        setSelectionEnabled: (enabled) => {
+          paged.lod.selectionEnabled = enabled;
+          paged.lod.dirty = true;
+        },
+        setCullingEnabled: (enabled) => {
+          paged.paged.mesh.frustumCulled = enabled;
+        },
+        markDirty: () => {
+          paged.lod.dirty = true;
+        },
+      },
     };
   }
 
@@ -999,10 +1301,12 @@ export class ThreeGsBackend implements SplatBackend {
   counts(handle: SplatHandle): SplatCounts {
     const state = requireHandle(handle, "counts");
     if (state.paged !== null) {
-      // Paged path: resident = splats in resident pages; everything resident
-      // is shown until ticket 07's selection.
+      // Paged path: resident = splats in resident pages; selected = the last
+      // RENDER's frontier (the draw count; 0 before the first render), never
+      // more than what is resident right now — residency can shrink between
+      // renders (adversarial review, 2026-09-12).
       const resident = state.paged.pool.residentSplatCount;
-      return { total: state.total, resident, selected: resident };
+      return { total: state.total, resident, selected: Math.min(state.paged.paged.drawCount, resident) };
     }
     // Monolithic path: once ready, everything is resident and selected.
     const resident = state.progress.phase === "ready" ? state.total : 0;

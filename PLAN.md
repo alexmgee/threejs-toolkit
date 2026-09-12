@@ -51,9 +51,9 @@ links: [scene-core, diagnostics, embed-site, fixtures]
 - [x] Manage page budget, LRU, and GPU uploads {#page-residency}
   by: claude
   tech: ticket 06 — `patches/paged.ts` sibling patch (fixed capacity, partial uploads, invalidation), `src/backend/PagePool.ts` (priority-protected residency, admission gate — ChunkPriority is 07's swap point), paged `load("rad")` path + `pagerDiagnostics`; `examples/pager-lab/` 18/18 on WebGPU and WebGL2 in both regimes (10 H-LIFE cycles, SH band live); GPU sort within-bin nondeterminism measured per run as the pixel-drill band
-- [ ] Traverse LOD tree and cull by selection {#lod-culling}
-  from: roadmap
-  tech: ticket 07; `center.w` flags + `setBinNode`; explicit sort/SH invalidation
+- [x] Traverse LOD tree and cull by selection {#lod-culling}
+  by: claude
+  tech: ticket 07 — `src/backend/LodTraversal.ts` (spike traversal promoted; ChunkPriority swap), fork patch 2 `patches/selection.ts` (selection-aware sort via setBinNode + reserved bin + instanceCount cull), LOD driver in ThreeGsBackend (object-space hysteresis on the vendored sort thresholds, admissions, selection-change invalidation), frustum culling from the resident AABB sphere; `examples/pager-lab/` 26/26 on WebGPU and WebGL2 in both regimes
 - [ ] Answer raycast for resident splats {#picking}
   from: roadmap
   tech: Phase 3 §B; CPU vs GPU route chosen by measurement at phase entry
@@ -199,6 +199,13 @@ links: [scene-core, render-stack, text-markers, site-rules, diagnostics, backend
 
 ## decisions
 
+- **Ticket 07 rulings (owner, 2026-09-12):** deselection = reserved last sort bin +
+  public `instanceCount` cull (declared divergence from the spike's vertex-node cull;
+  vendored JS frozen; 4095 depth bins). LOD threshold derived from the camera ×
+  `lodRenderScale` (default 1). Splat budget option, Spark's 2.5M desktop start; mobile
+  classes unpinned. Foveation = Spark defaults as options (ADR 0003 starting values).
+  Re-traversal hysteresis = the vendored sort's own motion thresholds, mirrored.
+  H-FORK identity judged on the monolithic path only.
 - **Ticket 06 rulings (owner, 2026-09-03):** budget = ADR 0003 formula exactly (device
   limits → capacity guard on WebGPU, MAX_TEXTURE_SIZE formula on WebGL2, asset, override);
   "device memory class" stays unpinned pending mobile measurement. Eviction: static

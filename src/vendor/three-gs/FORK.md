@@ -144,8 +144,9 @@ named errors.
 
 - **`[paged]`** (ticket 06, 2026-09-03): `patches/paged.ts` — the spike's
   `[capacity]` + `[uploadPage]` + `[invalidate]` promoted as ONE pure .ts
-  sibling (`[selection]` — the `center.w` lane — is NOT promoted; ticket 07
-  decides it). `createPagedMesh(capacity, pageSize, shDegree)` builds a
+  sibling (`[selection]` landed with ticket 07 as its own entry below — the
+  `center.w` lane write `setSelection` lives here in paged.ts; the sort
+  side lives in selection.ts). `createPagedMesh(capacity, pageSize, shDegree)` builds a
   zero-filled source geometry of `capacity` splats so the UNMODIFIED
   constructor allocates the storage buffers at capacity (a zero row renders
   nothing: zero covariance → alphaScale 0, zero color alpha), validates
@@ -178,8 +179,9 @@ named errors.
   `updateAttribute`); `attribute.pbo.needsUpdate` (WebGL2 PBO DataTexture —
   whole-texture re-upload, no partial path on the fallback);
   `mesh._positionAttribute.array` (the source `position` BufferAttribute
-  captured at construction, read by `_sortCPU` on WebGL2 — kept as the CPU
-  mirror); `mesh._sortInitialized` and `mesh._sphericalHarmonicsInitialized`
+  captured at construction — validated only; the vendored `_sortCPU` that
+  read it is replaced on the instance by `[selection]`, so no mirror is
+  maintained); `mesh._sortInitialized` and `mesh._sphericalHarmonicsInitialized`
   (booleans gating `updateSort` / `updateSphericalHarmonics`);
   `mesh.onBeforeRender` (the vendored constructor installs its own — the
   patch WRAPS it, calling the original after its snapshot) and
@@ -189,12 +191,58 @@ named errors.
   RGBA bytes the same way. Depends on vendor exports `SH_BAND_WORDS`,
   `createPackedSphericalHarmonicsBand` (neutral word 0x80808080).
 
+- **`[selection]`** (ticket 07, 2026-09-12 — fork patch 2):
+  `patches/selection.ts` — the spike's `[selection]` promoted as a pure .ts
+  sibling with ONE declared divergence from the SPIKE (owner ruling 07-S1;
+  the vendored JS stays frozen): deselected splats leave the draw through
+  the SORT, not the vertex shader. `installSelectionSort(mesh)` disposes the
+  four compute nodes the vendored constructor built and rebuilds them via
+  the sort's own public `setBinNode` door with a bin function that reads the
+  full `center` vec4: rows with `w < 0.5` (deselected AND empty capacity
+  slots) go to the RESERVED last bin (`BIN_COUNT − 1`), selected rows use the
+  vendored depth math over `BIN_COUNT − 1` depth bins (4095 instead of 4096
+  — stated, negligible). The backend then sets the draw geometry's public
+  `instanceCount` to the selected count, so deselected rows are never drawn
+  and never enter the vertex shader (the spike's degenerate-quad cull still
+  ran them). The WebGL2 CPU path is covered by replacing `_sortCPU` ON THE
+  INSTANCE with the same bins read from the vec4 center array's w lane.
+  `PagedMesh.setSelection(slot, flags)` (patches/paged.ts) writes the lane +
+  partial range; `PagedMesh.setDrawCount(n)` sets `instanceCount`;
+  `PagedMesh.beforeRender` runs the caller's LOD driver BEFORE the vendored
+  `onBeforeRender` (so its sort/SH updates see the new selection). Frustum
+  culling (doc 03 §F `[public-api]`): `mesh.frustumCulled = true` with the
+  DRAW geometry's `boundingSphere` kept over the resident pages' AABB union
+  by `setBounds` — three's own per-frame test culls from the pager's AABBs;
+  a culled mesh gets no `onBeforeRender`, so traversal pauses and resumes
+  when three un-culls it. Re-traversal hysteresis (owner ruling 07-S5) uses
+  the vendored `_needsSort` thresholds, MIRRORED as `SORT_POSITION_THRESHOLD`
+  0.0025 / `SORT_DIRECTION_THRESHOLD` 0.9995 (GaussianSplatMesh.js:49-50).
+  Internal surfaces reached (re-verify each at re-diff): `mesh._sort`
+  (`setBinNode`, `computeCPU`, `binCount === 4096`, `count`); the four
+  compute nodes `mesh._sort.{_resetNode,_histogramNode,_prefixNode,
+  _scatterNode}` (disposed before the rebuild — the dispose patch later
+  frees the REBUILT ones through the same fields); `mesh._buffers.centerRead`
+  (TSL storage node — `.element(instanceIndex)`; `.value.array` the vec4
+  Float32Array, re-read per CPU sort because the PBO setup replaces it);
+  `mesh._sortMatrix` and `mesh._sortDepthRange` (the vendored uniforms the
+  bin math reads — same expression as GaussianSplatMesh.js:161-172 and
+  `_sortCPU`); `mesh._sortCPU` (instance-level replacement; the vendored
+  `updateSort` calls `this._sortCPU()` on the WebGL2 path);
+  `mesh.geometry.instanceCount` and `mesh.geometry.boundingSphere` (public
+  InstancedBufferGeometry API); `BIN_COUNT = 4096` mirrored as
+  `SORT_BIN_COUNT`; `SORT_POSITION_THRESHOLD`/`SORT_DIRECTION_THRESHOLD`
+  mirrored; the vendored fragment kernel's footprint cutoff `r2 > 4`
+  (GaussianSplatMesh.js:740 — a 2σ radius) is the derivation of the
+  culling sphere's margin (2 × the largest resident splat scale, applied
+  by the backend through `setBounds`). H-FORK scope (owner, 2026-09-12): identity is judged on the
+  MONOLITHIC path (splat-lab), which this patch never touches; the paged
+  mesh always carries it — "features off" there means all-resident selected.
+
 Future functional patches land as titled entries here, per doc 03 §F's
 capability list (§F is the policy home; no enumeration here). The Phase 0
-spike's `[selection]` patch (`spikes/native-rad/src/GaussianSplatMesh.fork.js`)
-remains un-promoted — ticket 07 decides whether the `center.w` lane needs a
-JS edit or a sibling; `[capacity]`/`[uploadPage]`/`[invalidate]` landed as
-`[paged]` above (reconciled against §F 2026-09-03).
+spike's four titles are now all promoted: `[capacity]`/`[uploadPage]`/
+`[invalidate]` as `[paged]` (2026-09-03) and `[selection]` as `[selection]`
+(2026-09-12, with the declared sort-side divergence above).
 
 ## Known upstream drift — as of 2026-08-20 (retire/re-date at each re-diff)
 

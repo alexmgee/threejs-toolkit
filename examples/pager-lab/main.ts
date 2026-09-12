@@ -109,6 +109,18 @@ function maxChannelDiff(a: number[], b: number[]): number {
   return max;
 }
 
+function maxCaptureDiff(
+  a: Record<string, number[] | string>,
+  b: Record<string, number[] | string>,
+  names: readonly string[],
+): number {
+  let max = 0;
+  for (const name of names) {
+    max = Math.max(max, maxChannelDiff(px(a, name), px(b, name)));
+  }
+  return max;
+}
+
 function isNearBackground(rgba: number[]): boolean {
   const bgR = 0x11;
   const bgG = 0x11;
@@ -233,6 +245,81 @@ function yieldMacrotask(): Promise<void> {
   });
 }
 
+async function renderAndSettle(): Promise<void> {
+  scene3.renderer.render(scene3.scene, scene3.camera);
+  await yieldMacrotask();
+  scene3.renderer.render(scene3.scene, scene3.camera);
+}
+
+async function spinUntilLodResidencyConverged(
+  h: ReturnType<ThreeGsBackend["load"]>,
+): Promise<{
+  spins: number;
+  elapsedMs: number;
+  residencyChanges: number;
+  selectedCount: number;
+  residentPages: number;
+  admitting: number;
+  converged: boolean;
+}> {
+  // Convergence is a CHAIN: each admitted page re-traverses, which may want
+  // the next page (under a budget smaller than the wanted set, pages swap
+  // until the frontier and the protected set agree). Bound by TIME, not
+  // spins — a spin is ~5 ms when nothing is dirty and ~300 ms when a
+  // traversal runs, so a spin count means nothing (observed live
+  // 2026-09-12: 200 spins expired mid-chain, then the state settled).
+  // Converged = no admission in flight and residency + selection unchanged
+  // across three consecutive samples.
+  const t0 = performance.now();
+  let prevResident = Number.NaN;
+  let prevSelected = Number.NaN;
+  let stable = 0;
+  let spins = 0;
+  let residencyChanges = 0;
+  while (performance.now() - t0 < WAIT_BOUND_MS) {
+    await renderAndSettle();
+    spins++;
+    const snap = backend.pagerDiagnostics(h);
+    if (snap.residentPages !== prevResident || snap.lod.selectedCount !== prevSelected) {
+      if (!Number.isNaN(prevResident)) residencyChanges++;
+      stable = 0;
+    } else if (snap.lod.admitting === 0) {
+      stable++;
+    }
+    prevResident = snap.residentPages;
+    prevSelected = snap.lod.selectedCount;
+    if (stable >= 3) {
+      return {
+        spins,
+        elapsedMs: performance.now() - t0,
+        residencyChanges,
+        selectedCount: snap.lod.selectedCount,
+        residentPages: snap.residentPages,
+        admitting: snap.lod.admitting,
+        converged: true,
+      };
+    }
+  }
+  const snap = backend.pagerDiagnostics(h);
+  return {
+    spins,
+    elapsedMs: performance.now() - t0,
+    residencyChanges,
+    selectedCount: snap.lod.selectedCount,
+    residentPages: snap.residentPages,
+    admitting: snap.lod.admitting,
+    converged: false,
+  };
+}
+
+function countResidentChunks(snap: PagerDiagnostics, chunkCount = 122): number {
+  let n = 0;
+  for (let i = 0; i < chunkCount; i++) {
+    if (snap.isResident(i)) n++;
+  }
+  return n;
+}
+
 async function sampleCenterRgba(): Promise<number[]> {
   let pixelsAfter: Record<string, number[] | string>;
   if (scene3.backend === "webgl2-fallback") {
@@ -342,9 +429,21 @@ async function spinUntilSettled(
     await yieldMacrotask();
     try {
       const diag = backend.pagerDiagnostics(h);
-      if (diag.loadSettled) return diag;
-    } catch {
-      // not paged yet
+      if (diag.loadSettled) {
+        // Ticket 07: the load settling is not the END of residency work —
+        // each traversal admits newly wanted cached chunks (re-decode), and
+        // each arrival re-traverses. Converge: no admission in flight and
+        // residency + selection unchanged across two consecutive renders.
+        const converged = await spinUntilLodResidencyConverged(h);
+        if (!converged.converged) {
+          throw new Error(`spinUntilSettled: LOD residency did not converge within ${WAIT_BOUND_MS} ms (admitting=${converged.admitting} residentPages=${converged.residentPages} spins=${converged.spins} residencyChanges=${converged.residencyChanges})`);
+        }
+        console.log(`pager-lab CONVERGENCE spins=${converged.spins} elapsedMs=${converged.elapsedMs.toFixed(0)} residencyChanges=${converged.residencyChanges} selected=${converged.selectedCount} residentPages=${converged.residentPages}`);
+        return backend.pagerDiagnostics(h);
+      }
+    } catch (error) {
+      if (error instanceof SplatBackendError && error.reason === "not-paged") continue;
+      throw error;
     }
   }
   throw new Error(`spinUntilSettled: loadSettled not reached after ${WAIT_BOUND_MS} ms`);
@@ -446,20 +545,33 @@ const done = (async () => {
     `phase=${backend.progress(handle).phase} pre={${formatCounters(preLoadBaseline)}} loaded={${formatCounters(loadedCounters)}}`,
   );
 
-  let allProtectedResident = true;
-  for (let i = 0; i < budgetPages; i++) {
-    if (!diag.isResident(i)) allProtectedResident = false;
+  // Ticket 07: residency follows the traversal's wanted order (the
+  // ChunkPriority swap point) — the PROTECTED set is the first `pages`
+  // wanted chunks and, after convergence, every one of them is resident;
+  // chunks the frontier never wanted at this pose stay deferred (fetched +
+  // cached, never decoded). The budget is never exceeded.
+  const wantedAtSettle = diag.lod.wantedChunks;
+  const protectedWanted = wantedAtSettle.slice(0, Math.min(budgetPages, wantedAtSettle.length));
+  let allProtectedResident = protectedWanted.length > 0;
+  for (const chunk of protectedWanted) {
+    if (!diag.isResident(chunk)) allProtectedResident = false;
   }
-  const expectedDeferred = 122 - Math.min(budgetPages, 122);
+  // Every chunk is exactly one of: resident, cached for a later admission
+  // (deferred at load OR evicted since), or unavailable — nothing may fall
+  // through (a chunk with no bytes anywhere could never be shown again).
+  let cachedNotResident = 0;
+  for (let c = 0; c < 122; c++) if (!diag.isResident(c) && diag.isCached(c)) cachedNotResident++;
+  const accounted = diag.residentPages + cachedNotResident + diag.unavailable.length;
   assert(
     "residency-within-budget",
     residentPagesMax <= budgetPages &&
-      diag.residentPages === Math.min(budgetPages, 122) &&
+      diag.residentPages <= budgetPages &&
+      diag.residentPages === Math.min(budgetPages, wantedAtSettle.length) &&
       allProtectedResident &&
-      diag.deferred.length === expectedDeferred &&
+      accounted === 122 &&
       diag.unavailable.length === 0 &&
       diag.refused.length === 0,
-    `residentPages=${diag.residentPages}/${budgetPages} deferred=${diag.deferred.length} unavailable=${diag.unavailable.length} refused=${diag.refused.length}`,
+    `residentPages=${diag.residentPages}/${budgetPages} (max observed during load ${residentPagesMax}); wanted=${wantedAtSettle.length}, protected=${protectedWanted.length} all resident=${allProtectedResident}; cached-not-resident=${cachedNotResident} (deferred at load ${diag.deferred.length}) unavailable=${diag.unavailable.length} refused=${diag.refused.length} → accounted ${accounted}/122`,
   );
 
   const centerRgba = px(await meteredCapture(), "p11");
@@ -550,11 +662,25 @@ const done = (async () => {
     counts.total === 7935358 &&
       counts.resident === diagForCounts.residentSplats &&
       diagForCounts.residentSplats > 0 &&
-      counts.selected === counts.resident &&
+      counts.selected === diagForCounts.lod.drawCount &&
+      counts.selected > 0 &&
+      counts.selected <= counts.resident &&
+      counts.selected <= diagForCounts.lod.tuning.maxSplats &&
       boundsOk,
-    `total=${counts.total} resident=${counts.resident} selected=${counts.selected} bounds min=(${box.min.x},${box.min.y},${box.min.z}) max=(${box.max.x},${box.max.y},${box.max.z})`,
+    `total=${counts.total} resident=${counts.resident} selected=${counts.selected} maxSplats=${diagForCounts.lod.tuning.maxSplats} bounds min=(${box.min.x},${box.min.y},${box.min.z}) max=(${box.max.x},${box.max.y},${box.max.z})`,
   );
 
+  // Ticket 07: the evict -> re-admit MACHINERY proof below is a ticket-06
+  // drill and needs a residency the LOD driver will not heal on its own:
+  // with selection ON, evicting a wanted chunk is undone by the next
+  // traversal's admission before the capture can see it (observed live
+  // 2026-09-12: evicted max diff 0 with the root re-admitted mid-drill).
+  // Run it with selection OFF (every resident row drawn, the 06 behaviour),
+  // then restore selection and re-converge. AC4's pose-driven half runs
+  // further down with selection ON.
+  await spinUntilLodResidencyConverged(handle);
+  backend.pagerDiagnostics(handle).lod.setSelectionEnabled(false);
+  await renderAndSettle();
   const P0 = await meteredCapture();
   // Sort-nondeterminism CONTROL (doc 05 H-LOAD criterion 4: "within-bin
   // sort order may reorder equal-depth splats — record the measured diff
@@ -585,9 +711,17 @@ const done = (async () => {
   const evictedChunks: number[] = [];
   const slotsBefore = new Map<number, number>();
   let evictedMax = 0;
-  for (let chunk = 0; chunk < Math.min(budgetPages, 122) && evictedMax <= sortBand; chunk++) {
-    slotsBefore.set(chunk, diag.slotOf(chunk));
-    if (!diag.evictChunk(chunk)) break;
+  // Under LOD residency the resident set is the frontier's, not 0..pages-1
+  // (at ?pages=32: chunks 0, 27, 104, ...) — walk the RESIDENT chunks.
+  const residentForDrill: number[] = [];
+  {
+    const dRes = backend.pagerDiagnostics(handle);
+    for (let c = 0; c < 122; c++) if (dRes.isResident(c)) residentForDrill.push(c);
+  }
+  for (const chunk of residentForDrill) {
+    if (evictedMax > sortBand) break;
+    slotsBefore.set(chunk, backend.pagerDiagnostics(handle).slotOf(chunk));
+    if (!backend.pagerDiagnostics(handle).evictChunk(chunk)) break;
     evictedChunks.push(chunk);
     scene3.renderer.render(scene3.scene, scene3.camera);
     const P1 = await meteredCapture();
@@ -618,6 +752,8 @@ const done = (async () => {
     readmitMax = Math.max(readmitMax, d);
   }
   const evictReadmitOk = gridChanged && allResident && readmitMax <= sortBand;
+  backend.pagerDiagnostics(handle).lod.setSelectionEnabled(true);
+  await spinUntilLodResidencyConverged(handle);
   assert(
     "evict-readmit-pixel-identical",
     evictReadmitOk,
@@ -637,6 +773,220 @@ const done = (async () => {
     `uploadPath=${diagAfterDrills.uploadPath} pushed=${diagAfterDrills.rangesPushed} consumed=${diagAfterDrills.rangesConsumed} pboUploads=${diagAfterDrills.pboUploads} (at settle: consumed=${diag.rangesConsumed} pboUploads=${diag.pboUploads})`,
   );
 
+  const gridPointNames = CAPTURE_POINT_NAMES.slice(0, 9);
+
+  await renderAndSettle();
+  const dSelection = backend.pagerDiagnostics(handle);
+  assert(
+    "selection-active",
+    dSelection.lod.traversals >= 1 &&
+      dSelection.lod.selectedCount === dSelection.lod.drawCount &&
+      dSelection.lod.drawCount > 0 &&
+      dSelection.lod.drawCount < dSelection.residentSplats &&
+      dSelection.lod.wantedChunks.length > 0 &&
+      dSelection.lod.wantedChunks[0] === 0,
+    `selectedCount=${dSelection.lod.selectedCount} residentSplats=${dSelection.residentSplats} fullQuality=${dSelection.lod.fullQuality} traversals=${dSelection.lod.traversals} lastTraversalMs=${dSelection.lod.lastTraversalMs} wantedChunks.length=${dSelection.lod.wantedChunks.length} stats=${JSON.stringify(dSelection.lod.stats)}`,
+  );
+
+  const selectedCountTrials: number[] = [];
+  for (let i = 0; i < 5; i++) {
+    backend.pagerDiagnostics(handle).lod.markDirty();
+    await renderAndSettle();
+    selectedCountTrials.push(backend.pagerDiagnostics(handle).lod.selectedCount);
+  }
+  const selectedCountsEqual = selectedCountTrials.every((c) => c === selectedCountTrials[0]);
+  const cameraUnchangedAfterTrials = scene3.camera.matrixWorld.equals(cameraBeforeLoad);
+  assert(
+    "selected-count-deterministic-5-trials",
+    selectedCountsEqual && cameraUnchangedAfterTrials,
+    `counts=[${selectedCountTrials.join(",")}] cameraUnchanged=${cameraUnchangedAfterTrials}`,
+  );
+
+  const pixelTrials: Array<Record<string, number[] | string>> = [];
+  const pixelTrialMaxDiffs: number[] = [];
+  for (let i = 0; i < 5; i++) {
+    backend.pagerDiagnostics(handle).lod.markDirty();
+    await renderAndSettle();
+    const captured = await meteredCapture();
+    pixelTrials.push(captured);
+    if (i === 0) {
+      pixelTrialMaxDiffs.push(0);
+    } else {
+      pixelTrialMaxDiffs.push(maxCaptureDiff(pixelTrials[0]!, captured, CAPTURE_POINT_NAMES));
+    }
+  }
+  // AC2 / doc 05 criterion 4: "pixel-stable across trials; if strict
+  // stability is unachievable, the measured diff band is recorded, never
+  // passed silently". The WebGL2 CPU sort is deterministic → strict (band
+  // must be 0). The WebGPU counting sort's within-bin order is
+  // nondeterministic by design (06 evidence) → strict stability is
+  // unachievable there; the trial band AND the sort-only control band are
+  // recorded, and the checkable half — identical selection across the
+  // trials (the content) — is what passes or fails. A sample-max-vs-
+  // sample-max comparison of two noise draws would be a coin flip, not a
+  // criterion.
+  const pixelTrialBand = Math.max(...pixelTrialMaxDiffs);
+  const pixelStableOk = isWebGpuBackend
+    ? selectedCountsEqual
+    : pixelTrialBand === 0 && selectedCountsEqual;
+  assert(
+    "pixel-stable-5-trials",
+    pixelStableOk,
+    `backend=${scene3.backend}: per-trial max diffs vs trial 1=[${pixelTrialMaxDiffs.join(",")}] → trial band=${pixelTrialBand}; sort-only control band=${sortBand}; selection identical across trials=${selectedCountsEqual}${isWebGpuBackend ? " (WebGPU: band RECORDED — strict pixel stability unachievable by the vendored GPU sort's design)" : " (WebGL2: strict — band must be 0)"}`,
+  );
+
+  resetInvalidationCounts();
+  const P_a = await meteredCapture();
+  const selectedCountBeforeScale = backend.pagerDiagnostics(handle).lod.selectedCount;
+  // The coarser threshold must produce a VISIBLE change at the ten sample
+  // points, not just a smaller count. Measured on WebGPU at 122 pages
+  // (2026-09-12, band 9–16): scale 4 → 1,669,521 selected, diff 18; 16 →
+  // 418,755 / 24; 64 → 107,750 / 62; 256 → 27,146 / 72; 1024 → 5,365 / 65.
+  // Scale 64 is the first probe point whose change is unambiguously above
+  // the noise band — the drill's lever is chosen from that table.
+  const COARSE_LOD_RENDER_SCALE = 64;
+  backend.pagerDiagnostics(handle).lod.setLodRenderScale(COARSE_LOD_RENDER_SCALE);
+  await spinUntilLodResidencyConverged(handle);
+  const P_b = await meteredCapture();
+  const dScale = backend.pagerDiagnostics(handle);
+  const scaleGridDiff = maxCaptureDiff(P_a, P_b, gridPointNames);
+  dScale.lod.setLodRenderScale(1);
+  // A coarser frontier can want chunks the fine one did not; restoring the
+  // scale must be followed by residency re-convergence before comparing.
+  const scaleReturn = await spinUntilLodResidencyConverged(handle);
+  const P_c = await meteredCapture();
+  const scaleRestoreDiff = maxCaptureDiff(P_a, P_c, CAPTURE_POINT_NAMES);
+  // Criterion 10 (doc 05): the selection change re-dispatched the sort with
+  // the camera motionless, the frontier shrank (coarser threshold) and the
+  // draw count followed it, and restoring the threshold restored the exact
+  // selection. Pixel diffs are RECORDED: at a 256×128 capture ten sample
+  // points cannot reliably separate a 2× coarser frontier from sort noise
+  // (measured live: 2 units), so they are evidence, not the criterion.
+  assert(
+    "selection-change-updates-draw-order-motionless",
+    sortDispatches >= 1 &&
+      dScale.lod.selectedCount < selectedCountBeforeScale &&
+      dScale.lod.drawCount === dScale.lod.selectedCount &&
+      scaleGridDiff > sortBand &&
+      scaleReturn.converged &&
+      scaleReturn.selectedCount === selectedCountBeforeScale &&
+      scene3.camera.matrixWorld.equals(cameraBeforeLoad),
+    `camera motionless; lodRenderScale 1→${COARSE_LOD_RENDER_SCALE}→1: selected ${selectedCountBeforeScale} → ${dScale.lod.selectedCount} → ${scaleReturn.selectedCount} (restore converged=${scaleReturn.converged} in ${scaleReturn.elapsedMs.toFixed(0)} ms, ${scaleReturn.residencyChanges} residency changes); sort re-dispatched ${sortDispatches}×; frame changed by ${scaleGridDiff} (> band ${sortBand} = visible) and returned to within ${scaleRestoreDiff} of the original (band recorded)`,
+  );
+
+  const P_on = await meteredCapture();
+  const dCulling = backend.pagerDiagnostics(handle);
+  dCulling.lod.setCullingEnabled(false);
+  await renderAndSettle();
+  const P_off = await meteredCapture();
+  const dCullingOff = backend.pagerDiagnostics(handle);
+  const cullingOffDiff = maxCaptureDiff(P_on, P_off, CAPTURE_POINT_NAMES);
+  assert(
+    "culling-off-restores-content",
+    cullingOffDiff <= sortBand && dCullingOff.mesh.frustumCulled === false,
+    `maxDiff=${cullingOffDiff} sortBand=${sortBand} frustumCulled=${dCullingOff.mesh.frustumCulled}`,
+  );
+  dCullingOff.lod.setCullingEnabled(true);
+
+  // Culling is three's own frustum test against the resident pages' bounding
+  // sphere (public API). At the pinned pose the camera sits INSIDE that
+  // sphere (the hero spans ~950 units; the camera is 3 units from the
+  // origin), so no rotation can cull it: a sphere test only culls when the
+  // camera is outside the sphere looking away. Park the camera far outside
+  // the resident bounds, facing away; restore the EXACT pose afterwards
+  // (rotate/rotate-back is not an identity in floating point).
+  const savedPos = scene3.camera.position.clone();
+  const savedQuat = scene3.camera.quaternion.clone();
+  const boundsForCull = backend.bounds(handle);
+  const extent = Math.max(boundsForCull.max.x - boundsForCull.min.x, boundsForCull.max.y - boundsForCull.min.y, boundsForCull.max.z - boundsForCull.min.z);
+  const farZ = boundsForCull.max.z + 4 * extent;
+  const traversalsBeforeAway = backend.pagerDiagnostics(handle).lod.traversals;
+  scene3.camera.position.set(0, 0, farZ);
+  scene3.camera.lookAt(0, 0, farZ + 1);
+  await renderAndSettle();
+  const P_away = await meteredCapture();
+  const dAway = backend.pagerDiagnostics(handle);
+  let awayAllNearBackground = true;
+  for (const name of gridPointNames) {
+    if (!isNearBackground(px(P_away, name))) awayAllNearBackground = false;
+  }
+  const traversalsUnchanged = dAway.lod.traversals === traversalsBeforeAway;
+  scene3.camera.position.copy(savedPos);
+  scene3.camera.quaternion.copy(savedQuat);
+  scene3.camera.updateMatrixWorld(true);
+  await spinUntilLodResidencyConverged(handle);
+  const P_back = await meteredCapture();
+  const awayRestoreDiff = maxCaptureDiff(P_on, P_back, CAPTURE_POINT_NAMES);
+  const restoredExactly = scene3.camera.matrixWorld.equals(cameraBeforeLoad);
+  assert(
+    "culling-culls-when-away",
+    awayAllNearBackground && traversalsUnchanged && awayRestoreDiff <= sortBand && restoredExactly,
+    `camera parked at z=${farZ.toFixed(0)} facing away: near-background=${awayAllNearBackground}, traversals before=${traversalsBeforeAway} after=${dAway.lod.traversals} (a culled mesh gets no onBeforeRender); restored exactly=${restoredExactly} restore max diff=${awayRestoreDiff} sortBand=${sortBand}`,
+  );
+
+  const poseS0 = backend.pagerDiagnostics(handle).lod.selectedCount;
+  const poseP0 = await meteredCapture();
+  if (pages === 32) {
+    scene3.camera.position.set(0, 0, 30);
+    scene3.camera.lookAt(0, 0, 0);
+    const pose2 = await spinUntilLodResidencyConverged(handle);
+    const dPose2 = backend.pagerDiagnostics(handle);
+    const residentChunksAtPose2 = countResidentChunks(dPose2);
+    const selectedAtPose2 = dPose2.lod.selectedCount;
+    scene3.camera.position.copy(savedPos);
+    scene3.camera.quaternion.copy(savedQuat);
+    scene3.camera.updateMatrixWorld(true);
+    const poseReturn = await spinUntilLodResidencyConverged(handle);
+    const dPoseReturn = backend.pagerDiagnostics(handle);
+    const residentChunksAtReturn = countResidentChunks(dPoseReturn);
+    const P_return = await meteredCapture();
+    const poseReturnDiff = maxCaptureDiff(poseP0, P_return, CAPTURE_POINT_NAMES);
+    const poseReturnDiffDetails: string[] = [];
+    for (const name of CAPTURE_POINT_NAMES) {
+      const d = maxChannelDiff(px(poseP0, name), px(P_return, name));
+      if (d > 0) poseReturnDiffDetails.push(`${name}=${d}`);
+    }
+    // AC4's pose-driven half: leaving the pose changes residency (eviction
+    // pressure at 32 pages), returning must restore the SAME selection —
+    // that is the checkable content criterion. Pixels: strict (band 0) on
+    // the deterministic WebGL2 sort; on WebGPU the diff is RECORDED against
+    // the sort-only band (doc 05 criterion 4), not judged — a noise draw vs
+    // a noise draw is a coin flip, not a criterion (observed: 6 vs band 5
+    // with the selection restored exactly).
+    const poseOk =
+      pose2.converged &&
+      poseReturn.converged &&
+      dPoseReturn.lod.selectedCount === poseS0 &&
+      (isWebGpuBackend || poseReturnDiff === 0);
+    assert(
+      "pose-revisit-restores-selection",
+      poseOk,
+      `S0=${poseS0} selectedAtPose2=${selectedAtPose2} selectedAfterReturn=${dPoseReturn.lod.selectedCount} residentChunksAtPose2=${residentChunksAtPose2} residentChunksAtReturn=${residentChunksAtReturn} residentPages pose2=${pose2.residentPages} return=${poseReturn.residentPages} spins pose2=${pose2.spins} return=${poseReturn.spins} converged pose2=${pose2.converged} return=${poseReturn.converged} maxDiff=${poseReturnDiff} sortBand=${sortBand}${poseReturnDiffDetails.length > 0 ? ` [${poseReturnDiffDetails.join(", ")}]` : ""} (${isWebGpuBackend ? "WebGPU: pixel band RECORDED, selection judged" : "WebGL2: strict"})`,
+    );
+  } else {
+    assert(
+      "pose-revisit-restores-selection",
+      true,
+      "not applicable (no eviction pressure at 122 pages)",
+    );
+  }
+
+  const dSelOff = backend.pagerDiagnostics(handle);
+  dSelOff.lod.setSelectionEnabled(false);
+  await renderAndSettle();
+  const dSelOffAfter = backend.pagerDiagnostics(handle);
+  const selectionOffOk = dSelOffAfter.lod.drawCount === dSelOffAfter.residentSplats;
+  dSelOffAfter.lod.setSelectionEnabled(true);
+  await renderAndSettle();
+  const dSelOnAfter = backend.pagerDiagnostics(handle);
+  const selectionOnOk = dSelOnAfter.lod.drawCount === poseS0;
+  assert(
+    "selection-off-draws-all-resident",
+    selectionOffOk && selectionOnOk,
+    `off drawCount=${dSelOffAfter.lod.drawCount} residentSplats=${dSelOffAfter.residentSplats} restored drawCount=${dSelOnAfter.lod.drawCount} S0=${poseS0}`,
+  );
+
+  const evLod = backend.pagerDiagnostics(handle);
   console.log(
     `pager-lab EVIDENCE\n` +
       `  budget: ${JSON.stringify(diag.budget)}\n` +
@@ -647,7 +997,15 @@ const done = (async () => {
       `  rangesPushed: ${diag.rangesPushed}\n` +
       `  rangesConsumed: ${diag.rangesConsumed}\n` +
       `  load ms: ${loadMs.toFixed(1)}\n` +
-      `  backend: ${scene3.backend}`,
+      `  backend: ${scene3.backend}\n` +
+      `  lod: ${JSON.stringify({
+        selected: evLod.lod.selectedCount,
+        resident: evLod.residentSplats,
+        fullQuality: evLod.lod.fullQuality,
+        traversals: evLod.lod.traversals,
+        lastTraversalMs: evLod.lod.lastTraversalMs,
+        wanted: evLod.lod.wantedChunks.length,
+      })}`,
   );
 
   const heapSamples: (number | null)[] = [];
@@ -823,8 +1181,25 @@ const done = (async () => {
     const pagesHere = d0.budget.pages;
     const chunks = d0.budget.pAsset;
     if (pagesHere < chunks) {
-      const protectedLast = pagesHere - 1;
-      const unprotected = pagesHere; // first chunk outside the protected set
+      // The protected set is the first `pages` WANTED chunks (traversal
+      // order), all resident after convergence; the unprotected chunk is
+      // any cached non-resident chunk outside it.
+      const wanted = d0.lod.wantedChunks;
+      const protectedSet = new Set(wanted.slice(0, Math.min(pagesHere, wanted.length)));
+      let protectedLast = pagesHere - 1;
+      for (let r = Math.min(pagesHere, wanted.length) - 1; r >= 0; r--) {
+        if (d0.isResident(wanted[r]!)) {
+          protectedLast = wanted[r]!;
+          break;
+        }
+      }
+      let unprotected = pagesHere;
+      for (let i = 0; i < chunks; i++) {
+        if (!protectedSet.has(i) && !d0.isResident(i)) {
+          unprotected = i;
+          break;
+        }
+      }
       // 1. A full pool of protected residents refuses an unprotected chunk.
       const refusedWhenFull = !(await d0.admitChunk(unprotected));
       // 2. Free a protected slot; the unprotected chunk takes it (free-slot path).
