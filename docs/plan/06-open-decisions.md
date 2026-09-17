@@ -265,15 +265,31 @@ final inventory's "LANDED FILES DELIBERATELY AT THE OLD VINTAGE" set is now
 EMPTY — every landed rules/site file is at the pin. Semantic inheritances (a)
 and (b) remain pending their first runtime consumer (Phase 2 ticket 09).
 
-**D22 — PARTIALLY RULED (2026-08-20): the renderer TYPING half was assigned
+**D22 — RULED AND DONE (typing half 2026-08-20 → ticket 03; dead-fields half
+2026-09-17 → Phase 2 ticket 10). The renderer TYPING half was assigned
 to ticket 03 and is DONE** (one-line widen to `WebGLRenderer |
 WebGPURenderer`, type-only import, declared adaptation). **The dead-fields /
-~10-construction-literals half remains OPEN and unassigned:** doc 01:92
+~10-construction-literals half was OPEN and unassigned until 2026-09-17:** doc 01:92
 requires "2 dead fields, ~10 construction literals" for CameraSystem, and
 no ticket in the cut owns those edits (grep-verified across all 11; ticket
 04's AC scoped its adaptation to picking only). The typing obstacle is
-RESOLVED — the field now takes WebGPURenderer. Needs an owner assignment.
+RESOLVED — the field now takes WebGPURenderer. (Assigned 2026-09-17 — below.)
 Detail: ticket 04 Comments (registration) + ticket 03 Comments (the widen).
+**Second half ASSIGNED to Phase 2 ticket 10 and RULED (owner, 2026-09-17):**
+the "2 dead fields" are `CameraSystemConfig.renderer` and `.sparkRenderer`
+(both unused at the pin and here); the "~10 construction literals" are the
+10 `new CameraSystem({…})` call sites at the pin (sparkjs
+`docs/research/threejs-port-findings.html:949`), 3 of which exist here. Both
+fields STAY, `@deprecated` and ignored, `renderer` made optional — H-API
+compile-unchanged, because all 10 pin call sites pass `renderer` (the
+opposite of D24's zero-caller evidence); no divergence entry. **Phase 3 item
+(recorded so it is not re-discovered as a surprise):** `CameraSystem`'s
+private `scene` field is assigned but never read HERE — it fed the pin's
+splat raycast, which Phase 1 stubbed (doc 03 §B); whether it lives or goes is
+decided with `backend.raycast()`. **DONE (ticket 10):** both fields deprecated in
+`src/core/CameraSystem.ts`; `examples/camera-lab/` proves orbit/recenter unchanged
+(pre-edit baseline = post-edit capture, numbers and pixels, both backends). Detail:
+ticket 10 Comments.
 
 **D23 — OPEN (2026-08-20): boundary-rule gaps surfaced by ticket 04's
 review, owner call on whether/where to guard:** (a) examples/ may legally

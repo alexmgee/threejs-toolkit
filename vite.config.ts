@@ -54,6 +54,7 @@ export default defineConfig({
         "rad-lab": resolve(__dirname, "examples/rad-lab/index.html"),
         "pager-lab": resolve(__dirname, "examples/pager-lab/index.html"),
         "loader-lab": resolve(__dirname, "examples/loader-lab/index.html"),
+        "camera-lab": resolve(__dirname, "examples/camera-lab/index.html"),
       },
     },
   },

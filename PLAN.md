@@ -73,9 +73,9 @@ links: [render-stack, site-rules, fixtures, backend-pager]
 - [x] EnvironmentLoader on three/webgpu PMREM {#environment-loader}
   by: phase-1 ticket 08
   tech: commit `782482e`; `core/EnvironmentLoader.ts` on `three/webgpu` PMREM; `examples/periphery/` env map both backends; `examples/rail/main.ts` repointed to ThreeSplatScene
-- [ ] Finish CameraSystem dead-field cleanup (D22) {#d22-camerasystem}
-  from: roadmap
-  tech: ticket 10; construction literals + 2 dead fields
+- [x] Finish CameraSystem dead-field cleanup (D22) {#d22-camerasystem}
+  by: claude
+  tech: ticket 10 — `renderer`/`sparkRenderer` kept `@deprecated` and ignored, `renderer` optional (H-API compile-unchanged); `examples/camera-lab/` pre-edit baseline = post-edit capture (camera numbers + 270 pixel samples, synthetic pointer orbit + dblclick recenter) on WebGPU and WebGL2
 - [ ] Rebuild CropTool and SceneComposer on backend edits {#crop-composer}
   from: roadmap
   tech: Phase 3; CropTool preview, SceneComposer crop hydration
@@ -213,6 +213,14 @@ links: [scene-core, render-stack, text-markers, site-rules, diagnostics, backend
   gains `backend`, returns the handle (D25); the loader applies the pin's conditional
   180° flip — corrects the "X-flip is SiteConfig's, ticket 09" line below. Embed size
   bound: measured in 09, set by the owner.
+- **Ticket 10 rulings (owner, 2026-09-17):** CameraSystemConfig's dead `renderer` and `sparkRenderer`
+  stay, `@deprecated` and ignored, `renderer` made optional (H-API compile-unchanged: all 10 pin
+  call sites pass `renderer`); `scene` left as-is and recorded in doc 06 for Phase 3's
+  `backend.raycast()` decision; proof = dedicated `examples/camera-lab/`, pre-edit baseline, exact
+  match after (camera numbers + pixels, both backends), synthetic pointers verified before choosing
+  the orbit drive.
+- **Ticket 08 asymmetry ruling restated (owner, 2026-09-17):** split BY PATH — load-pipeline decode
+  errors fail the whole load; re-admission errors mark one chunk unavailable, pre- or post-settle.
 - **Ticket 08 third-stop rulings (owner, 2026-09-17):** a chunk found unavailable AFTER the
   load settled gets its own named warning (the load-finish warning stays); post-settle
   `decode-dispatch-failed` / `decode-protocol-error` mark the chunk unavailable instead of

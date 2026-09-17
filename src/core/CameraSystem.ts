@@ -90,10 +90,15 @@ export interface CameraSystemConfig {
   camera: THREE.PerspectiveCamera;
   canvas: HTMLCanvasElement;
   scene: THREE.Scene;
-  // Widened per D22 (docs/plan/06-open-decisions.md — status lives there).
-  renderer: THREE.WebGLRenderer | WebGPURenderer;
+  /** @deprecated Ignored — CameraSystem never used it. Kept, and optional, so
+   *  every existing construction literal compiles unchanged (owner ruling
+   *  2026-09-17, Phase 2 ticket 10 / doc 06 D22: all 10 call sites at the
+   *  sparkjs pin pass it). */
+  renderer?: THREE.WebGLRenderer | WebGPURenderer;
 
-  /** SparkRenderer instance — required for GPU depth readback (click-to-orbit) */
+  /** @deprecated Ignored — the Spark-era GPU depth readback it served is gone.
+   *  Kept so existing construction literals compile unchanged (owner ruling
+   *  2026-09-17, Phase 2 ticket 10 / doc 06 D22). */
   sparkRenderer?: THREE.Mesh;
 
   // Orbit limits
@@ -254,7 +259,6 @@ export class CameraSystem {
       camera,
       canvas,
       scene,
-      renderer,
       minDistance = 0.5,
       maxDistance = 100,
       minPitch = -89,
