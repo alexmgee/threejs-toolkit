@@ -31,6 +31,7 @@ import type { DecodeResult } from "./rad-worker.js";
 import {
   HANDLE_BRAND,
   SplatBackendError,
+  formatFromName,
   type LoadProgress,
   type SdfEdit,
   type SplatBackend,
@@ -62,6 +63,9 @@ interface HandleState {
   readonly abort: AbortController;
   /** The paged (.rad) path's state; null on the monolithic path. */
   paged: PagedState | null;
+  /** The load request's observers (ticket 08 ruling S3). */
+  readonly onProgress: SplatSource["onProgress"];
+  readonly onFailure: SplatSource["onFailure"];
 }
 
 /** ADR 0003 decision 2: pages = min(P_limits, P_asset, override). */
@@ -76,6 +80,8 @@ export interface PageBudget {
 }
 
 interface PagedState {
+  /** The asset URL — names the asset in shortfall warnings. */
+  readonly url: string;
   readonly pager: RadPager;
   readonly header: RadHeaderInfo;
   readonly budget: PageBudget;
@@ -245,11 +251,8 @@ const _allFlags = new Uint8Array(65536);
 
 function inferFormat(source: SplatSource): SplatFormat {
   if (source.format !== undefined) return source.format;
-  const pathPart = source.url.split(/[?#]/)[0] ?? source.url;
-  const ext = pathPart.split(".").pop()?.toLowerCase();
-  if (ext === "ply" || ext === "spz" || ext === "splat" || ext === "rad") {
-    return ext;
-  }
+  const format = formatFromName(source.url);
+  if (format !== undefined) return format;
   throw new SplatBackendError(
     "unknown-format",
     `cannot infer format from url "${source.url}"`,
@@ -278,11 +281,33 @@ function fail(state: HandleState, reason: string, message: string): void {
   if (state.failure !== null) return;
   const error = new SplatBackendError(reason, message);
   state.failure = error;
-  state.progress = {
+  setProgress(state, {
     ...state.progress,
     phase: "failed",
-  };
+  });
   state.rejectReady(error);
+  // Ticket 08 ruling S2/S3: the one terminal-failure site announces itself.
+  // Before this, a whole-load failure AFTER first paint only flipped the
+  // phase above — whenReady had already resolved, so nothing heard it.
+  notifyObserver(state.onFailure, error);
+}
+
+/** Observer calls are isolated (ruling S3): a consumer bug must neither
+ *  fail the load under a misleading reason nor make fail() throw. */
+function notifyObserver<T>(observer: ((value: T) => void) | undefined, value: T): void {
+  if (observer === undefined) return;
+  try {
+    observer(value);
+  } catch (error) {
+    reportError(error);
+  }
+}
+
+/** Every LoadProgress refresh goes through here, so the request's
+ *  `onProgress` observer sees exactly what `progress()` would return. */
+function setProgress(state: HandleState, progress: LoadProgress): void {
+  state.progress = progress;
+  notifyObserver(state.onProgress, { ...progress });
 }
 
 /** PLY headers are ASCII and live at the front of the file — decode a
@@ -395,12 +420,18 @@ function updateFetchProgress(
     declaredTotal > 0 ? Math.max(declaredTotal, bytesLoaded) : 0;
   const fraction =
     bytesTotal > 0 ? Math.min(1, bytesLoaded / bytesTotal) : 0;
-  state.progress = {
+  setProgress(state, {
     bytesLoaded,
     bytesTotal,
     phase: "fetching",
     fraction,
-  };
+  });
+}
+
+/** "chunk N (reason, K attempts)" — the one wording of a given-up chunk in
+ *  both shortfall warnings. */
+function describeUnavailable(u: ChunkUnavailable): string {
+  return `chunk ${u.index} (${u.reason}, ${u.attempts} attempt${u.attempts === 1 ? "" : "s"})`;
 }
 
 /** three's PBO texture layout (GLSLNodeBuilder setupPBO, verified in
@@ -514,6 +545,8 @@ export class ThreeGsBackend implements SplatBackend {
       mesh: null,
       abort: new AbortController(),
       paged: null,
+      onProgress: source.onProgress,
+      onFailure: source.onFailure,
     };
     // A failure that lands before any consumer calls whenReady() must not
     // fire the browser's unhandledrejection — later whenReady() callers
@@ -660,6 +693,7 @@ export class ThreeGsBackend implements SplatBackend {
           pagedMesh.mesh.frustumCulled = true;
           pagedMesh.setDrawCount(0);
           paged = {
+            url,
             pager,
             header,
             budget,
@@ -711,8 +745,7 @@ export class ThreeGsBackend implements SplatBackend {
         },
         onUnavailable: (given) => {
           if (paged === null) return;
-          paged.unavailable.push(given);
-          paged.unavailableSet.add(given.index);
+          this.markUnavailable(state, paged, given);
         },
         onChunk: (result) => {
           // A failed handle (fail() never sets disposed) must not keep
@@ -737,6 +770,14 @@ export class ThreeGsBackend implements SplatBackend {
           state,
           "no-pages-available",
           `no splat could be uploaded — ${settled.pool.firstUploadedCount} pages uploaded (all empty), ${report.unavailable.length} unavailable, ${report.deferred.length} deferred of ${report.header.chunks.length}`,
+        );
+      } else if (state.failure === null && settled.unavailable.length > 0) {
+        // Owner ruling 08-S2: a partial shortfall reveals normally, with
+        // truthful counts and ONE console warning — printed here because the
+        // backend is the only layer holding the unavailable list.
+        const given = settled.unavailable.map(describeUnavailable).join(", ");
+        console.warn(
+          `[ThreeGsBackend] "${url}" settled with ${settled.unavailable.length} of ${report.header.chunks.length} chunks unavailable — ${given}`,
         );
       }
     } catch (error) {
@@ -923,6 +964,22 @@ export class ThreeGsBackend implements SplatBackend {
   /** Wanted-but-missing chunks whose bytes are cached re-decode through the
    *  pool (owner ruling 06-S4); at most poolSize in flight. A chunk given up
    *  on is never retried (S3). */
+  /** Every chunk given up on goes through here. Before the load settles it
+   *  only joins the list (the settle warning reports the whole shortfall,
+   *  owner ruling 08-S2); a chunk given up on AFTER settle is a new fact and
+   *  gets its own named warning (owner ruling F4-A, 2026-09-17). A given-up
+   *  chunk is never retried, so the warnings are bounded by the chunk count. */
+  private markUnavailable(state: HandleState, paged: PagedState, given: ChunkUnavailable): void {
+    if (paged.unavailableSet.has(given.index)) return;
+    paged.unavailableSet.add(given.index);
+    paged.unavailable.push(given);
+    if (paged.loadSettled && state.failure === null && !state.disposed) {
+      console.warn(
+        `[ThreeGsBackend] "${paged.url}": ${describeUnavailable(given)} became unavailable after the load settled — ${given.detail}`,
+      );
+    }
+  }
+
   private kickAdmissions(state: HandleState, paged: PagedState): void {
     const lod = paged.lod;
     const limit = DECODE_POOL_SIZE; // one re-decode in flight per worker
@@ -948,8 +1005,22 @@ export class ThreeGsBackend implements SplatBackend {
       },
       (error: unknown) => {
         if (error instanceof DecodeFailedError) {
-          paged.unavailableSet.add(chunk);
-          paged.unavailable.push({ index: chunk, reason: "decode-failed", attempts: 1, detail: error.message });
+          this.markUnavailable(state, paged, { index: chunk, reason: "decode-failed", attempts: 1, detail: error.message });
+        } else if (
+          error instanceof SplatBackendError &&
+          (error.reason === "decode-dispatch-failed" || error.reason === "decode-protocol-error")
+        ) {
+          // Per-job pool rejections: the pool itself is healthy, but
+          // decodeCached already took this chunk's bytes out of the cache, so
+          // it can never be admitted again — give it up by name instead of
+          // letting it vanish (owner ruling 2026-09-17).
+          this.markUnavailable(state, paged, { index: chunk, reason: error.reason, attempts: 1, detail: error.message });
+        } else if (!state.disposed && error instanceof SplatBackendError && error.reason === "decode-worker-error") {
+          // A BROKEN pool rejects every later decode with this same error
+          // (DecodePool.breakPool) — after the load settled, no page can
+          // ever be admitted again. That is a whole-load failure after first
+          // paint, never a silent `false` (owner ruling 08-S2; review F1).
+          fail(state, error.reason, error.message);
         }
         return false;
       },
@@ -974,12 +1045,12 @@ export class ThreeGsBackend implements SplatBackend {
     // non-decreasing (fixed denominators, non-decreasing numerators), so
     // the mean is; a clamp would only hide a genuine term regression from
     // the fixture's monotonicity tripwire (built-in review, 2026-09-03).
-    state.progress = {
+    setProgress(state, {
       bytesLoaded: paged.pager.progress.bytesLanded,
       bytesTotal: paged.header.allChunkBytes,
       phase,
       fraction: Math.min(1, fraction),
-    };
+    });
   }
 
   private pagedProgressTerms(paged: PagedState): { bytes: number; decoded: number; uploaded: number } {
@@ -1140,12 +1211,12 @@ export class ThreeGsBackend implements SplatBackend {
         offset += chunk.byteLength;
       }
 
-      state.progress = {
+      setProgress(state, {
         bytesLoaded,
         bytesTotal: Math.max(bytesTotal, bytesLoaded),
         phase: "constructing",
         fraction: 1,
-      };
+      });
 
       const header = readPlyHeader(arrayBuffer);
       validateSplatPlyHeader(header);
@@ -1238,11 +1309,11 @@ export class ThreeGsBackend implements SplatBackend {
 
       mesh.onAfterRender = () => {
         if (state.progress.phase === "ready") return;
-        state.progress = {
+        setProgress(state, {
           ...state.progress,
           phase: "ready",
           fraction: 1,
-        };
+        });
         state.resolveReady();
       };
 

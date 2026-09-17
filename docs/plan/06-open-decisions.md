@@ -301,6 +301,42 @@ one-line-dependency goal (D12) is carried by Phase 2's consumer re-typing;
 the external rename is a loud one-line edit, not a silent semantic trap.
 H-API's consumer fixture (Phase 2) records this divergence as expected.
 
+**D25 — DECIDED (2026-09-13, OWNER RULED at ticket 08's stop): `loadSplat`
+keeps its name and options shape, gains a `backend` option, and returns the
+seam's `SplatHandle` instead of Spark's `SplatMesh`.** The H-API-sanctioned
+divergence entry for the rebuilt `core/SplatLoader` (doc 05: "divergences
+allowed only via doc 06 entries"). Grounds: the pin's `loadSplat(options):
+SplatMesh` (`fd67153:src/core/SplatLoader.ts`) needs no renderer and returns a
+Spark type that cannot exist here; a seam loader needs the backend (the paged
+`.rad` path needs the renderer for its page budget and a decode-worker factory)
+and the seam hands the renderable over as `handle.object` for the caller to
+compose (doc 02 resolution note, 2026-08-29). The barrel name and the options
+names stay, so pin callers (SiteRuntime, SceneComposer, 8 example pages at the
+pin) change at the call site, loudly, never silently. The conditional 180°
+X-flip stays the loader's (pin `SplatLoader.ts:81-88`: presence of
+`eulerRotationDeg` arms it), applied to `handle.object`; the backend hands the
+object over unrotated. H-API's consumer fixture records this divergence as
+expected.
+
+**D26 — DECIDED (2026-09-13, OWNER RULED at ticket 08's stop S1): reveal = the
+seam's paint-observed ready; the pin's reveal gate is a REFERENCE, not a
+pending constant set.** The rebuilt SplatLoader reveals at the seam's ready
+(first paint after the first page with splats), reports the true completed-work
+fraction until then, then exactly 1 once — monotone, never un-revealed. Grounds:
+doc 04 Phase 2 says the element "reveals progressively" (coarse-then-sharpen is
+the stated intent); zero constants; one meaning of ready on both load paths;
+cannot hang under `?pages=32`, where the fraction tops out at 0.5082. **The
+pin's gate is recorded here as the reference** for a future PRODUCT decision
+that wants the coarse first moment hidden: `fd67153:src/embed/SiteRuntime.ts:2460-2476`
+(REVEAL_MODE auto/visual/pristine; REVEAL_MIN_MS 1500; REVEAL_MAX_WAIT_MS
+20000/120000; REVEAL_LIGHT_MAX_WANTED 48; REVEAL_STABLE_MS 5000;
+REVEAL_LIGHT_STABLE_MS 1500; PROGRESS_CHASE_RATE 0.35; REVEAL_VISUAL_WINDOW_MS
+1200; REVEAL_VISUAL_GROWTH 0.06; REVEAL_VISUAL_DWELL_MS 500;
+PROGRESS_REPORT_INTERVAL_MS 80) plus the 0.98 progress cap at `:2529` — every
+one hand-picked, and its signals read residency (resident/wanted) or splat-count
+growth, which §A5 forbids. That revisit needs its own evidence and ruling; no
+constant may be smuggled in under this entry.
+
 **sRGB constraint — ACCEPTED (2026-08-20, ticket 03 close):** with the doc 04
 sRGB working space set (core/colorSpace.ts), assigning
 `renderer.outputColorSpace` on a CLASSIC WebGLRenderer throws inside three —

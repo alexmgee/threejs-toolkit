@@ -40,7 +40,10 @@ export type ChunkUnavailableReason =
 
 export interface ChunkUnavailable {
   index: number;
-  reason: ChunkUnavailableReason | "decode-failed";
+  /** Fetch-layer reasons, `decode-failed` (the bytes do not decode), and —
+   *  after the load settled only — the two per-job pool rejections an
+   *  admission can meet (ticket 08, owner ruling 2026-09-17). */
+  reason: ChunkUnavailableReason | "decode-failed" | "decode-dispatch-failed" | "decode-protocol-error";
   attempts: number;
   detail: string;
 }

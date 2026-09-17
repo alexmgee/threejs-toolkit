@@ -5,6 +5,31 @@ export type SplatFormat = "rad" | "spz" | "ply" | "splat";
 export interface SplatSource {
   url: string;
   format?: SplatFormat;
+  /** Optional observer (ticket 08 ruling S3): called every time the backend
+   *  refreshes this handle's LoadProgress, with the same snapshot
+   *  `progress()` would return at that moment — including the terminal
+   *  "failed" phase. The seam is otherwise pull-only; nothing polls, so it
+   *  keeps working in hidden tabs. A throwing observer is reported
+   *  (`reportError`) and never alters the load. */
+  onProgress?: (progress: LoadProgress) => void;
+  /** Optional observer (ruling S3): called once, with the named error, when
+   *  the handle fails terminally — before OR after ready. `whenReady`
+   *  settles once, so a whole-load failure after first paint has no other
+   *  push path (ruling S2). Mirrors `whenReady`'s rejection before ready,
+   *  including dispose-before-ready (`handle-disposed`). */
+  onFailure?: (error: SplatBackendError) => void;
+}
+
+const FORMAT_EXTENSIONS: readonly SplatFormat[] = ["ply", "spz", "splat", "rad"];
+
+/** The format a file name or URL's extension names (query and fragment
+ *  ignored), or undefined. The one extension rule: the backend infers a
+ *  source's format with it, and the loader picks the format from a blob
+ *  URL's `fileName` with it (ticket 08, pin SplatLoader semantics). */
+export function formatFromName(name: string): SplatFormat | undefined {
+  const pathPart = name.split(/[?#]/)[0] ?? name;
+  const ext = pathPart.split(".").pop()?.toLowerCase();
+  return FORMAT_EXTENSIONS.find((format) => format === ext);
 }
 
 export type LoadPhase = "fetching" | "constructing" | "ready" | "failed";
@@ -16,8 +41,10 @@ export type LoadPhase = "fetching" | "constructing" | "ready" | "failed";
  * unknown; clamped to 1 in case a lying content-length under-reports, which
  * also keeps monotonicity), holds at 1.0 through "constructing", and
  * "ready"/whenReady is the authoritative gate — monotone by construction. On
- * failure the fraction freezes and phase becomes "failed". Ticket 08 owns
- * the full §A5 reveal contract and may refine these semantics.
+ * failure the fraction freezes and phase becomes "failed". The paged path's
+ * fraction is the equal-weight mean of three completed-work ratios (ruling
+ * 06-S5) and keeps rising after ready. The §A5 REVEAL policy built on this
+ * (ticket 08, doc 06 D26) lives in `core/SplatLoader`, not here.
  */
 export interface LoadProgress {
   readonly bytesLoaded: number;

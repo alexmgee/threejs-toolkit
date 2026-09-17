@@ -15,10 +15,20 @@ element end to end on both backends. **GATE:** regression vs the spike's own num
 01 DisplayChannel re-sync (—) · 02 WASM worker + lib packaging (—) ·
 03 seam + monolithic path (—) · 04 fork patch 1: dispose+capacity (03) ·
 05 fetch + 4-worker decode pool (02, 03) · 06 page residency (05) ·
-07 LOD + selection + culling (06) · 08 §A5 contract into SplatSiteElement (03, 06) ·
-09 SiteRuntime re-typing (01, 04, 08) · 10 D22 CameraSystem micro (—) ·
+07 LOD + selection + culling (06) · 08 §A5 contract in the rebuilt SplatLoader (03, 06) ·
+09 SiteRuntime re-typing + embed set (01, 04, 08) · 10 D22 CameraSystem micro (—) ·
 11 StatsHUD + SplatBounds (07, 09) · 12 diagnostics rewired §G (07, 09) ·
 13 Phase 2 exit evidence (11, 12).
+
+**Amendment 2026-09-13 (owner ruling 08-S0):** ticket 08 builds the §A5
+load/reveal/ready contract UNDERNEATH the runtime — the rebuilt SplatLoader holds
+the one reveal/progress policy, proven on a loader-level page. The three embed
+pin-copies (SplatSiteElement, FragmentRouter, `register`), the element's H-API
+event proof and the embed-entry switch moved to ticket 09, because the pinned
+element cannot run without SiteRuntime (`fd67153:src/embed/SplatSiteElement.ts:25`,
+`:1006-1017`; SiteRuntime owns the gate at `:748-769`, `:2432-2606` and imports
+five files that did not yet exist). Evidence and rejected options: ticket 08
+Comments. The dependency graph is unchanged (09 still needs 08).
 
 Frontier: 01, 02, 03, 10 — but ticket 01 is worked first by owner mandate (handoff
 004: the lifetime trap is Phase 2's opening move). One ticket at a time; unlocked ≠

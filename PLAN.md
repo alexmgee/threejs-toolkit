@@ -132,7 +132,7 @@ links: [text-markers, diagnostics, embed-site]
   tech: ticket 09; registration :2221, teardown :4133; D24 rename; latent throw proofs
 - [ ] Copy embed sources at pin (SplatSiteElement, register, …) {#embed-copy}
   from: roadmap
-  tech: ticket 08; byte-identical to fd67153 via `git show`
+  tech: ticket 09 (moved from 08 by ruling 08-S0); byte-identical to fd67153 via `git show`
 
 ## Watch loads and report problems {#diagnostics}
 tech: LoadCoordinator, probes, sinks, SparkPagerAdapter (temporary)
@@ -159,9 +159,12 @@ files: [src/embed/**, vite.embed.config.ts, dist-embed/**]
 needs: [backend-pager, scene-core, site-rules, diagnostics]
 links: [fixtures]
 
-- [ ] Wire load/reveal/ready contract into SplatSiteElement {#a5-contract}
+- [x] Reveal scenes progressively through the rebuilt splat loader {#a5-contract}
+  by: claude
+  tech: ticket 08 — `src/core/SplatLoader.ts` (one reveal/progress policy: reveal = seam ready, D26; true fraction then exactly one 1; onError before or after reveal; loadSplatAsync refused), `SplatSource` onProgress/onFailure observers (whenever the backend fails the handle, including after first paint), named shortfall warnings at settle and per chunk after; `examples/loader-lab/` 31/31 on WebGPU and WebGL2 in both regimes
+- [ ] Prove `<splat-site>` fires the same events as sparkjs {#element-events}
   from: roadmap
-  tech: ticket 08; §A5; reveal on progress + first-paint, never residency
+  tech: ticket 09 (moved from 08 by ruling 08-S0); H-API row on a fixture site.json, both backends
 - [ ] Copy diagWiring.stub at pin {#diagwiring-copy}
   from: roadmap
   tech: ticket 09; SHA in Comments
@@ -199,6 +202,28 @@ links: [scene-core, render-stack, text-markers, site-rules, diagnostics, backend
 
 ## decisions
 
+- **Ticket 08 rulings (owner, 2026-09-13):** S0 — the §A5 contract is built UNDER
+  the runtime: the rebuilt SplatLoader holds the one reveal/progress policy (loader-level
+  page); the three embed pin-copies, the element's event proof and the embed-entry switch
+  move to ticket 09 (the pinned element cannot run without SiteRuntime). S1 — reveal = the
+  seam's paint-observed ready; true fraction until then, exactly 1 once; the pin's
+  11-constant gate is a reference only (doc 06 D26). S2 — partial shortfall reveals with
+  truthful counts + one console warning; a whole-load failure after first paint must
+  surface as a named failure (backend gap fixed here). `loadSplat` keeps name/options,
+  gains `backend`, returns the handle (D25); the loader applies the pin's conditional
+  180° flip — corrects the "X-flip is SiteConfig's, ticket 09" line below. Embed size
+  bound: measured in 09, set by the owner.
+- **Ticket 08 third-stop rulings (owner, 2026-09-17):** a chunk found unavailable AFTER the
+  load settled gets its own named warning (the load-finish warning stays); post-settle
+  `decode-dispatch-failed` / `decode-protocol-error` mark the chunk unavailable instead of
+  silently dropping its bytes. Reviewer selection: the agent-collaboration v2 registry's lane
+  order governs (astra-review first) — handoffs are dated snapshots, never standing pins.
+- **Ticket 08 second-stop rulings (owner, 2026-09-16):** S3 — progress and failure reach
+  the loader through optional `onProgress`/`onFailure` callbacks on the load request (no
+  polling, no new seam method; `onError` on the loader options for 09). S4 — `loadSplatAsync`
+  refuses by name until SceneComposer's Phase 3 ticket has a real caller. S5 — `extSplats`/
+  `lod`/`paged` accepted with one named warning on a contradiction; noise level reviewed
+  once in 09. `onLoad` = reveal on both paths; a pre-reveal 1.0 is held for reveal.
 - **Ticket 07 rulings (owner, 2026-09-12):** deselection = reserved last sort bin +
   public `instanceCount` cull (declared divergence from the spike's vertex-node cull;
   vendored JS frozen; 4095 depth bins). LOD threshold derived from the camera ×

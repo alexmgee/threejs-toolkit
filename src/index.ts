@@ -11,8 +11,12 @@
 //          embed/FragmentRouter (parseFragment, connectSiteRouting, …)
 //          core/StatsHUD (StatsHUD)
 //          core/SplatBounds (computeSplatBounds)
-//          core/SplatLoader (loadSplat, loadSplatAsync)
-// Phase 3: core/CropTool (CropTool, evaluateSdf)
+// Phase 3: core/SplatLoader (loadSplatAsync only — loadSplat returned with
+//          ticket 08; loadSplatAsync is a named refusal until SceneComposer's
+//          ticket settles it (ruling 08-S4), and per the D19 precedent a
+//          barrel name returns with its real implementation, not as a
+//          throwing export)
+//          core/CropTool (CropTool, evaluateSdf)
 //          core/SceneComposer (SceneComposer)
 //          interact/SplatHighlight (SplatHighlight)
 //          core/DebugPanel (DebugPanel)
@@ -36,6 +40,7 @@
 import "./core/colorSpace";
 
 // ─── Core ───
+export { loadSplat, type SplatLoadOptions } from "./core/SplatLoader";
 export { ThreeSplatScene, type ThreeSplatSceneConfig } from "./core/ThreeSplatScene";
 export { createOrbitControls, type OrbitControlsConfig } from "./core/Controls";
 export { LoadingUI, type LoadingUIConfig } from "./core/LoadingUI";

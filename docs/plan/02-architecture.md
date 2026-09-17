@@ -104,6 +104,17 @@ the interface stays at exactly the method set above. Rejected alternatives: a te
 backend-side attach (fights three.js composition idiom and ticket 09's
 SceneComposer work).
 
+*Resolution note (2026-09-16, ticket 08 ruling S3):* the load REQUEST type
+grows — `SplatSource` gains two optional observers, `onProgress(progress)`
+(called at every point the backend refreshes the handle's `LoadProgress`) and
+`onFailure(error)` (called from the one terminal-failure site). The seam is
+otherwise pull-only, and `whenReady` settles once, so before this a whole-load
+failure AFTER first paint only flipped `progress().phase` to `failed` with no
+announcement — the silent failure the named-refusal design forbids. No method
+is added; the interface stays at exactly the method set above. Rejected:
+per-frame polling (hidden tabs stop frames — the throttling trap) and a
+failure promise on the handle (the handle-shape ruling above).
+
 ## RadPager — the streaming loader (full spec: doc 03 §A)
 
 Pipeline: `RadHeader` (parse; `chunksStart = 8 + roundup8(headerLength)` — the format

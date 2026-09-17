@@ -53,6 +53,7 @@ export default defineConfig({
         "splat-lab": resolve(__dirname, "examples/splat-lab/index.html"),
         "rad-lab": resolve(__dirname, "examples/rad-lab/index.html"),
         "pager-lab": resolve(__dirname, "examples/pager-lab/index.html"),
+        "loader-lab": resolve(__dirname, "examples/loader-lab/index.html"),
       },
     },
   },
