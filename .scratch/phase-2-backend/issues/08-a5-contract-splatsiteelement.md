@@ -356,6 +356,13 @@ Codex weekly window 39% used at launch, no paid credits, one pre-existing codex.
   rejection paths, the warning bound, fixture validity (Proxy binding, one-shot fault consumption,
   eviction fallback, later-drill state).
 
+**Owner ruling (2026-09-17, restated — SUPERSEDES the "during load vs after settle" wording of the
+asymmetry ruling above): the split is BY PATH, not by time.** Decode errors on the LOAD PIPELINE's
+own decodes fail the whole load (ticket 05's pool-integrity fail-fast). Errors on a RE-ADMISSION
+mark that one chunk unavailable whenever they happen, pre- or post-settle — folding into the
+load-finish warning if the load is still running, announced by name if it has settled. Behaviour
+stays exactly as built (commit 06fe819; comment corrected in cd46e05).
+
 **Status change: done — the four ACs that remain in this ticket are met on
 both backends in both regimes (evidence above); the original AC1/AC2 moved to
 ticket 09 by ruling S0 (2026-09-13).**
