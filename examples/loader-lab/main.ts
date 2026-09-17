@@ -110,7 +110,10 @@ const scene3 = new ThreeSplatScene({
   forceWebGL,
 });
 
-/** Yield (no rendering, so the LOD driver kicks nothing new) until `done()`. */
+/** Yield until `done()` without calling render here. This does NOT stop the
+ *  scene's own animation loop from rendering, so it cannot by itself keep the
+ *  LOD driver from kicking admissions — a drill that needs that turns
+ *  selection off first. */
 async function yieldUntil(label: string, done: () => boolean): Promise<number> {
   const t0 = performance.now();
   while (!done()) {

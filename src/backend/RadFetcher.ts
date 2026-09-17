@@ -40,9 +40,11 @@ export type ChunkUnavailableReason =
 
 export interface ChunkUnavailable {
   index: number;
-  /** Fetch-layer reasons, `decode-failed` (the bytes do not decode), and —
-   *  after the load settled only — the two per-job pool rejections an
-   *  admission can meet (ticket 08, owner ruling 2026-09-17). */
+  /** Fetch-layer reasons, `decode-failed` (the bytes do not decode), and the
+   *  two per-job pool rejections a RE-ADMISSION can meet — before or after
+   *  the load settled (ticket 08, owner ruling 2026-09-17). The load's own
+   *  decodes never record these two: RadPager.load treats them as a
+   *  whole-load pool failure (ticket 05 fail-fast). */
   reason: ChunkUnavailableReason | "decode-failed" | "decode-dispatch-failed" | "decode-protocol-error";
   attempts: number;
   detail: string;

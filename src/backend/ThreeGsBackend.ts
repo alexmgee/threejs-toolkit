@@ -961,9 +961,6 @@ export class ThreeGsBackend implements SplatBackend {
     lod.lastPixelScaleLimit = pixelScaleLimit;
   }
 
-  /** Wanted-but-missing chunks whose bytes are cached re-decode through the
-   *  pool (owner ruling 06-S4); at most poolSize in flight. A chunk given up
-   *  on is never retried (S3). */
   /** Every chunk given up on goes through here. Before the load settles it
    *  only joins the list (the settle warning reports the whole shortfall,
    *  owner ruling 08-S2); a chunk given up on AFTER settle is a new fact and
@@ -980,6 +977,9 @@ export class ThreeGsBackend implements SplatBackend {
     }
   }
 
+  /** Wanted-but-missing chunks whose bytes are cached re-decode through the
+   *  pool (owner ruling 06-S4); at most poolSize in flight. A chunk given up
+   *  on is never retried (S3). */
   private kickAdmissions(state: HandleState, paged: PagedState): void {
     const lod = paged.lod;
     const limit = DECODE_POOL_SIZE; // one re-decode in flight per worker

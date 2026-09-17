@@ -242,6 +242,10 @@ ruling):** during the LOAD itself RadPager treats any non-DecodeFailedError
 pool rejection — these two included — as a pool failure and rejects the
 whole load (RadPager.ts:237-241), so the same error is whole-load at load
 time and per-chunk after settle.
+**Owner ruling (2026-09-17): this asymmetry is DESIGNED.** During the load a
+dispatch/protocol error is pool infrastructure failing (ticket 05's deliberate fail-fast); after
+settle it is one chunk's re-admission in a proven pool — different blast radius, different correct
+answer.
 
 **Prove-red record for the third-stop drills.** First attempt corrupted the
 last chunk at fetch and relied on it staying deferred; on a cold dev server
@@ -323,6 +327,34 @@ normalized to LF in binary mode; each equals its tested version minus exactly it
 (351 / 1,461 / 929, verified with `cmp`). Gate re-run on the committed bytes: `npm run check:full`
 EXIT=0 (`.collab-logs/gate-t08-run3.log`; embed 216,527 B; 161 modules / 491 deps, no violations;
 crate 6 + golden 7). Fixtures were not re-run for this CR-only change.
+
+**Targeted adversarial review of the third-stop diff (2026-09-17; owner-ordered after close;
+astra-review per the v2 registry lane order — gpt-6-astra, effort high, sandbox read-only,
+codex-cli 0.153.3, banner-confirmed; access class ordinary_authorized, residual broad-read
+capability recorded; material = the third-stop diff RECONSTRUCTED exactly by reversing the patch
+scripts' recorded string pairs on HEAD 06fe819 (`.collab-logs/t08-third-stop-review-material.diff`),
+prompt `t08-third-stop-review-prompt.md`, output `astra-review-t08-third-stop.md`, trace
+`astra-review-t08-third-stop-err.log` (13 tool calls); 266 repo files hash-identical before/after;
+Codex weekly window 39% used at launch, no paid credits, one pre-existing codex.exe left alone):
+3 findings, all LOW, all CONFIRMED by source trace, all comment-only, fixed in a follow-up commit.**
+- F1 (RadFetcher.ts:44): the reason-union comment said the two per-job rejections occur "after the
+  load settled only" — false: `kickAdmissions` runs from the per-render LOD driver
+  (ThreeGsBackend.ts:938) before settle too, and `admit()`'s routing has no settle guard. Comment
+  now states the real split: by PATH — a re-admission (before or after settle) marks the chunk
+  unavailable; the load path's own decodes treat the same errors as whole-load pool failure. This
+  also CORRECTS the "whole-load at load time and per-chunk after settle" wording in the observed-
+  asymmetry note above (a pre-settle re-admission failure is per-chunk and is folded into the settle
+  warning, not announced separately). Behaviour unchanged; question put to the owner.
+- F2 (examples/loader-lab/main.ts:113): `yieldUntil`'s comment claimed "no rendering, so the LOD
+  driver kicks nothing new" — ThreeSplatScene's own animation loop still renders
+  (ThreeSplatScene.ts:193); the drill is protected by `setSelectionEnabled(false)`, which it
+  already applies first. Comment corrected.
+- F3 (ThreeGsBackend.ts:967): `markUnavailable` had been inserted below `kickAdmissions`'s doc
+  comment, attaching it to the wrong method (also noticed by the coordinator while rebuilding the
+  diff, left for the reviewer). Comment moved back onto `kickAdmissions`.
+- Reviewer found none in: `markUnavailable` dedupe and settle-warning timing, other admission
+  rejection paths, the warning bound, fixture validity (Proxy binding, one-shot fault consumption,
+  eviction fallback, later-drill state).
 
 **Status change: done — the four ACs that remain in this ticket are met on
 both backends in both regimes (evidence above); the original AC1/AC2 moved to
