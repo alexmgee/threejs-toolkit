@@ -149,10 +149,12 @@ links: [site-rules, embed-site, fixtures]
 - [x] Diagnostic framework copied; selfTest 20/20 {#diag-framework}
   by: phase-1 ticket 07
   tech: commit `b9c9251`; 22 diag paths at fd67153 byte-verified; SparkPagerAdapter carried per R4; `examples/diag/` selfTest `20/20 PASS` in-browser
-- [ ] Feed StatsHUD from backend counters {#statshud}
+- [~] Feed StatsHUD from backend counters {#statshud}
+  by: claude
   from: roadmap
   tech: ticket 11; no seam bypass
-- [ ] Feed SplatBounds from resident-page union {#splat-bounds}
+- [~] Feed SplatBounds from resident-page union {#splat-bounds}
+  by: claude
   from: roadmap
   tech: ticket 11; independent union, not 8-corner applyMatrix4
 - [ ] Rewire diagnostics off Spark pager (§G) {#diag-rewire}
@@ -210,6 +212,15 @@ links: [scene-core, render-stack, text-markers, site-rules, diagnostics, backend
   tech: ticket 11 phase-1 done (51 sources); 13 deferred names return per phase
 
 ## decisions
+
+- **Ticket 11 rulings (owner, 2026-09-18):** `computeSplatBounds(backend, handle, options?)` (A1, the
+  one-argument pin call breaks loudly); world bounds = the 8-corner transform of the seam's box, doc 03
+  amended (exact for axis-aligned transforms, conservative under arbitrary rotation; per-page seam
+  growth is the recorded revisit path); `SplatBoundsOptions` unchanged with `targetSamples` deprecated
+  and ignored; StatsHUD takes `{ container, backend, handles? }` and shows fps | drawn | resident |
+  src, the Spark-only fields deleted (doc 06 entry, D15 caveat); a broad lint rule makes backend
+  internals reachable only through five named doors (doc 02 rule 2 amended; examples exempt); the
+  text-lab placeholder obstacle is swapped for loadSplat + computeSplatBounds in this ticket.
 
 - **Ticket 09 review rulings (owner, 2026-09-17):** all eight confirmed findings fixed as
   recommended, red-first — a scene the backend refuses on the spot fails the load through
