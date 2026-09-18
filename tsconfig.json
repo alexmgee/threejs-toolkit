@@ -21,5 +21,10 @@
       "@toolkit/*": ["./src/*"]
     }
   },
-  "include": ["src", "examples/**/*.ts"]
+  "include": ["src", "examples/**/*.ts"],
+  // The H-API divergence fixture MUST fail to compile here — that failure is
+  // D24's predicted outcome, measured (ticket 09 AC6 / ruling Stop 17). It is
+  // compiled deliberately, by its own scratch tsconfigs against each toolkit,
+  // never by this program.
+  "exclude": ["examples/h-api/scene-naming.ts"]
 }

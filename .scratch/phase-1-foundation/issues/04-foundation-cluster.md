@@ -193,6 +193,15 @@ session report):**
   (src/core/index.ts replaced by ticket 04); vite-env.d.ts comment
   corrected (the types reference is program-global, not examples-scoped —
   src/ must stay import.meta-free).
+  **AMENDED 2026-09-17 (Phase 2 ticket 09, owner ruling Stop 9):** the
+  constraint NARROWS to Vite-specific surfaces — `import.meta.env` and
+  `import.meta.hot` stay out of src/. Grounds: the concern above was Vite type
+  pollution; `import.meta.url` is standard JavaScript, proven to typecheck
+  with `"types": []` (scratch tsc exit 0); src/ already depends on Vite at
+  `decode.ts`'s `?worker&inline` import. First use: the decode-worker URL
+  factory SiteRuntime imports (config-time swapped to the inline worker in
+  the embed build). Detail: `.scratch/phase-2-backend/issues/09-siteruntime-retyping.md`
+  Comments.
 - Skipped (recorded, not acted): vite 500 kB chunk warning left as a growth
   tripwire (bundle is ~93% three by measurement; one-line
   chunkSizeWarningLimit silences it if preferred); dev-server root URL 404s

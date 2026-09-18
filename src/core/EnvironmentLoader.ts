@@ -8,6 +8,10 @@
  * port, per the corrected AC):
  * - SparkScene -> ThreeSplatScene (the `sparkScene` field NAME is kept:
  *   it is public API consumed by Phase 2's SiteRuntime copy).
+ *   CORRECTED 2026-09-17 (doc 06 D28): that reason was wrong — the pin's
+ *   SiteRuntime never constructs EnvironmentLoader. The key's consumers are
+ *   SceneComposer, CropTool and DebugPanel (Phase 3) and example pages. The
+ *   name is kept on D12 (strict source compatibility).
  * - PMREMGenerator comes from three/webgpu, not core three — the core
  *   class calls WebGL-only renderer methods; the node generator serves
  *   BOTH the WebGPU backend and the facade's WebGL2 fallback.

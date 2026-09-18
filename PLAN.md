@@ -54,6 +54,10 @@ links: [scene-core, diagnostics, embed-site, fixtures]
 - [x] Traverse LOD tree and cull by selection {#lod-culling}
   by: claude
   tech: ticket 07 — `src/backend/LodTraversal.ts` (spike traversal promoted; ChunkPriority swap), fork patch 2 `patches/selection.ts` (selection-aware sort via setBinNode + reserved bin + instanceCount cull), LOD driver in ThreeGsBackend (object-space hysteresis on the vendored sort thresholds, admissions, selection-change invalidation), frustum culling from the resident AABB sphere; `examples/pager-lab/` 26/26 on WebGPU and WebGL2 in both regimes
+- [x] Wait for the renderer before reading device limits {#renderer-init-wait}
+  by: claude
+  from: roadmap
+  tech: ticket 09 Stop 10 — ThreeGsBackend awaits `renderer.init()` before the page budget (.rad) and the capacity pre-check (PLY); a failed init fails the handle by name; loader-lab, pager-lab, splat-lab re-run both backends
 - [ ] Answer raycast for resident splats {#picking}
   from: roadmap
   tech: Phase 3 §B; CPU vs GPU route chosen by measurement at phase entry
@@ -127,10 +131,12 @@ links: [text-markers, diagnostics, embed-site]
 - [x] DisplayChannel re-synced to fd67153 {#displaychannel-resync}
   by: claude
   tech: commit `d9022b6`; `src/rules/DisplayChannel.ts` byte-identical to `git show fd67153:…` (sha256 `89c4a9c4…`); four barrel names restored; `examples/rules-lab/` before 2/7 trap → after 9/9; selfTest 20/20
-- [ ] Re-type SiteRuntime for three backend {#siteruntime-retype}
+- [x] Re-type SiteRuntime for three backend {#siteruntime-retype}
+  by: claude
   from: roadmap
   tech: ticket 09; registration :2221, teardown :4133; D24 rename; latent throw proofs
-- [ ] Copy embed sources at pin (SplatSiteElement, register, …) {#embed-copy}
+- [x] Copy embed sources at pin (SplatSiteElement, register, …) {#embed-copy}
+  by: claude
   from: roadmap
   tech: ticket 09 (moved from 08 by ruling 08-S0); byte-identical to fd67153 via `git show`
 
@@ -162,15 +168,18 @@ links: [fixtures]
 - [x] Reveal scenes progressively through the rebuilt splat loader {#a5-contract}
   by: claude
   tech: ticket 08 — `src/core/SplatLoader.ts` (one reveal/progress policy: reveal = seam ready, D26; true fraction then exactly one 1; onError before or after reveal; loadSplatAsync refused), `SplatSource` onProgress/onFailure observers (whenever the backend fails the handle, including after first paint), named shortfall warnings at settle and per chunk after; `examples/loader-lab/` 31/31 on WebGPU and WebGL2 in both regimes
-- [ ] Prove `<splat-site>` fires the same events as sparkjs {#element-events}
+- [x] Prove `<splat-site>` fires the same events as sparkjs {#element-events}
+  by: claude
   from: roadmap
   tech: ticket 09 (moved from 08 by ruling 08-S0); H-API row on a fixture site.json, both backends
-- [ ] Copy diagWiring.stub at pin {#diagwiring-copy}
+- [x] Copy diagWiring.stub at pin {#diagwiring-copy}
+  by: claude
   from: roadmap
-  tech: ticket 09; SHA in Comments
-- [ ] Drive real site.json end-to-end on both backends {#site-e2e}
+  tech: ticket 09; stub byte-identical + real diagWiring.ts with one declared line (Stop 1); SHAs in Comments
+- [x] Drive real site.json end-to-end on both backends {#site-e2e}
+  by: claude
   from: roadmap
-  tech: ticket 13; load, navigation, teardown
+  tech: ticket 09 `examples/site-lab/` 11/11 on WebGPU and WebGL2 (the pin's own lab + lm-lifetime sites, one URL line repointed): load/reveal/ready, site progress (Stop 5 P1), navigation, teardown through the seam with the renderer's own counters (Stop 16 H1), 10 cycles, both latent throws with controls, authored lifetime with its control, author outlines (Stop 15); ticket 13 still owns the H-LOAD re-run and element-level H-LIFE
 - [ ] Switch alexgee.online dependency {#first-consumer}
   from: roadmap
   tech: Phase 6; D15 — first consuming site
@@ -201,6 +210,59 @@ links: [scene-core, render-stack, text-markers, site-rules, diagnostics, backend
   tech: ticket 11 phase-1 done (51 sources); 13 deferred names return per phase
 
 ## decisions
+
+- **Ticket 09 review rulings (owner, 2026-09-17):** all eight confirmed findings fixed as
+  recommended, red-first — a scene the backend refuses on the spot fails the load through
+  `failReady` and the element still gets a disposable runtime; the outline drill counts errors from
+  boot; the element proof compares event counts (except `loadprogress`) and asserts the backend it
+  ran on; the raycast drill requires the mesh to have attached; the orphaned
+  `src/backend/embed-entry.ts` is deleted; the Stop 17 text is corrected. ThreeSplatScene's
+  dispose-after-failed-init fix (ticket 03's code) lands as its own commit after ticket 09's. The
+  size bound's anchor is re-grounded on measured figures; the bound itself is unchanged.
+
+- **Ticket 09 fourth/fifth-stop rulings and the embed size bound (owner, 2026-09-17):** Stop 3 —
+  typed `SplatBounds` stub returning the pin's documented `null` (doc 06 D30; ticket 11 deletes it).
+  Stop 7 — the backend refuses three's stock raycast on splat meshes (it hit a phantom template
+  quad) until Phase 3 §B, with one author-mode note at the first `pickPoint` (D31; phase-0.md's
+  raycast-absence claim narrowed). Stop 13 — the pin's three embed barrel blocks return verbatim.
+  Stop 15 — author obstacle outlines on three's WebGPU line pair (`Line2NodeMaterial`; D29 item 5).
+  Stop 16 — runtime-scope H-LIFE read synchronously after dispose, the window asserted. Stop 14 —
+  the live two-sided run is the element's evidence of record; the stored pin record is a
+  convenience. Stop 17 — C1, one consumer file, two scratch tsconfigs, two variants. Stop 6 — no
+  advance ruling; 0 contract warnings measured. Embed size bound: 3,932,160 B (3.75 MiB =
+  15 × 256 KiB) for the product embed, telemetry in — ~25% over the measured 3,138,621 B; grounds
+  and the baseline for any future raise are in ticket 09.
+
+- **Ticket 09 third-stop rulings (owner, 2026-09-17):** WebGL2 budget guard fixed to `gl == null`
+  (named-refusal contract; unreachable in normal flow since Stop 10; unit probe). Stop 4 —
+  `pagedExtSplats`, `sparkRenderer`, `registerPagedSplat` deleted; rail DoF skipped with one
+  author-mode note; docked-idle throttle carried (T1) with a seam-read guard that never throttles
+  capped sites (doc 06 D29; ticket 12 notes, ticket 13's evidence decides T2). Stop 5 — site
+  progress = slowest scene across all scenes, one 1 at the last reveal; pin's 1-spam and double 1
+  not reproduced (D29). Stop 8 — white tint no-op, non-white one author-mode note, boot catch
+  narrowed to font failures (D29). Stop 12 — handle keeps `sparkScene`/`mesh` names, re-typed, new
+  `handle` field, `paged` from the file format (doc 06 D28, D12; EnvironmentLoader's stale reason
+  corrected).
+
+- **Ticket 09 Stops 9/10/11/2 rulings (owner, 2026-09-17):** Stop 9 — SiteRuntime imports a
+  checked-in URL-constructed worker factory; `vite.embed.config.ts` swaps it for the inline
+  `decode.ts` (the "config-time swap pattern", now used twice with telemetry); phase-1's
+  "src/ import.meta-free" narrows to `import.meta.env`/`.hot`. Stop 10 — the backend awaits the
+  renderer's init before reading device limits on both load paths (a failed init fails the handle
+  by name; also closes the silently skipped PLY pre-check); loader-lab, pager-lab and splat-lab
+  re-run on both backends. Stop 11 — the element fixture hides `navigator.gpu` to reach WebGL2
+  through three's automatic fallback: deliberately different coverage from `forceWebGL`, not a
+  substitute. Stop 2 — inert `SplatHighlight` stub with the pin's API, one author-mode note,
+  doc 06 D27 (Phase 3 deletes and replaces it, D19's obligation).
+
+- **Ticket 09 Stop 1 ruling (owner, 2026-09-17):** ticket 09 lands the REAL `diagWiring.ts`
+  (one declared line: the Spark type import repointed at the backend's type — scratch typecheck
+  shows zero diagWiring errors after it) with the stub byte-identical beside it, the pin's
+  `TELEMETRY_MEASURE` switch, and barrel names identical to the pin incl. `LOAD_TELEMETRY_MARKER`.
+  Until ticket 12, SiteRuntime skips paged-scene telemetry registration and prints ONE named
+  author-mode note; ticket 12 owns removing both. Closes the plan-review gap (no ticket owned the
+  real file). The embed is measured with and without telemetry; both numbers go to the owner with
+  the size-bound question.
 
 - **Ticket 08 rulings (owner, 2026-09-13):** S0 — the §A5 contract is built UNDER
   the runtime: the rebuilt SplatLoader holds the one reveal/progress policy (loader-level

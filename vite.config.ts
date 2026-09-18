@@ -34,7 +34,21 @@ export default defineConfig({
     format: "es",
   },
   resolve: {
-    alias: [{ find: "@toolkit", replacement: resolve(__dirname, "src") }],
+    // Array form: the measurement entry is conditional and regex-keyed.
+    // Bundle-budget measurement (pin fd67153 load-telemetry Phase 7, carried by
+    // ticket 09 ruling Stop 1): TELEMETRY_MEASURE=off swaps the runtime's single
+    // diagnostics import boundary for the stub at CONFIG time, so Rollup
+    // statically eliminates the whole diagnostics graph in build B of the
+    // two-build differential. Normal builds are unaffected.
+    alias: [
+      { find: "@toolkit", replacement: resolve(__dirname, "src") },
+      ...(process.env.TELEMETRY_MEASURE === "off"
+        ? [{
+            find: /^\.\/diagWiring$/,
+            replacement: resolve(__dirname, "src/embed/diagWiring.stub.ts"),
+          }]
+        : []),
+    ],
   },
   build: {
     target: "esnext",
@@ -55,6 +69,8 @@ export default defineConfig({
         "pager-lab": resolve(__dirname, "examples/pager-lab/index.html"),
         "loader-lab": resolve(__dirname, "examples/loader-lab/index.html"),
         "camera-lab": resolve(__dirname, "examples/camera-lab/index.html"),
+        "site-lab": resolve(__dirname, "examples/site-lab/index.html"),
+        "site-lab-element": resolve(__dirname, "examples/site-lab/element.html"),
       },
     },
   },

@@ -2,16 +2,16 @@ import { defineConfig } from "vite";
 import { resolve } from "path";
 
 /**
- * Embed bundle build — SCAFFOLD ENTRY (ticket 01).
+ * Embed bundle build — the PRODUCT entry (ticket 09).
  *
- * The real entry is src/embed/register.ts producing a single self-contained
- * <splat-site> file (sparkjs-toolkit's vite.embed.config.ts shape) — the
- * embed set is DEFERRED to Phase 2 by owner ruling R2
- * (.scratch/phase-1-foundation/spec.md). Until then this lib-builds
- * src/backend/embed-entry.ts — the decode-only surface. It was the backend
- * barrel until ticket 03 gave the barrel runtime exports (ThreeGsBackend →
- * three/webgpu + vendored mesh), which ballooned embed.js 213 kB → ~1.1 MB;
- * the dedicated entry restores the ticket-02 artifact contract.
+ * Lib-builds src/embed/register.ts into ONE self-contained <splat-site> file
+ * (sparkjs-toolkit's vite.embed.config.ts shape). History: until ticket 09
+ * the entry was a decode-only scaffold, src/backend/embed-entry.ts (deleted
+ * with the switch as the orphan it became); before that it was the backend
+ * barrel, until ticket 03 gave the barrel runtime exports (ThreeGsBackend →
+ * three/webgpu + vendored mesh) and ballooned embed.js 213 kB → ~1.1 MB.
+ * scripts/check-embed-size.mjs guards the size; its bound is the owner's
+ * (ticket 09).
  *
  * Self-contained by definition (sibling repo's reasoning, carried forward):
  * this config exists separately BECAUSE the main config becomes a multi-page
@@ -23,14 +23,37 @@ import { resolve } from "path";
  *
  * WASM worker settings graduated from the Phase 0 spike with ticket 02
  * (`worker.format: "es"`, `build.target: "esnext"`). D14 RULED 2026-08-23
- * (doc 06): variant A — the embed entry imports the decode worker INLINE
- * (src/backend/decode.ts `?worker&inline`), wasm as base64 inside the one
- * file. Single-file self-containment is the embed's contract; do not
+ * (doc 06): variant A — the embed carries the decode worker INLINE
+ * (src/backend/decode.ts `?worker&inline`, reached through the Stop 9 swap
+ * below), wasm as base64 inside the one file. Single-file self-containment
+ * is the embed's contract; do not
  * split assets out of it without re-opening D14.
  */
 export default defineConfig({
   resolve: {
-    alias: [{ find: "@toolkit", replacement: resolve(__dirname, "src") }],
+    // Array form: the measurement entry is conditional and regex-keyed.
+    // Bundle-budget measurement (pin fd67153 load-telemetry Phase 7, carried by
+    // ticket 09 ruling Stop 1): TELEMETRY_MEASURE=off swaps the runtime's single
+    // diagnostics import boundary for the stub at CONFIG time, so Rollup
+    // statically eliminates the whole diagnostics graph in build B of the
+    // two-build differential. Normal builds are unaffected.
+    alias: [
+      { find: "@toolkit", replacement: resolve(__dirname, "src") },
+      // Ticket 09 Stop 9 — the config-time swap pattern again: SiteRuntime
+      // imports the URL-constructed decode-worker factory (what pages and
+      // library consumers want), and the EMBED build replaces that module with
+      // the inline worker, so the bundle stays one self-contained file (D14).
+      {
+        find: /^\.\.\/backend\/decode-url$/,
+        replacement: resolve(__dirname, "src/backend/decode.ts"),
+      },
+      ...(process.env.TELEMETRY_MEASURE === "off"
+        ? [{
+            find: /^\.\/diagWiring$/,
+            replacement: resolve(__dirname, "src/embed/diagWiring.stub.ts"),
+          }]
+        : []),
+    ],
   },
   worker: {
     format: "es",
@@ -39,7 +62,7 @@ export default defineConfig({
     target: "esnext",
     outDir: "dist-embed",
     lib: {
-      entry: resolve(__dirname, "src/backend/embed-entry.ts"),
+      entry: resolve(__dirname, "src/embed/register.ts"),
       formats: ["es"],
       fileName: () => "embed.js",
     },

@@ -207,8 +207,36 @@ export class ThreeSplatScene {
     this.clock.update();
     const deltaTime = this.clock.getDelta();
     this.onFrameCallback?.(timeMs / 1000, deltaTime);
+    // Docked-idle throttle: skip only the RENDER — the state callback above
+    // already ran (SparkScene.animate's order, pin SparkScene.ts:279-300).
+    if (this.throttleGate && this.throttleGate(timeMs)) {
+      this._throttled = true;
+      return;
+    }
+    this._throttled = false;
+    this._renderCount++;
     if (this.renderOverride) this.renderOverride();
     else this.renderer.render(this.scene, this.camera);
+  }
+
+  // ─── Docked-idle render throttle (SparkScene's contract, carried by Phase 2
+  //     ticket 09 Stop 4f; doc 06 D29) ───
+
+  /** Consulted per frame; return true to SKIP this frame's render (state
+   *  callbacks above have already run). Absent → never throttled. */
+  throttleGate: ((timeMs: number) => boolean) | null = null;
+  private _renderCount = 0;
+  private _throttled = false;
+
+  /** Frames actually rendered by the animation loop — how a fixture measures
+   *  renders per second instead of eyeballing. */
+  get renderCount(): number {
+    return this._renderCount;
+  }
+
+  /** True while the docked-idle throttle skipped the latest frame. */
+  get throttled(): boolean {
+    return this._throttled;
   }
 
   dispose(): void {

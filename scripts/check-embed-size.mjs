@@ -1,16 +1,21 @@
-// The embed artifact's contract is ticket 02's inline-decode-only bundle:
-// 215,915 bytes as of 2026-08-29 (93.1 kB gzip). This tripwire exists because
-// ticket 03's barrel change silently ballooned embed.js to 1,157,614 bytes and
-// only a reviewer's habit caught it — no gate pinned the size. The 256 KiB
-// bound leaves ~21% headroom for ordinary drift while failing loudly on any
-// bundle-graph regression (the failure class is 5x, not 5%). Raising the bound
-// requires an owner ruling recorded in the ticket that raises it.
+// The embed artifact is the PRODUCT embed since ticket 09 switched the entry to
+// src/embed/register.ts: 3,138,621 bytes when the bound was ruled, 2026-09-17
+// (806,083 B gzip), built telemetry-in — the pin's default configuration,
+// which is what this gate builds (3,016,389 B with TELEMETRY_MEASURE=off).
+// The 3.75 MiB bound (15 x 256 KiB) leaves ~25% headroom, the original bound's
+// proportion and binary-round convention; the owner's ruling and the baseline
+// any future raise is measured against are recorded in ticket 09. This
+// tripwire exists because ticket 03's barrel change silently ballooned the then
+// decode-only embed.js (ticket 02's contract: 215,915 bytes, bound 256 KiB) to
+// 1,157,614 bytes and only a reviewer's habit caught it — no gate pinned the
+// size. Raising the bound requires an owner ruling recorded in the ticket that
+// raises it.
 
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const BOUND = 262144;
+const BOUND = 3932160;
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const artifact = path.join(repoRoot, 'dist-embed', 'embed.js');
 

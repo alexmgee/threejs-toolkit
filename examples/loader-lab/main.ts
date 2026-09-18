@@ -18,7 +18,7 @@
  * GPU device). Waits are time-bounded and timer-free (MessageChannel).
  */
 
-import { Group } from "three/webgpu";
+import { BoxGeometry, Group, Mesh, MeshBasicMaterial, Raycaster, Vector2, WebGPURenderer } from "three/webgpu";
 import { ThreeSplatScene } from "@toolkit/core/ThreeSplatScene";
 import { loadSplat, loadSplatAsync, type SplatLoadOptions } from "@toolkit/core/SplatLoader";
 import {
@@ -565,6 +565,234 @@ const done = (async () => {
     );
     await pumpUntil("rad warning drill failure", () => w.errors().length > 0);
     warnBackend.dispose(w.handle);
+  }
+
+  // ─── Ticket 09 Stop 10: loads issued BEFORE the renderer finished init ───
+  // The pin's SiteRuntime loads during construction, but device limits exist
+  // only after the renderer's init. Owner ruling (2026-09-17): the backend
+  // awaits the renderer's own init promise before reading them, on both load
+  // paths, and a failed init fails the handle by name. None of these drills
+  // needs a paint, and none may throw out of the lab — bounds are counted.
+  {
+    /** A renderer stand-in whose device — and so its storage limit — exists
+     *  only once the drill resolves init(), so WHEN the backend reads the
+     *  limit is observable. Every read of `backend.device` records whether
+     *  init had completed at that moment. */
+    function deferredInitRenderer(limit: number) {
+      let initialized = false;
+      let initCalls = 0;
+      let device: { limits: { maxStorageBufferBindingSize: number; maxBufferSize: number } } | undefined;
+      let resolveInit!: () => void;
+      const initDone = new Promise<void>((resolve) => { resolveInit = resolve; });
+      const reads: boolean[] = [];
+      const backendObject = {};
+      Object.defineProperty(backendObject, "device", {
+        get: () => {
+          reads.push(initialized);
+          return device;
+        },
+      });
+      return {
+        renderer: {
+          backend: backendObject,
+          init: () => {
+            initCalls++;
+            return initDone;
+          },
+        },
+        reads,
+        initCalls: () => initCalls,
+        resolve(): void {
+          device = { limits: { maxStorageBufferBindingSize: limit, maxBufferSize: limit } };
+          initialized = true;
+          resolveInit();
+        },
+      };
+    }
+    /** Yield until `done()` or `macrotasks` have passed — never throws. */
+    async function yieldAtMost(macrotasks: number, done: () => boolean): Promise<void> {
+      for (let i = 0; i < macrotasks && !done(); i++) await yieldMacrotask();
+    }
+    async function yieldPastFetching(backend: SplatBackend, h: SplatHandle, failed: () => boolean): Promise<void> {
+      const t0 = performance.now();
+      while (backend.progress(h).phase === "fetching" && !failed() && performance.now() - t0 < WAIT_BOUND_MS) {
+        await yieldMacrotask();
+      }
+    }
+
+    // PLY: the capacity pre-check reads the device limit only after init. A
+    // 1-byte stand-in limit — any value below the fixture's storage need —
+    // makes the pre-check's run visible as an over-capacity refusal. Before
+    // the fix the limit was read while absent and the pre-check skipped
+    // without a word (ThreeGsBackend.ts runPlyPipeline, found by reading at
+    // the stop).
+    const stand = deferredInitRenderer(1);
+    const plyEarlyBackend = new ThreeGsBackend({ renderer: stand.renderer });
+    const plyEarly = recordedLoad(plyEarlyBackend, { url: plyUrl });
+    await yieldPastFetching(plyEarlyBackend, plyEarly.handle, () => plyEarly.errors().length > 0);
+    await yieldAtMost(20, () => plyEarly.errors().length > 0);
+    const readsWhilePending = stand.reads.length;
+    const phaseWhilePending = plyEarlyBackend.progress(plyEarly.handle).phase;
+    stand.resolve();
+    await yieldAtMost(50, () => plyEarly.errors().length > 0);
+    assert(
+      "ply-limit-read-waits-for-renderer-init",
+      readsWhilePending === 0 && stand.reads.length > 0 && stand.reads.every((atInit) => atInit) &&
+        plyEarly.errors().length === 1 && plyEarly.errors()[0]!.reason === "over-capacity",
+      `init() calls=${stand.initCalls()}; while init pending: phase=${phaseWhilePending}, device-limit reads=${readsWhilePending}; after init: reads=${stand.reads.length} (init complete at each: [${stand.reads.join(",")}]); onError=${JSON.stringify(plyEarly.errors().map((e) => e.reason))}`,
+    );
+    try {
+      plyEarlyBackend.dispose(plyEarly.handle);
+    } catch (error) {
+      // Only the unfixed backend gets here: it built a mesh the stand-in cannot free.
+      if (!(error instanceof SplatBackendError)) throw error;
+    }
+
+    // PLY: a renderer whose init rejects fails the handle by name.
+    const plyInitFailBackend = new ThreeGsBackend({
+      renderer: { backend: {}, init: () => Promise.reject(new Error("stand-in renderer init failure")) },
+    });
+    const plyInitFail = recordedLoad(plyInitFailBackend, { url: plyUrl });
+    await yieldPastFetching(plyInitFailBackend, plyInitFail.handle, () => plyInitFail.errors().length > 0);
+    await yieldAtMost(50, () => plyInitFail.errors().length > 0);
+    assert(
+      "ply-renderer-init-failure-named",
+      plyInitFail.errors().length === 1 && plyInitFail.errors()[0]!.reason === "renderer-init-failed" &&
+        plyInitFail.loads() === 0 && plyInitFailBackend.progress(plyInitFail.handle).phase === "failed",
+      `onError=${JSON.stringify(plyInitFail.errors().map((e) => e.reason))}, onLoad=${plyInitFail.loads()}, seam phase=${plyInitFailBackend.progress(plyInitFail.handle).phase}`,
+    );
+    try {
+      plyInitFailBackend.dispose(plyInitFail.handle);
+    } catch (error) {
+      if (!(error instanceof SplatBackendError)) throw error;
+    }
+
+    // .rad on a REAL renderer nobody has initialized: the page budget reads
+    // the device limits inside RadPager's synchronous header hook, so without
+    // the wait the header lands first and the load dies rad-needs-renderer
+    // (2 of 2 on WebGPU at the stop). Chunk ranges are refused so no 213 MB
+    // download runs: reaching no-pages-available proves the budget was derived.
+    const refuseChunksOnly: typeof fetch = async (input, init) => {
+      if (parseRangeStart(getRangeHeader(init)) !== 0) return new Response(null, { status: 404 });
+      return fetch(input, init);
+    };
+    const raw = new WebGPURenderer({ antialias: false, forceWebGL });
+    const initializedAtLoad = (raw as unknown as { _initialized: boolean })._initialized;
+    const radEarlyBackend = new ThreeGsBackend({ renderer: raw, createDecodeWorker, pageBudgetOverride: pages, fetchImpl: refuseChunksOnly });
+    const radEarly = recordedLoad(radEarlyBackend, { url: ASSET });
+    {
+      const t0 = performance.now();
+      while (radEarly.errors().length === 0 && performance.now() - t0 < WAIT_BOUND_MS) await yieldMacrotask();
+    }
+    let budget = "none";
+    let budgetBackend = "";
+    try {
+      const d = radEarlyBackend.pagerDiagnostics(radEarly.handle);
+      budget = `${d.budget.pages} pages — ${d.budget.source}`;
+      budgetBackend = d.budget.backend;
+    } catch (error) {
+      budget = `pagerDiagnostics threw ${error instanceof SplatBackendError ? error.reason : String(error)}`;
+    }
+    const expectedBackend = forceWebGL ? "webgl2-fallback" : "webgpu";
+    assert(
+      "rad-load-before-renderer-init-derives-budget",
+      initializedAtLoad === false && radEarly.errors().length === 1 &&
+        radEarly.errors()[0]!.reason === "no-pages-available" && budgetBackend === expectedBackend,
+      `renderer initialized at load=${initializedAtLoad}; onError=${JSON.stringify(radEarly.errors().map((e) => e.reason))}; budget: ${budget} (expected backend ${expectedBackend})`,
+    );
+    radEarlyBackend.dispose(radEarly.handle);
+    raw.dispose();
+
+    // .rad: a renderer whose init rejects fails the handle by name, before
+    // any fetch — the header request itself waits for the renderer.
+    let radInitFailFetches = 0;
+    const countingRefuseChunks: typeof fetch = async (input, init) => {
+      radInitFailFetches++;
+      return refuseChunksOnly(input, init);
+    };
+    const radInitFailBackend = new ThreeGsBackend({
+      renderer: { backend: {}, init: () => Promise.reject(new Error("stand-in renderer init failure")) },
+      createDecodeWorker,
+      fetchImpl: countingRefuseChunks,
+    });
+    const radInitFail = recordedLoad(radInitFailBackend, { url: ASSET });
+    {
+      const t0 = performance.now();
+      while (radInitFail.errors().length === 0 && performance.now() - t0 < WAIT_BOUND_MS) await yieldMacrotask();
+    }
+    assert(
+      "rad-renderer-init-failure-named",
+      radInitFail.errors().length === 1 && radInitFail.errors()[0]!.reason === "renderer-init-failed" &&
+        radInitFailFetches === 0 && radInitFailBackend.progress(radInitFail.handle).phase === "failed",
+      `onError=${JSON.stringify(radInitFail.errors().map((e) => e.reason))}, fetches issued=${radInitFailFetches}, seam phase=${radInitFailBackend.progress(radInitFail.handle).phase}`,
+    );
+    try {
+      radInitFailBackend.dispose(radInitFail.handle);
+    } catch (error) {
+      if (!(error instanceof SplatBackendError)) throw error;
+    }
+  }
+
+  // ─── Ticket 09 Stop 7: a splat mesh answers no Raycaster hits ───
+  // three's stock raycast ignores instancing, so it tested the mesh's ONE
+  // template quad at the object's ORIGIN (bbox [-2,-2,0]..[2,2,0]) and handed
+  // the pin's author pickPoint phantom points off the splats — 9 rays gave 10
+  // hits on a 48-splat PLY and on the 7.9M hero alike (stop evidence). Until
+  // Phase 3 §B puts real picking behind backend.raycast, a splat mesh answers
+  // nothing (doc 06 D31). The plain-box control proves the rays and the harness
+  // do find hits. No paint needed: the mesh exists as soon as it is built.
+  {
+    const rayFetch: typeof fetch = async (input, init) => {
+      if (parseRangeStart(getRangeHeader(init)) !== 0) return new Response(null, { status: 404 });
+      return fetch(input, init);
+    };
+    const rayBackend = new ThreeGsBackend({ renderer: scene3.renderer, createDecodeWorker, pageBudgetOverride: pages, fetchImpl: rayFetch });
+    const raycaster = new Raycaster();
+    const NDC = [-0.5, 0, 0.5];
+    const countHits = (target: Group | Mesh): number => {
+      let hits = 0;
+      for (const x of NDC) {
+        for (const y of NDC) {
+          raycaster.setFromCamera(new Vector2(x, y), scene3.camera);
+          hits += raycaster.intersectObjects([target], true).length;
+        }
+      }
+      return hits;
+    };
+    const perFormat: string[] = [];
+    let splatHits = 0;
+    // Zero hits only means something if the splat mesh EXISTED when the rays
+    // were cast (review finding B2): a mesh that never attached answers nothing.
+    let meshesAttached = 0;
+    for (const [label, url] of [["ply", plyUrl], ["rad", ASSET]] as const) {
+      const handle = rayBackend.load({ url });
+      scene3.scene.add(handle.object);
+      // Bounded, non-throwing: the mesh is attached to the handle's group when
+      // the pipeline builds it (PLY after parse, .rad in the header hook).
+      const t0 = performance.now();
+      while (handle.object.children.length === 0 && performance.now() - t0 < WAIT_BOUND_MS) {
+        await yieldMacrotask();
+      }
+      const attached = handle.object.children.length > 0;
+      if (attached) meshesAttached++;
+      const hits = countHits(handle.object as Group);
+      splatHits += hits;
+      perFormat.push(`${label}: mesh attached=${attached}, hits=${hits}`);
+      scene3.scene.remove(handle.object);
+      rayBackend.dispose(handle);
+    }
+    const control = new Mesh(new BoxGeometry(1, 1, 1), new MeshBasicMaterial());
+    scene3.scene.add(control);
+    control.updateMatrixWorld();
+    const controlHits = countHits(control);
+    scene3.scene.remove(control);
+    control.geometry.dispose();
+    control.material.dispose();
+    assert(
+      "splat-meshes-answer-no-raycast-hits",
+      meshesAttached === 2 && splatHits === 0 && controlHits > 0,
+      `${NDC.length * NDC.length} rays per object through the origin — ${perFormat.join("; ")}; plain-box control hits=${controlHits}`,
+    );
   }
 
   // ─── AC3: reveal at the seam's ready, true fraction, eviction mid-load ───

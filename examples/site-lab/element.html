@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>element-events — &lt;splat-site&gt; event proof (ticket 09 AC5)</title>
+  <style>
+    html, body { margin: 0; background: #111; color: #ccc; font: 13px/1.5 ui-monospace, monospace; }
+    body { padding: 280px 16px 16px; }
+    #viewer { position: fixed; left: 0; top: 0; width: 512px; height: 256px; }
+    splat-site { display: block; width: 100%; height: 100%; }
+    #out pre { white-space: pre-wrap; word-break: break-word; }
+  </style>
+  <script>
+    // Ticket 09 Stop 11: `?webgl=1` hides navigator.gpu before any toolkit
+    // module loads, so a WebGPU-capable browser takes the fallback path a
+    // visitor without WebGPU would. Harmless on the sparkjs side, which is
+    // WebGL-only.
+    if (new URLSearchParams(location.search).get("webgl") === "1") {
+      Object.defineProperty(navigator, "gpu", { value: undefined, configurable: true });
+    }
+  </script>
+</head>
+<body>
+  <div id="viewer"></div>
+  <div id="out"></div>
+  <script type="module" src="./element.ts"></script>
+</body>
+</html>

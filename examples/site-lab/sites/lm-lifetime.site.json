@@ -1,0 +1,221 @@
+{
+  "version": 1,
+  "name": "lm-lifetime",
+  "settings": {
+    "blocks": { "takeover": false }
+  },
+  "scenes": [
+    {
+      "id": "hero",
+      "url": "/@fs/D:/Projects/sparkjs-toolkit/examples/assets/lab-sh1-sparsity.rad",
+      "paged": true,
+      "extSplats": true,
+      "eulerRotationDeg": [0, 0, 0]
+    }
+  ],
+  "stops": [
+    {
+      "id": "overview",
+      "label": "Overview",
+      "camera": {
+        "yaw": 0,
+        "pitch": -10,
+        "distance": 6,
+        "pivot": { "x": 0, "y": 0, "z": 0 }
+      }
+    },
+    {
+      "id": "workbench",
+      "label": "The workbench",
+      "camera": {
+        "yaw": 120,
+        "pitch": -5,
+        "distance": 3,
+        "pivot": { "x": 0, "y": 0, "z": 0 }
+      }
+    }
+  ],
+  "obstacles": [],
+  "styles": [
+    { "id": "body", "name": "Body", "base": {} },
+    {
+      "id": "caption-body",
+      "name": "Caption Body",
+      "basedOn": "body",
+      "base": { "color": "#ffffff", "measurePx": 278 }
+    }
+  ],
+  "blocks": [
+    {
+      "id": "curator-note",
+      "content": "CURATOR PANEL. An author-built screen panel at slot right — the demoted option, fully functional: nothing seeds these any more, but an author who wants an edge panel builds one exactly like this.",
+      "space": "screen",
+      "presentation": "panel",
+      "styleId": "caption-body",
+      "binding": {},
+      "placement": { "slot": "right", "order": 1 },
+      "transitionMs": 200
+    }
+  ],
+  "annotations": [
+    {
+      "id": "plain",
+      "anchor": [2.108, 0.486, 0.316],
+      "radius": 0.35,
+      "copy": {
+        "title": "The plain marker",
+        "body": "No rules at all: this copy floats right here, stays through travel, and clicking the marker again closes it."
+      }
+    },
+    {
+      "id": "poster",
+      "anchor": [-2.37, 0.753, -1.682],
+      "radius": 0.3,
+      "copy": {
+        "title": "The poster",
+        "body": "An authored payoff that ends on arrival at a stop — open it, then travel, and it is gone when you land."
+      },
+      "rules": [
+        {
+          "on": "activate",
+          "do": [
+            {
+              "kind": "show-blocks",
+              "blocks": ["annotation-poster-effect-1"],
+              "template": { "space": "world", "at": "annotation" },
+              "lifetime": { "until": "travel" }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "keepsake",
+      "anchor": [0.0, 0.6, 1.4],
+      "radius": 0.3,
+      "copy": {
+        "title": "The keepsake",
+        "body": "Nothing else ends this one — not a second activation, not travel, not a condition. Only Escape."
+      },
+      "rules": [
+        {
+          "on": "activate",
+          "do": [
+            {
+              "kind": "show-blocks",
+              "blocks": ["annotation-keepsake-effect-1"],
+              "template": { "space": "world", "at": "annotation" },
+              "lifetime": { "until": "dismiss" }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "sentinel",
+      "anchor": [0.9, 0.2, -1.1],
+      "radius": 0.3,
+      "copy": {
+        "title": "The sentinel",
+        "body": "Never ends on its own — but takeover and Escape still remove it, because neither is the content ending by itself."
+      },
+      "rules": [
+        {
+          "on": "activate",
+          "do": [
+            {
+              "kind": "show-blocks",
+              "blocks": ["annotation-sentinel-effect-1"],
+              "template": { "space": "world", "at": "annotation" },
+              "lifetime": "forever"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "tourguide",
+      "anchor": [-0.8, 1.1, 0.4],
+      "radius": 0.3,
+      "copy": {
+        "title": "The tour guide",
+        "body": "Stays while the scene is in tour; leaving the tour ends it. Coming back does not bring it back — a new activation does."
+      },
+      "rules": [
+        {
+          "on": "activate",
+          "do": [
+            {
+              "kind": "show-blocks",
+              "blocks": ["annotation-tourguide-effect-1"],
+              "template": { "space": "world", "at": "annotation" },
+              "lifetime": { "while": { "state": "tour" } }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "ghost",
+      "anchor": [1.4, 0.9, -0.6],
+      "radius": 0.3,
+      "copy": {
+        "title": "The ghost",
+        "body": "Stays while the visitor is at Overview; the moment the rail departs it is gone, because travelling is not at any stop."
+      },
+      "rules": [
+        {
+          "on": "activate",
+          "do": [
+            {
+              "kind": "show-blocks",
+              "blocks": ["annotation-ghost-effect-1"],
+              "template": { "space": "world", "at": "annotation" },
+              "lifetime": { "while": { "stop": "overview" } }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "curator",
+      "anchor": [-1.6, 0.4, 1.1],
+      "radius": 0.3,
+      "copy": {
+        "title": "The curator",
+        "body": "Shows an author-built screen panel at the right edge — the demoted option, deliberately recreated."
+      },
+      "rules": [
+        {
+          "on": "activate",
+          "do": [
+            {
+              "kind": "show-blocks",
+              "blocks": ["curator-note"]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "rig",
+      "anchor": [0.5, 1.4, 0.8],
+      "radius": 0.25,
+      "copy": {
+        "title": "Rig probe",
+        "body": "Names lmRigHandle, which only the rig registers — activated once at rig start to capture the runtime handle; occupies no channel, so it disturbs nothing."
+      },
+      "rules": [
+        {
+          "on": "activate",
+          "do": [
+            {
+              "kind": "custom",
+              "handler": "lmRigHandle"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,92 @@
+{
+  "version": 1,
+  "name": "throw-duplicate-show-blocks",
+  "scenes": [
+    {
+      "id": "hero",
+      "url": "/@fs/D:/Projects/sparkjs-toolkit/examples/assets/lab-sh1-sparsity.rad",
+      "paged": true,
+      "extSplats": true
+    }
+  ],
+  "stops": [
+    {
+      "id": "only",
+      "label": "Only",
+      "camera": {
+        "yaw": 0,
+        "pitch": -10,
+        "distance": 6,
+        "pivot": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        }
+      }
+    }
+  ],
+  "blocks": [
+    {
+      "id": "note-a",
+      "content": "A block the author wrote.",
+      "space": "world",
+      "presentation": "plane",
+      "binding": {},
+      "placement": {
+        "position": [
+          0,
+          1,
+          0
+        ]
+      }
+    },
+    {
+      "id": "note-b",
+      "content": "A block the author wrote.",
+      "space": "world",
+      "presentation": "plane",
+      "binding": {},
+      "placement": {
+        "position": [
+          0,
+          1,
+          0
+        ]
+      }
+    }
+  ],
+  "annotations": [
+    {
+      "id": "marker",
+      "anchor": [
+        0,
+        0,
+        0
+      ],
+      "radius": 0.3,
+      "copy": {
+        "title": "Marker",
+        "body": "Copy."
+      },
+      "rules": [
+        {
+          "on": "activate",
+          "do": [
+            {
+              "kind": "show-blocks",
+              "blocks": [
+                "note-a"
+              ]
+            },
+            {
+              "kind": "show-blocks",
+              "blocks": [
+                "note-a"
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

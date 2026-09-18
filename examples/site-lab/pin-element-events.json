@@ -1,0 +1,37 @@
+{
+  "provenance": {
+    "toolkit": "sparkjs-toolkit",
+    "commit": "fd67153",
+    "captured": "2026-09-17",
+    "site": "examples/site-lab/sites/lab.site.json — byte-identical on both sides (sha256 61375c0b9db881e3…)",
+    "how": "git archive fd67153 into a scratch dir on D: + a node_modules junction (read-only; sparkjs untouched), vite dev on :5180 with a harness-only config, driven by THIS directory's element.ts unchanged",
+    "status": "A repeat-run CONVENIENCE, never the evidence of record. Ticket 09's evidence for AC5 is the live two-sided run quoted verbatim in its Comments; this file lets later runs compare without standing the pinned toolkit up again."
+  },
+  "sequenceCollapsed": [
+    ["loadstart", 1],
+    ["loadprogress", 23],
+    ["ready", 1],
+    ["stopchanged", 1]
+  ],
+  "shapes": {
+    "loadstart": "{loadId:number,src:string}",
+    "loadprogress": "{progress:number}",
+    "ready": "{initialStop:object,loadId:number,name:string,src:string,stopCount:number}",
+    "stopchanged": "{id:string,index:number,label:string}"
+  },
+  "ready": {
+    "loadId": 1,
+    "name": "portfolio-lab-p0-scaffold",
+    "initialStop": { "index": 0, "id": "overview", "label": "Overview" },
+    "stopCount": 3
+  },
+  "stopchanged": [{ "index": 2, "id": "shelf", "label": "The shelf" }],
+  "loadprogress": {
+    "count": 23,
+    "monotone": true,
+    "ones": 2,
+    "first": 0,
+    "last": 1,
+    "note": "The pin throttles to one report per 80 ms and chases the raw ratio, and it emits the final 1 TWICE (the throttled report and the ready branch). Ruling Stop 5 (P1) replaced that stream with report-on-rise and exactly one 1 — doc 06 D29 item 2. Values and counts are therefore NOT compared; the sequence of event TYPES, the payload shapes, and the ready/stopchanged values are."
+  }
+}

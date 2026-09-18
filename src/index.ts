@@ -3,14 +3,15 @@
 // exports under the SAME name; the deferred sources are listed below so the
 // trim is visible, not silent. Each later phase restores its names.
 //
-// ─── DEFERRED SOURCES (13 — the graph makes a full same-names barrel
-//     impossible until Phase 4; doc 04 / ticket 11) ───
-// Phase 2: embed/SiteRuntime (createSiteRuntime, engagementSwitches, …)
-//          embed/diagWiring (wireLoadTelemetry, LOAD_TELEMETRY_MARKER, …)
-//          embed/SplatSiteElement (defineSplatSite + event/bridge types)
-//          embed/FragmentRouter (parseFragment, connectSiteRouting, …)
-//          core/StatsHUD (StatsHUD)
-//          core/SplatBounds (computeSplatBounds)
+// ─── DEFERRED SOURCES (9 of the original 13 — the graph makes a full
+//     same-names barrel impossible until Phase 4; doc 04 / ticket 11. The four
+//     embed sources returned with Phase 2 ticket 09: embed/diagWiring (ruling
+//     Stop 1), embed/SiteRuntime, embed/SplatSiteElement and
+//     embed/FragmentRouter (ruling Stop 13, verbatim from the pin)) ───
+// Phase 2 (ticket 11): core/StatsHUD (StatsHUD)
+//          core/SplatBounds (computeSplatBounds — a D30 stub exists in-tree so
+//          SiteRuntime compiles; per the D19 precedent its BARREL name returns
+//          with ticket 11's rebuild, not as a stub)
 // Phase 3: core/SplatLoader (loadSplatAsync only — loadSplat returned with
 //          ticket 08; loadSplatAsync is a named refusal until SceneComposer's
 //          ticket settles it (ruling 08-S4), and per the D19 precedent a
@@ -107,8 +108,60 @@ export { AuthorGizmo, type AuthorGizmoConfig, type AuthorGizmoMode, type AuthorG
 export { geodeticToScene, sceneToGeodetic, bearingDistance, type GeoAnchor } from "./locative/GeoAnchor";
 export { GeoContext, DEMO_PLACES, type PlaceInfo, type PlaceTier, type PlaceSource, type GeoContextConfig } from "./locative/GeoContext";
 
+// ─── Embed: the <splat-site> element, the runtime it boots and the host-side
+//     router ─── verbatim from the pin (ticket 09 ruling Stop 13); the
+//     re-typed members of SiteRuntimeHandle / LoadedScene are doc 06 D28.
+export { defineSplatSite } from "./embed/SplatSiteElement";
+export type {
+  SplatSiteElement,
+  SplatSiteEventMap,
+  SplatSiteReadyState,
+  SplatSiteReadyDetail,
+  SplatSiteStopDetail,
+  SplatSiteHotspotDetail,
+  SplatSiteSelectionDetail,
+  SplatSiteEngagementDetail,
+  SplatSiteMemoryDetail,
+  SplatSiteLinkActivateDetail,
+  SplatSiteRuleHandler,
+  SplatSiteLoadStartDetail,
+  SplatSiteLoadErrorDetail,
+  SplatSiteLoadProgressDetail,
+  SplatSiteBridgeCommand,
+  SplatSiteBridgeMessage,
+  SplatSiteBridgeState,
+} from "./embed/SplatSiteElement";
+export { createSiteRuntime, engagementSwitches, type EngagementState, type EngagementSwitches, type SiteRuntimeOptions, type SiteRuntimeHandle, type LoadedScene, type SiteReadyDetail, type SiteStopDetail, type SiteHotspotDetail, type SiteSelectionDetail, type SiteMemoryDetail, type SiteLinkActivateDetail } from "./embed/SiteRuntime";
+// Host-side URL routing. `location` stays host-owned (spec §5.2), so the router
+// is an exported helper that talks to the element through its typed command API
+// and typed events — the embed itself never reads or writes global state.
+export {
+  parseFragment,
+  formatFragment,
+  connectSiteRouting,
+  ROUTED_KINDS,
+  type RouteTarget,
+  type SiteRoutingOptions,
+  type SiteRoutingHandle,
+  type SiteRoutingResult,
+} from "./embed/FragmentRouter";
+
 // ─── Diagnostics (runtime surface only — dev tooling stays off the barrel,
 //     matching the sparkjs doctrine) ───
+// Load-telemetry runtime surface (spec §3): status/config types and the wiring
+// entry only. Development tooling is deliberately NOT in this barrel — it
+// ships behind the diagnostics/dev subpath.
+export {
+  wireLoadTelemetry,
+  LOAD_TELEMETRY_MARKER,
+  type SiteTelemetryOptions,
+  type TelemetryCameraSample,
+  type TelemetryWiringStatus,
+  type TelemetrySceneStatus,
+  type LoadTelemetryHandle,
+  type WireLoadTelemetryInput,
+  type RegisterPagedSceneInput,
+} from "./embed/diagWiring";
 export { LoadCoordinator, type SceneRegistration } from "./diag/LoadCoordinator";
 export type { ConsentDecisions, LoadProbeAttachResult } from "./diag/LoadProbe";
 export type { LoadRecordRevision } from "./diag/LoadRecord";

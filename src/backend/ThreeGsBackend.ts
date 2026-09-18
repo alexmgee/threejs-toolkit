@@ -292,6 +292,22 @@ function fail(state: HandleState, reason: string, message: string): void {
   notifyObserver(state.onFailure, error);
 }
 
+/**
+ * A splat mesh answers NO Raycaster hits until Phase 3 §B puts real picking
+ * behind `backend.raycast` (ticket 09 Stop 7, doc 06 D31). three's stock
+ * Mesh.raycast ignores instancing, so it tests this mesh's ONE template quad
+ * at the object's origin (4 vertices, object-space bbox [-2,-2,0]..[2,2,0])
+ * and answers with points that have nothing to do with the splats — measured
+ * on both backends: 9 rays through the origin gave 10 hits on a 48-splat PLY
+ * and on the 7.9M-splat hero alike, at points outside the splat bounds. The
+ * pin's author `pickPoint` takes the first hit, so those phantom points were
+ * placing hotspots, boxes and props. Refusing to answer is the honest state
+ * while the capability is a named refusal.
+ */
+function refuseStockRaycast(mesh: GaussianSplatMesh): void {
+  mesh.raycast = () => {};
+}
+
 /** Observer calls are isolated (ruling S3): a consumer bug must neither
  *  fail the load under a misleading reason nor make fail() throw. */
 function notifyObserver<T>(observer: ((value: T) => void) | undefined, value: T): void {
@@ -589,8 +605,12 @@ export class ThreeGsBackend implements SplatBackend {
     let backendName: PageBudget["backend"];
     if (backend?.isWebGLBackend === true) {
       backendName = "webgl2-fallback";
-      const gl = backend.gl as WebGL2RenderingContext | undefined;
-      if (gl === undefined || typeof gl.getParameter !== "function") {
+      const gl = backend.gl as WebGL2RenderingContext | null | undefined;
+      // `== null`: three sets WebGLBackend.gl = null before init, which the
+      // old `=== undefined` let through to a TypeError instead of this named
+      // refusal. Unreachable in normal flow since awaitRendererInit (ticket 09
+      // Stop 10) — corrected for the named-refusal contract, not a live path.
+      if (gl == null || typeof gl.getParameter !== "function") {
         throw new SplatBackendError("rad-needs-renderer", "WebGL2 backend exposes no gl context for MAX_TEXTURE_SIZE");
       }
       const maxTex = gl.getParameter(gl.MAX_TEXTURE_SIZE) as number;
@@ -634,7 +654,36 @@ export class ThreeGsBackend implements SplatBackend {
     return { pages, pLimits, pAsset, override, source, backend: backendName };
   }
 
+  /**
+   * Device limits exist only after the renderer's init, and a consumer may
+   * load before that settles — the pin's SiteRuntime loads during
+   * construction (ticket 09 Stop 10, owner ruling 2026-09-17). Await the
+   * renderer's OWN init promise (three's `init()` returns the same promise
+   * once started) before any limit read. Resolves false when the handle is
+   * done for: init rejected (failed by name, "renderer-init-failed") or the
+   * handle was disposed meanwhile. A renderer with no init() is left as it
+   * was — the limit read names what is missing.
+   */
+  private async awaitRendererInit(state: HandleState): Promise<boolean> {
+    const renderer = this.renderer as { init?: unknown } | null | undefined;
+    if (typeof renderer?.init === "function") {
+      try {
+        await (renderer.init as () => Promise<unknown>).call(renderer);
+      } catch (error) {
+        if (this.checkDisposed(state)) return false;
+        const detail = error instanceof Error ? error.message : String(error);
+        fail(state, "renderer-init-failed", `renderer init failed — ${detail}`);
+        return false;
+      }
+    }
+    return !this.checkDisposed(state);
+  }
+
   private async runRadPipeline(url: string, state: HandleState): Promise<void> {
+    // The page budget reads device limits inside RadPager's SYNCHRONOUS
+    // header hook, so the renderer is awaited before the header fetch starts
+    // — the last point that still precedes the read.
+    if (!(await this.awaitRendererInit(state))) return;
     const createWorker = this.createDecodeWorker!;
     const pager = new RadPager(url, {
       createWorker,
@@ -687,6 +736,7 @@ export class ThreeGsBackend implements SplatBackend {
           );
           // Fork patch 2: selection-aware sort (07-S1) — before the first render.
           installSelectionSort(pagedMesh.mesh);
+          refuseStockRaycast(pagedMesh.mesh);
           // Frustum culling through public API: three tests the draw
           // geometry's bounding sphere, which setBounds keeps over the
           // resident pages' AABB union (doc 03 §F).
@@ -1222,6 +1272,10 @@ export class ThreeGsBackend implements SplatBackend {
       validateSplatPlyHeader(header);
       const degree = detectSphericalHarmonicsDegree(header);
       const vertexCount = parseVertexCount(header);
+      // Wait for the renderer before reading its device limit: read before
+      // init, the limit was absent and the WebGPU pre-check below was skipped
+      // without a word (ticket 09 Stop 10).
+      if (!(await this.awaitRendererInit(state))) return;
       const limit =
         this.maxStorageBufferBindingSizeOverride ??
         (this.renderer as { backend?: { device?: { limits?: { maxStorageBufferBindingSize?: number } } } })
@@ -1306,6 +1360,8 @@ export class ThreeGsBackend implements SplatBackend {
         }
         return;
       }
+
+      refuseStockRaycast(mesh);
 
       mesh.onAfterRender = () => {
         if (state.progress.phase === "ready") return;

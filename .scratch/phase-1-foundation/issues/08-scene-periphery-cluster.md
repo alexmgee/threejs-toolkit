@@ -66,6 +66,12 @@ Controls / PropLayer):**
 1. `import type { SparkScene }` → `ThreeSplatScene`; the public `sparkScene`
    field/config-key NAME is KEPT (consumed by Phase 2's SiteRuntime copy —
    renaming is ticket 11's naming ruling's business, not this port's).
+   **CORRECTED 2026-09-17 (Phase 2 ticket 09, Stop 12; doc 06 D28):** the
+   stated reason was wrong — the pin's SiteRuntime never constructs
+   EnvironmentLoader. The key's real consumers are SceneComposer, CropTool and
+   DebugPanel (Phase 3) and pin example pages
+   (`fd67153:examples/composer/main.ts:44-47`). The name stays, on D12 (strict
+   source compatibility); ticket 11's D24 ruled the barrel name only.
 2. PMREMGenerator imported from `three/webgpu` (AC (a)): the node generator
    (renderers/common/extras) serves both the WebGPU backend and the facade's
    WebGL2 fallback; core three's class calls WebGL-only renderer methods.

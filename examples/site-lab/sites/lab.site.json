@@ -1,0 +1,78 @@
+{
+  "version": 1,
+  "name": "portfolio-lab-p0-scaffold",
+  "scenes": [
+    {
+      "id": "hero",
+      "url": "/@fs/D:/Projects/sparkjs-toolkit/examples/assets/lab-sh1-sparsity.rad",
+      "paged": true,
+      "extSplats": true,
+      "eulerRotationDeg": [
+        0,
+        0,
+        0
+      ]
+    }
+  ],
+  "stops": [
+    {
+      "id": "overview",
+      "label": "Overview",
+      "camera": {
+        "yaw": 0,
+        "pitch": -10,
+        "distance": 6,
+        "pivot": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        }
+      }
+    },
+    {
+      "id": "workbench",
+      "label": "The workbench",
+      "camera": {
+        "yaw": 120,
+        "pitch": -5,
+        "distance": 3,
+        "pivot": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        }
+      },
+      "explore": "bounded"
+    },
+    {
+      "id": "shelf",
+      "label": "The shelf",
+      "camera": {
+        "yaw": 240,
+        "pitch": 0,
+        "distance": 4,
+        "pivot": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        }
+      }
+    }
+  ],
+  "obstacles": [],
+  "annotations": [
+    {
+      "id": "drone",
+      "anchor": [
+        -0.18232221760239997,
+        -1.0798091171505955,
+        -1.3643750333290507
+      ],
+      "radius": 0.35,
+      "copy": {
+        "title": "The drone",
+        "body": "[Placeholder \u2014 authored in P3.]"
+      }
+    }
+  ]
+}

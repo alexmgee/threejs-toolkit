@@ -353,6 +353,126 @@ one hand-picked, and its signals read residency (resident/wanted) or splat-count
 growth, which §A5 forbids. That revisit needs its own evidence and ruling; no
 constant may be smuggled in under this entry.
 
+**D27 — DECIDED (2026-09-17, OWNER RULED at Phase 2 ticket 09's Stop 2):
+`interact/SplatHighlight` ships as an API-preserving INERT stub until Phase 3.**
+SiteRuntime constructs the highlight unconditionally on every boot
+(`fd67153:src/embed/SiteRuntime.ts:3192`), and the real class value-imports
+Spark's SplatEdit family (`fd67153:src/interact/SplatHighlight.ts:10-15`), so it
+can be neither copied nor rebuilt before Phase 3's edit layer (doc 03 §C, doc 04
+Phase 3). The stub mirrors the pin's exported names and public members exactly
+and does nothing: marker hover glow is ABSENT until Phase 3 — a declared
+divergence, announced by ONE named note in author mode (printed by SiteRuntime,
+which knows the mode) and by no visitor-facing warning (ticket 08 S5's test: a
+warning that fires on every normal load is a broken warning). Unlike D19's
+`SplatTextMesh` stub it does NOT throw: D19's throwing constructor is safe only
+because the splat-text lane is reached conditionally, while a throwing stub that
+SiteRuntime constructs unconditionally would kill every boot. SAME OBLIGATION AS
+D19: Phase 3 DELETES this file and replaces it; never left beside real code. The
+barrel name stays deferred (D19 precedent: no stub in the barrel). Detail:
+ticket 09 Comments.
+
+**D28 — DECIDED (2026-09-17, OWNER RULED at Phase 2 ticket 09's Stop 12):
+SiteRuntime's handle keeps the pin's member NAMES, re-typed honestly.**
+`SiteRuntimeHandle.sparkScene` is typed `ThreeSplatScene`; `LoadedScene.mesh` is
+the `THREE.Object3D` the backend hands over (a group holding the splat mesh), with
+a new `handle: SplatHandle` beside it; `LoadedScene.paged` derives from the file
+format (a `.rad` is paged), and an authored `paged` is passed through, accepted and
+warned per ticket 08's S5 when it contradicts. Grounds: D12 (strict source
+compatibility — what makes the sibling swap a one-line dependency change): readers
+of `sparkScene.scene` / `.camera` / `.canvas` / `.renderer` compile unchanged. D24
+ruled only the BARREL type name, because an alias would misrepresent the class;
+here the type is honest and only the member name is inherited. Precedent: phase-1
+ticket 08 kept EnvironmentLoader's `sparkScene` config-key name typed
+`ThreeSplatScene`. Cost accepted: the names no longer match the types, and `mesh`
+is a group. The H-API divergence is in these members' TYPES: code calling Spark
+members on them breaks at compile time, loudly. PRECEDENT'S REASON CORRECTED
+(found at this stop): phase-1 ticket 08 kept the name as "consumed by Phase 2's
+SiteRuntime copy", but the pin's SiteRuntime never constructs EnvironmentLoader;
+the `sparkScene` config key's real consumers are SceneComposer, CropTool and
+DebugPanel (Phase 3) and pin example pages (`fd67153:examples/composer/main.ts:44-47`).
+The kept name stands on D12, not on that reason. Detail: ticket 09 Comments.
+
+**D29 — DECIDED (2026-09-17, OWNER RULED at Phase 2 ticket 09's Stops 4e, 4f, 5
+and 8): SiteRuntime's declared behavioural divergences from the pin** (H-API:
+divergences are allowed only via doc 06 entries). Pin lines are
+`fd67153:src/embed/SiteRuntime.ts`.
+1. **Docked-idle render throttle (Stop 4f, T1).** `ThreeSplatScene` carries the
+   pin's `throttleGate` (+ read-only `renderCount` / `throttled`). The refinement
+   guard reads the seam: a paged scene is still refining while
+   `progress().fraction < 1` (the pin read resident < wanted from Spark pager
+   internals, `:3444-3453`). More conservative than the pin: throttling waits for
+   the whole file, and under a constrained page budget the paged fraction never
+   reaches 1 (0.5082 under `?pages=32`, ticket 06), so capped sites never throttle.
+   Never refinement-starving; zero constants. REVISIT OWNER: ticket 12 notes whether
+   its diagnostics door can offer a seam-legal "wanted" signal; ticket 13's
+   idle-power / H-LOAD evidence decides whether that signal (T2) is ever warranted.
+   REJECTED BY NAME: T4, a gate without the refinement guard — the pin's own
+   documented bug (`:3433-3443`).
+2. **Site load progress (Stop 5, P1).** The slowest scene across ALL scenes (a
+   revealed scene counts 1), reported only when it rises, exactly one 1 at the last
+   reveal; ready is pin-identical (`:2596-2605`). NOT reproduced: (a) idle 1-spam —
+   a site with no paged scene reported `1` every 80 ms before ready, because the
+   report loop skips non-paged scenes (`:2585-2594`); (b) the double 1 — when the
+   last scene reveals, the throttled report can send 1 and the ready branch sends 1
+   again (`:2585-2599`). The pin's 80 ms report interval (`:2476`, a D26 reference
+   constant) is not carried. `<splat-site>` emits one `loadprogress` per report, so
+   this shapes the element's event stream.
+3. **Locative tint and the boot catch (Stop 8, R1 + K2).** A white tint is a no-op
+   by value and skips silently; a non-white tint skips with ONE author-mode note
+   (Phase 4's `setMeshColor` owns the real tint). The pin's `.catch(() => {})` after
+   `whenFontsReady(...).then(...)` (`:3365-3375`) is narrowed to the font promise's
+   own rejection — a divergence in failure VISIBILITY only. Grounds: the pin's
+   catch-all is exactly the mechanism that would have swallowed the tint loss.
+4. **Rail depth of field (Stop 4e).** The Spark optics writes (`:887-892`) are
+   skipped and `fov` still applies; ONE author-mode note the first time a stop asks
+   for aperture > 0. Phase 5 owns optics.
+5. **Author-mode obstacle outlines (Stop 15, L-A).** The pin's classic
+   `LineSegments2` + `LineMaterial` (`:3550-3554`) become three's WebGPU pair —
+   `lines/webgpu/LineSegments2` + `Line2NodeMaterial`, which take the pin's own
+   parameters (`color`, `linewidth`, `worldUnits`) and share `LineSegmentsGeometry`.
+   A renderer-migration adaptation of the kind doc 01 counts, not a feature change.
+   Measured in site-lab on BOTH backends: with the classic pair, three logs
+   `NodeBuilder: Material "LineMaterial" is not compatible.` and substitutes a plain
+   node material that floods the frame (266 of 527 sampled pixels change on WebGL2);
+   with the node pair, zero such errors and a real outline (27 of 527 sampled pixels
+   on WebGPU, 10 of 527 on WebGL2, at the authored colour `[74,222,128]`). The named
+   alternative if this pair ever fails is plain `LineSegments` + `LineBasicMaterial`
+   at 1 px — never a silent substitution.
+Detail and evidence: ticket 09 Comments.
+
+**D30 — DECIDED (2026-09-17, OWNER RULED at Phase 2 ticket 09's Stop 3):
+`core/SplatBounds` ships as an API-preserving typed stub until ticket 11.** The
+pin's module samples splat centres through Spark's `forEachSplat`
+(`fd67153:src/core/SplatBounds.ts`), which this backend does not expose; ticket 11
+rebuilds it on the backend's resident-page union. The stub keeps the pin's exported
+names (`SplatBoundsOptions` verbatim, `computeSplatBounds` with the mesh parameter
+widened) and returns `null` — the pin's OWN documented outcome ("Returns null when
+no splat data is readable yet — callers treat null as 'no bounds'", pin :12-14). It
+is silent for the same reason D27's stub is: the one consumer branch cannot be
+reached in Phase 2. SiteRuntime calls it only from `sphereFromObject` (pin :3758-3771)
+behind an `isSplatMesh` duck-type that the vendored mesh never satisfies (it sets
+`isGaussianSplatMesh`, `GaussianSplatMesh.js:121`), and the only pin objects that
+satisfy it are splat-text meshes, which D19's throwing stub keeps from existing until
+Phase 4. SAME OBLIGATION AS D19 AND D27: ticket 11 DELETES this file and replaces it;
+never left beside real code. The barrel name stays deferred until then. Detail:
+ticket 09 Comments.
+
+**D31 — DECIDED (2026-09-17, OWNER RULED at Phase 2 ticket 09's Stop 7): the
+backend neutralizes three's stock raycast on its splat meshes until Phase 3 §B.**
+Measured at the stop (both backends, camera 3 units from the origin): 9 rays gave 10
+hits on a 48-splat PLY and on the 7.9 M-splat hero alike, all on the mesh's own
+template quad (`InstancedBufferGeometry`, position count 4, bbox `[-2,-2,0]..[2,2,0]`)
+— three's raycast ignores instancing, so it tests one quad at each mesh's origin. The
+hits land off the splats (a PLY hit at y 0.866 against splat bounds of ±0.225), and the
+pin's author `pickPoint` returns the first hit, so hotspot/box/prop placement silently
+landed on a phantom plane. A splat mesh therefore answers no `Raycaster` hits at all
+until §B puts real picking behind `backend.raycast`; SiteRuntime announces the gap once,
+in author mode, at the first `pickPoint`. Fixed in the backend, where the wrong answer is
+produced, on the same grounds as ticket 09 Stop 10. CONSEQUENCE for the Phase 0 record:
+`docs/plan/results/phase-0.md`'s "Raycast absence: CONFIRMED empirically … 0 hits" holds
+only for rays that MISS that quad — corrected there with a dated note. Detail: ticket 09
+Comments.
+
 **sRGB constraint — ACCEPTED (2026-08-20, ticket 03 close):** with the doc 04
 sRGB working space set (core/colorSpace.ts), assigning
 `renderer.outputColorSpace` on a CLASSIC WebGLRenderer throws inside three —

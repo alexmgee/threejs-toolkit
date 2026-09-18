@@ -1,0 +1,43 @@
+{
+  "version": 1,
+  "name": "obstacle",
+  "scenes": [
+    {
+      "id": "fixture",
+      "url": "/examples/assets/splat-lab/fixture.ply"
+    }
+  ],
+  "stops": [
+    {
+      "id": "only",
+      "label": "Only",
+      "camera": {
+        "yaw": 0,
+        "pitch": -10,
+        "distance": 6,
+        "pivot": {
+          "x": 0,
+          "y": 0,
+          "z": 0
+        }
+      }
+    }
+  ],
+  "obstacles": [
+    {
+      "id": "crate",
+      "min": [
+        -2,
+        -1.2,
+        -2
+      ],
+      "max": [
+        2,
+        1.2,
+        2
+      ],
+      "color": "#4ade80",
+      "lineWidth": 3
+    }
+  ]
+}
