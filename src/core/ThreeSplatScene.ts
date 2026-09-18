@@ -253,12 +253,19 @@ export class ThreeSplatScene {
     this.clock.disconnect();
     this.onFrameCallback = undefined;
     this.canvas.remove();
-    // three's Renderer.dispose() is a documented no-op while uninitialized
-    // (_initialized === false guard), so always defer teardown until init
-    // settles — `ready` always settles, an already-settled promise runs
-    // this on the next microtask, and the continuation above early-returns
-    // on `disposed`, so nothing renders in between (review finding; one
-    // path, not two, so future teardown edits can't miss a branch).
-    void this.ready.catch(() => {}).then(() => this.renderer.dispose());
+    // three's Renderer.dispose() frees nothing while uninitialized (its
+    // internals sit behind an `_initialized === true` guard), so teardown
+    // waits for init to settle — `ready` always settles, an already-settled
+    // promise runs this on the next microtask, and the continuation above
+    // early-returns on `disposed`, so nothing renders in between (review
+    // finding; one call site, so future teardown edits can't miss a branch).
+    // After a FAILED init it must not run at all: dispose() still ends with
+    // setAnimationLoop(null), which is async and awaits init() again — the
+    // stored rejected promise — unobserved, firing unhandledrejection; a
+    // failed init also left nothing to free (ticket 09 review finding 2).
+    void this.ready.then(
+      () => this.renderer.dispose(),
+      () => {},
+    );
   }
 }

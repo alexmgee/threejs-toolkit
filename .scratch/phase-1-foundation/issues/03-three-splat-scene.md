@@ -244,3 +244,11 @@ all record gaps closed at close):**
   guarded; HMR dispose also removes the status bar; dispose-mid-capture
   rejection labeling accepted as a documented cosmetic residual. Final gate
   after sweep fixes: TRUE exit 0, 46 modules / 65 deps.
+
+**CORRECTED 2026-09-17 (Phase 2 ticket 09, review finding 2 — its own commit by owner ruling):**
+`dispose()` after a FAILED init fired `unhandledrejection`. The deferred teardown called three's
+`Renderer.dispose()` whether init succeeded or not, and that method is not a no-op while
+uninitialized: it skips its internals but still ends with the async `setAnimationLoop(null)`, which
+awaits `init()` again — the stored rejected promise — unobserved. The teardown now runs only
+after a successful init (a failed init left nothing to free); the comment's "documented no-op" claim
+is corrected. Probe and evidence: ticket 09 Comments, "Finding 2".

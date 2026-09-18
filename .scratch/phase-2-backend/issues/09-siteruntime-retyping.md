@@ -881,3 +881,29 @@ artifact, not evidence that fetching stopped.
 **Status change: done — all nine ACs met (2026-09-17).** Evidence per AC in the blocks above; the
 review fixes are green on every side the rulings require. Finding 2 (ThreeSplatScene, ticket 03's code)
 follows as its own commit after this ticket's, by ruling.
+
+**Finding 2 — ThreeSplatScene dispose after a failed init (2026-09-17; its own commit AFTER this
+ticket's, by owner ruling; the code is phase-1 ticket 03's, which carries a dated pointer here).**
+- Fix (`src/core/ThreeSplatScene.ts` `dispose()`): the deferred teardown is `ready.then(() =>
+  renderer.dispose(), () => {})` — three's `Renderer.dispose()` runs only after a successful init. It
+  is not a no-op while uninitialized: it skips its internals but still ends with the async
+  `setAnimationLoop(null)`, which awaits `init()` again — the stored rejected promise — unobserved.
+  A failed init left nothing to free. The comment's "documented no-op" claim is corrected.
+- Red-first probe (`.collab-logs/t09-f2-probe/`, served by the dev server; BOTH backends fail before
+  any module loads — `navigator.gpu` hidden so three falls back, and `getContext("webgl2")` returns
+  null so the fallback fails too), with a success-path CONTROL in the same run (both backends
+  restored, a working scene disposed, its `renderer.dispose` counted) so a "fix" that never disposed
+  could not pass. RED on the committed code: `initFailed: true, initError: "Cannot read properties of
+  null (reading 'getSupportedExtensions')", unhandledBeforeDispose: 0, unhandledAfterDispose: 1,
+  reasons: ["Cannot read properties of null (reading 'getSupportedExtensions')"]`; control `backend
+  webgpu, init ok, rendererDisposeCallsAtReturn 0 → after 1, unhandled 0`. GREEN after the fix: the
+  same init failure, `unhandledAfterDispose: 0, reasons: []`, the control unchanged (`0 → 1`, `0`
+  unhandled) — `verdict: GREEN`.
+- Affected fixtures: the scene-level `dispose()` calls in the other labs are HMR teardown hooks no
+  drill runs; site-lab is the fixture that asserts runtime teardown (Stop 16's window, 10 H-LIFE
+  cycles, no unhandled rejections) — **12 passed, 0 failed** on WebGPU and on WebGL2
+  (`backend=webgl2-fallback`), `measuring window open (renderer not yet disposed)=true`, H-LIFE
+  `[1111111111]`, `no-unhandled-rejections: 0`.
+- Gate: `npm run check:full` EXIT=0 (`.collab-logs/t09-f2-check-full.log`; embed 3,138,830 B OK under
+  3,932,160; crate 6 + golden 7; lint 185 modules / 585 dependencies). No separate adversarial
+  dispatch: the ruled sequence authorized the targeted pass over the ticket's fix diff only.
