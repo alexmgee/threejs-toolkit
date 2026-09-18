@@ -101,6 +101,15 @@ load-completion analog); warm-fill decode scheduling.
    **0 hits**; `mesh.raycast === THREE.Mesh.prototype.raycast` (stock path
    testing the 4-vertex placeholder quad; `geometry.position.count = 4`).
    Doc 03 §B's "three consumers silently dead" prediction holds.
+   **SCOPE CORRECTED 2026-09-17 (Phase 2 ticket 09, Stop 7; doc 06 D31):** the
+   0-hit result held only for rays that MISS that placeholder quad. The quad sits
+   at each mesh's ORIGIN and spans `[-2,-2,0]..[2,2,0]` in object space, so rays
+   through it DO hit: measured on both backends with a camera 3 units from the
+   origin, 9 rays gave 10 hits — on a 48-splat PLY and on the 7.9 M-splat hero
+   alike, at points off the splats (a PLY hit at y 0.866 against splat bounds of
+   ±0.225). "CONFIRMED" narrows to that scope; the consumers are not merely dead,
+   they were being handed PHANTOM points. Ticket 09 neutralizes the stock raycast
+   on the backend's splat meshes until Phase 3 §B lands real picking.
 2. **Picking-prototype timing (§B route choice): OPEN** — not built this
    session; carried to the Phase 3 entry work. Neither route (CPU ray-ellipsoid
    over retained attributes vs GPU ID-readback) has been timed yet.
