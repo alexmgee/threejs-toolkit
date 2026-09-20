@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>counters-lab — StatsHUD + computeSplatBounds on the seam's counters (ticket 11)</title>
+  <link rel="stylesheet" href="../shared/sandbox-styles.css" />
+  <style>
+    html, body { overflow: auto; }
+    body { padding: 24px; color: #ccc; }
+    #viewer { position: relative; }
+    #hud { position: relative; height: 22px; }
+    #out .assertion { margin: 4px 0; padding: 2px 8px; border-left: 3px solid #555; }
+    #out .pass { color: #4ade80; border-color: #4ade80; }
+    #out .fail { color: #f87171; border-color: #f87171; }
+    #out h2.pass { color: #4ade80; }
+    #out h2.fail { color: #f87171; }
+  </style>
+</head>
+<body>
+  <h1>counters-lab — StatsHUD + computeSplatBounds on the seam's counters (ticket 11)</h1>
+  <div id="viewer"></div>
+  <div id="hud"></div>
+  <div id="out"></div>
+  <script type="module" src="./main.ts"></script>
+</body>
+</html>

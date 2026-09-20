@@ -28,6 +28,31 @@ module.exports = {
       },
     },
     {
+      name: "backend-doors-only",
+      comment:
+        "doc 02 design rule 2, amended 2026-09-18 (owner ruling E2, Phase 2 " +
+        "ticket 11) — backend internals are reachable only through the five " +
+        "doors: SplatBackend.ts, ThreeGsBackend.ts, decode.ts, decode-url.ts " +
+        "and index.ts. No src/ file outside src/backend/ may import any other " +
+        "src/backend/ module, type-only imports included (tsPreCompilationDeps " +
+        "counts them, as it does for vendor-seam-only). examples/ stays exempt " +
+        "(doc 06 D23 (a): fixtures exercise the backend exactly as consumers " +
+        "will). HONEST SCOPE: a lint rule sees imports, not property reads — " +
+        "whatever a door hands out (ThreeGsBackend.pagerDiagnostics) stays " +
+        "reachable through it; the counter consumers (StatsHUD, SplatBounds) " +
+        "type their backend as the SplatBackend interface, on which only the " +
+        "seam's methods exist. Route the need through a door instead.",
+      severity: "error",
+      from: {
+        path: "^src/",
+        pathNot: "^src/backend/",
+      },
+      to: {
+        path: "^src/backend/",
+        pathNot: "^src/backend/(SplatBackend|ThreeGsBackend|decode|decode-url|index)\\.ts$",
+      },
+    },
+    {
       name: "no-spike-imports",
       comment:
         "doc 02 module map — 'spikes/native-rad/ … throwaway; never imported " +

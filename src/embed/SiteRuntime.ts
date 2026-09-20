@@ -20,7 +20,9 @@
  * are disposed through the SplatBackend seam on ThreeSplatScene instead of
  * Spark; the pin's reveal gate is replaced by the loader's reveal/progress
  * callbacks; features this backend does not have yet are skipped and
- * announced once, in author mode, each with a named owner.
+ * announced once, in author mode, each with a named owner. Phase 2 ticket 11
+ * added one ruled edit (S1, doc 06 D33): sphereFromObject's dead splat branch
+ * and its SplatBounds import are deleted.
  */
 
 import * as THREE from "three";
@@ -104,7 +106,6 @@ import {
 } from "../ui/Typography";
 import { GeoContext, type PlaceInfo } from "../locative/GeoContext";
 import { bearingDistance } from "../locative/GeoAnchor";
-import { computeSplatBounds } from "../core/SplatBounds";
 import {
   conjuredCopyBlock,
   normalizeSiteConfig,
@@ -3697,20 +3698,13 @@ function makePropTarget(prop: NonNullable<SiteConfig["scenes"][number]["props"]>
 // CameraSystem updates — an un-arbitrated tween would silently lose), stops
 // travel through the rail itself.
 
-/** World bounding sphere of an object. SplatMesh has no BufferGeometry, so
- *  Box3.setFromObject misses splat extents — sample them via computeSplatBounds
- *  and union with any real-geometry descendants. Null when nothing measurable. */
+/** World bounding sphere of an object's real geometry. Null when nothing
+ *  measurable. The pin also sampled duck-typed SplatMesh children here through
+ *  computeSplatBounds — a branch no Phase 2 object reaches, deleted with its
+ *  import (ruling S1, doc 06 D33); Phase 4 re-adds splat-text framing with a
+ *  real handle source (D19). */
 function sphereFromObject(object: THREE.Object3D): { center: THREE.Vector3; radius: number } | null {
   const bounds = new THREE.Box3().setFromObject(object);
-  object.traverse((child) => {
-    // Duck-typed SplatMesh (value import would pull Spark into the graph here).
-    if ((child as unknown as { isSplatMesh?: boolean }).isSplatMesh === true) {
-      // The cast is gone with the Spark type: the stub takes an Object3D
-      // (doc 06 D30); this branch is unreachable until Phase 4's splat text.
-      const splatBounds = computeSplatBounds(child);
-      if (splatBounds) bounds.union(splatBounds);
-    }
-  });
   if (bounds.isEmpty()) return null;
   const sphere = bounds.getBoundingSphere(new THREE.Sphere());
   if (!Number.isFinite(sphere.radius) || sphere.radius <= 0) return null;

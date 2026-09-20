@@ -91,7 +91,16 @@ Design rules for the seam:
    monotonic by construction (spike criterion 8).
 2. **The seam is the only door.** No file outside `src/backend/` and `src/vendor/`
    may import from `vendor/three-gs/`. Enforced by lint rule from day one — this is
-   what keeps the fork surface auditable.
+   what keeps the fork surface auditable. *Amended (2026-09-18, owner ruling E2 at
+   Phase 2 ticket 11):* the door rule reaches the backend's own internals too — no
+   file under `src/` outside `src/backend/` may import a backend module other than
+   the five doors `SplatBackend.ts`, `ThreeGsBackend.ts`, `decode.ts`, `decode-url.ts`
+   and `index.ts` (lint rule `backend-doors-only`, type-only imports included).
+   `examples/` stays exempt (doc 06 D23 (a): fixtures exercise the backend exactly as
+   consumers will). HONEST SCOPE: a lint rule sees imports, not property reads —
+   whatever a door hands out, such as `ThreeGsBackend.pagerDiagnostics`, stays
+   reachable through it; the counter consumers (StatsHUD, SplatBounds) type their
+   backend as the `SplatBackend` interface, on which only the seam's methods exist.
 3. **One implementation, honestly.** No pretense of a Spark implementation living here
    too — sparkjs-toolkit *is* the other implementation, in its own repo. The seam
    exists to concentrate coupling, not to promise pluggability.

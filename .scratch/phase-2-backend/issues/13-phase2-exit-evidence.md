@@ -26,3 +26,12 @@ comparisons — the spike's own numbers are the bar).
 - [ ] Upstream watch list (doc 06) re-checked at the boundary, including
       `npm view three version` dated; anything landed answered with "delete our
       code" or a recorded reason not to.
+
+## Comments
+
+**`CONTEXT.md` stays absent — not a gap (owner, 2026-09-18, at ticket 11's second
+stop).** The repo's CLAUDE.md names a root `CONTEXT.md` that does not exist; that is by
+recorded design (`docs/agents/domain.md`: "There is no `CONTEXT.md` yet. Layout is
+**single-context**."). The owner schedules `/domain-modeling` at the Phase 2 boundary,
+which is where the file first gets written. Recorded here so the absence stops
+resurfacing as a finding in the meantime.

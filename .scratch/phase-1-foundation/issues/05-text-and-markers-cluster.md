@@ -107,6 +107,23 @@ copies + stub with no file modified.
      `Box3.setFromObject` bounds feed the SAME projectBox3ToScreen →
      layoutObstacleColumn → LinePool.commit path. Phase 2 swaps the
      placeholder for the real splat load. `OB_SPLAT_URL` dropped with it.
+     **DISCHARGED (2026-09-19, Phase 2 ticket 11, rulings F1 + S7):** the
+     placeholder box and its two declared constants are gone; the obstacle is
+     `loadSplat` + `computeSplatBounds(backend, handle)` over the seam, framed
+     once at reveal as the pin does, feeding the same projection → layout →
+     commit path. `OB_SPLAT_URL` returns as `moss.ply` — the pin's own scene
+     (its `moss.spz` is refused here: SPZ waits for r186, doc 06 watch item
+     13) — with the pin's `quaternion: [1, 0, 0, 0]` kept, which is exactly
+     the loader's 180° X flip. NOT the paged hero (the S3-(b) ruling it
+     supersedes): the hero's exact centre box is floater-set, so framing on it
+     is meaningless until Phase 4's percentile clamping (doc 04, dated note).
+     New divergences from the pin, both declared here: the dev hook gains
+     `backend` + `handle` (so a check can call `computeSplatBounds` itself)
+     and `mesh` returns `handle.object`; a load failure is loud — `onError`
+     writes `console.error` and the status line reads
+     `LOAD FAILED (<reason>)` instead of the pin's "none (fallback)", the same
+     loud-not-fatal rule this ticket's AC set for the bench. Evidence (both
+     backends): Phase 2 ticket 11 Comments.
    - Original header's calibration tables trimmed (they document
      Spark-measured splat counts; they re-enter with the Phase 4 rebuild).
 4. `vite.config.ts`: `text-lab` page added to the build input map (the
@@ -168,6 +185,10 @@ before acting):**
   replaces the whole block with the real splat load). The original's
   `bounds &&` guard in the boundsToggle handler is dropped because `bounds`
   is now non-null by construction. All three now declared here.
+  **CLOSED (2026-09-19, Phase 2 ticket 11):** both constants are deleted with
+  the placeholder block, and the pin's `bounds &&` guards are restored —
+  `bounds` is nullable again (`computeSplatBounds` answers null until splat
+  data is readable, doc 06 D33 ruling S2).
 - ASSESSED, NOT CHANGED (gpt5.6-sol #2): changing a baked control
   (fontSize/lhw/billboard/weight) re-runs the throwing construction — one
   console.error per user interaction. That is the loud-by-design path, not

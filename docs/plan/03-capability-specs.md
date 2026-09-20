@@ -206,10 +206,23 @@ regions; SplatLane.ts untouched if the class API is preserved. **Live production
 path** (SiteRuntime → TextSystem → SplatLane → SplatTextMesh) — visitor-facing, not
 authoring-only. Recolor/opacity fades ride §C's `setMeshColor`.
 
-**Bounds (SplatBounds, 74):** public `position` attribute read; exact world AABB
-computed per-point (never `Box3.applyMatrix4` — 8-corner only, review). Streamed
-variant reports resident bounds from the pager (contract preserved: "currently
-readable streamed bounds"). Percentile clamping for paged-scene floaters carries over.
+**Bounds (SplatBounds, 74):** the seam's `bounds()` is the only truth — an object-space
+box of splat CENTRES, exact per point on the monolithic path and, on the paged path, the
+union of the resident pages' exact per-point boxes. Streamed variant reports resident
+bounds from the pager (contract preserved: "currently readable streamed bounds"). The
+world box is the 8-corner `Box3.applyMatrix4` of that box (owner ruling B1, Phase 2
+ticket 11, 2026-09-18 — supersedes this paragraph's earlier "public `position` attribute
+read; exact world AABB computed per-point (never `Box3.applyMatrix4` — 8-corner only,
+review)", which was written when per-point access was assumed; the seam-as-sole-truth
+ruling supersedes the mechanism and keeps the intent). The box is EXACT wherever the
+transform is axis-aligned — the loader's actual flip, translation and scale (bit-exact
+when the matrix holds exact zeros off the axes, as the quaternion `[1, 0, 0, 0]` flip
+does; an Euler-built flip carries ~1e-16 cross terms and is conservative by that much) —
+and under an arbitrary rotation it is CONSERVATIVE, never smaller than the true box: the
+safe direction for camera framing. Revisit trigger: if arbitrarily rotated splat scenes
+become real usage, the recorded path is growing the seam to expose per-page boxes
+(tighter, still not per-point), owned by whichever phase brings that usage. Percentile
+clamping for paged-scene floaters carries over.
 Plus the missed call site: **sparkjs-toolkit's** `examples/rail/main.ts:131–154`
 centroid (not this repo's same-named adapted fixture — disambiguated ticket 04).
 

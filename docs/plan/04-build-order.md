@@ -144,6 +144,15 @@ them; `textSplatGeometry.ts` + SplatTextMesh rebuild (8 regions); recolor/opacit
 `setMeshColor`; bounds percentile clamping + rail-sandbox centroid call site.
 **Exit:** H-ASSET (export round-trip; text parity vs sparkjs-toolkit).
 
+*Bounds percentile clamping is a framing REQUIREMENT, not polish (2026-09-19, measured in
+Phase 2 ticket 11):* floaters set 94 % of the hero's exact centre box — the centre-spread
+diagonal is ≈64 units for the middle 98 % of splats, ≈155 for the middle 99.8 %, and ≈1,085
+for the exact min…max. A camera framed on the exact union therefore stands ~17× too far out;
+measured end to end in text-lab, it landed INSIDE the box and the obstacle stopped projecting
+at all. The pin hid this by SAMPLING (its undershoot skipped the floaters); exact bounds — the
+Phase 2 contract — cannot. Until this lands, splat framing is honest only on floater-free
+assets. Evidence and the full distribution: Phase 2 ticket 11 Comments.
+
 ## Phase 5 — Optics  ·  14–16 adapt points
 
 Last: nothing depends on it, so it is ordered last for scheduling reasons only —

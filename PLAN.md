@@ -2,7 +2,7 @@
 
 Gaussian-splat website toolkit on three.js native rendering (`GaussianSplatMesh` +
 `WebGPURenderer`). Sibling of `sparkjs-toolkit` — same site model, different renderer.
-**Phase 1 closed 2026-08-23.** **Phase 2 underway** (tickets 01–02 done; 03 is next).
+**Phase 1 closed 2026-08-23.** **Phase 2 underway** (tickets 01–11 done; 12 and 13 remain).
 Phase map and exit criteria live in `docs/plan/04-build-order.md`; ticket detail in
 `.scratch/phase-2-backend/`.
 
@@ -149,14 +149,14 @@ links: [site-rules, embed-site, fixtures]
 - [x] Diagnostic framework copied; selfTest 20/20 {#diag-framework}
   by: phase-1 ticket 07
   tech: commit `b9c9251`; 22 diag paths at fd67153 byte-verified; SparkPagerAdapter carried per R4; `examples/diag/` selfTest `20/20 PASS` in-browser
-- [~] Feed StatsHUD from backend counters {#statshud}
+- [x] Feed StatsHUD from backend counters {#statshud}
   by: claude
   from: roadmap
-  tech: ticket 11; no seam bypass
-- [~] Feed SplatBounds from resident-page union {#splat-bounds}
+  tech: ticket 11; `{ container, backend, handles? }` and `fps | drawn | resident | src` summed over handles (D32), K format kept, a disposed handle throws; counters-lab 15/15 both backends against an independent header read; no seam bypass (`backend-doors-only` lint)
+- [x] Feed SplatBounds from resident-page union {#splat-bounds}
   by: claude
   from: roadmap
-  tech: ticket 11; independent union, not 8-corner applyMatrix4
+  tech: ticket 11; `computeSplatBounds(backend, handle)` over the seam's `bounds()`, world box by forced 8-corner transform (ruling B1, D33); exact against the fixture's own decoded union at 9 sampled moments and its per-point world box under the flip
 - [ ] Rewire diagnostics off Spark pager (§G) {#diag-rewire}
   from: roadmap
   tech: ticket 12; delete SparkPagerAdapter (~1,362 lines) for good
@@ -201,6 +201,9 @@ links: [scene-core, render-stack, text-markers, site-rules, diagnostics, backend
 - [x] decode-lab proves WASM chunk decode {#decode-lab}
   by: claude
   tech: commit `1fb65d4`; `examples/decode-lab/` — 9 output arrays pinned; `4 passed, 0 failed`; center=`9f411115`, sh1Words=`50b88b76`; renders nothing, so backend-independent (the earlier "on default and `?webgl=1`" read as backend coverage it never had)
+- [x] counters-lab proves the HUD and bounds against an independent decode {#counters-lab}
+  by: claude
+  tech: ticket 11; `examples/counters-lab/` on the hero at `?pages=32` — own header parse, own Range fetches, own decode workers; 9 synchronous samples across load, eviction, admission, nothing-resident and convergence; 15/15 on WebGPU and WebGL2, five planted defects each caught
 - [ ] Record Phase 2 H-LOAD re-run on production runtime {#h-load-rerun}
   from: roadmap
   tech: ticket 13; five cold-cache trials per backend; match or beat spike
@@ -209,9 +212,33 @@ links: [scene-core, render-stack, text-markers, site-rules, diagnostics, backend
   tech: ticket 13; full element with real site.json
 - [ ] Trimmed public barrel restored as phases land {#trimmed-barrel}
   from: roadmap
-  tech: ticket 11 phase-1 done (51 sources); 13 deferred names return per phase
+  tech: phase-1 ticket 11 done (51 sources); Phase 2 ticket 09 returned the four embed names and ticket 11 the two counter names (StatsHUD, computeSplatBounds) — 7 of the original 13 still deferred, each returning with its phase
 
 ## decisions
+
+- **Ticket 11 third-stop ruling — S7 (owner, 2026-09-19):** text-lab's obstacle is `moss.ply`,
+  SUPERSEDING the S3-(b) hero ruling, which was made before the floater measurement: the hero's
+  exact bounds defeat the pin's framing by construction (centre-spread diagonals — middle 98 %
+  ≈ 64, middle 99.8 % ≈ 155, exact ≈ 1,085 units: floaters set 94 % of the box), and the pin's own
+  framing worked only through sampling undershoot. Text-lab returns to the pin's own scene in its
+  closest loadable form; the paged-consumer proof lives in step 7's counters-lab. Conditions: the
+  fixture's own carving run on both backends; moss.ply is the first SH degree-3 asset through the
+  monolithic path, so that run also notes the newly-live SH3 branch and asserts a clean dispose
+  (closing the degree > 1 gap at monolithic scope); doc 04's Phase 4 bounds item gets a dated line
+  making percentile clamping a framing REQUIREMENT, not polish. Rejected: keeping the hero with a
+  cut criterion (a lab that displays its own fallback proves the fallback) and scaling the camera
+  to the floaters (a criterion passed literally while the scene fills 5.6 % of frame is the
+  vacuous-check trap with a camera). The 170 MB per-open parse is an accepted lab cost.
+
+- **Ticket 11 second-stop rulings (owner, 2026-09-18):** SiteRuntime's dead splat branch in
+  `sphereFromObject` and its import are deleted; Phase 4 re-adds splat-text framing with a real handle
+  source (S1). `computeSplatBounds` returns null before construction and with no page resident — the
+  pin's "no readable data yet" — while a disposed handle still throws (S2). Text-lab's obstacle is the
+  hero `.rad`, the pin's `[1, 0, 0, 0]` quaternion kept as the loader's own flip (S3). The new lab
+  proves the 8-corner world box both ways — exact under the flip at pad 0, never smaller under a tilt
+  (S4). The HUD keeps the pin's K format (S5) and throws on a disposed handle (S6). Doc 06's D23
+  heading is fixed in this ticket's doc pass; `CONTEXT.md` stays absent until the owner's
+  `/domain-modeling` at the Phase 2 boundary (noted in ticket 13).
 
 - **Ticket 11 rulings (owner, 2026-09-18):** `computeSplatBounds(backend, handle, options?)` (A1, the
   one-argument pin call breaks loudly); world bounds = the 8-corner transform of the seam's box, doc 03

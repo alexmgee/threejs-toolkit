@@ -119,6 +119,11 @@ API-preserving typed STUB** inside the text cluster ticket, so
 SplatTextMesh keeps its API"). The stub throws on construction with an explicit
 "rebuilt in Phase 4 (doc 03 §E)" error. Phase 4's rebuild deletes and replaces
 it — same delete-and-replace obligation as D18. Never left beside real code.
+**Phase 4 addition (owner ruling S1, Phase 2 ticket 11, 2026-09-18):** the rebuild
+also re-adds splat-text FRAMING. SiteRuntime's `sphereFromObject` lost its dead
+duck-typed splat branch (D33 item 5), so selection framing of a splat-text block
+needs a real handle source for `computeSplatBounds(backend, handle)` when the
+rebuilt mesh exists.
 
 **D20 — DECIDED (2026-08-20): fork patches are authored in `.ts` files
 alongside the vendored JS.** New patch logic gets full type-checking; the
@@ -291,14 +296,21 @@ decided with `backend.raycast()`. **DONE (ticket 10):** both fields deprecated i
 (pre-edit baseline = post-edit capture, numbers and pixels, both backends). Detail:
 ticket 10 Comments.
 
-**D23 — OPEN (2026-08-20): boundary-rule gaps surfaced by ticket 04's
+**D23 — RULED AND DONE (surfaced 2026-08-20; owner ruling 2026-08-23 at Phase 2
+ticketing, `.scratch/phase-2-backend/spec.md` "D23 reconciliation"; executed
+2026-08-29 by Phase 2 ticket 03): boundary-rule gaps surfaced by ticket 04's
 review, owner call on whether/where to guard:** (a) examples/ may legally
 import src/backend and thus the re-exported fork-mesh TYPE (the seam's
 public door — tightening is a design choice); (b) src -> examples is
 cruised but unguarded (fixture code could become load-bearing); (c) vendor
 -> src is unguarded (a fork patch could reach into toolkit code, corrupting
 re-diff purity); (d) spikes/ is outside the cruise set entirely (spike ->
-vendor internals invisible). Detail: ticket 04 Comments.
+vendor internals invisible). Detail: ticket 04 Comments. **Ruling:** (a) stays
+OPEN BY DESIGN — the seam's public door, where fixtures exercise the backend
+exactly as consumers will (Phase 2 ticket 11's `backend-doors-only` rule exempts
+examples/ on this ground); (b) and (d) stay ACCEPTED-UNGUARDED, with reasons; (c)
+is GUARDED by `vendor-must-not-reach-src`, drilled both ways. Detail and drills:
+Phase 2 ticket 03 Comments.
 
 **D24 — DECIDED (2026-08-23, OWNER RULED at ticket 11's stop): the barrel
 exports `ThreeSplatScene` under its OWN name — no `SparkScene` alias.**
@@ -455,7 +467,9 @@ behind an `isSplatMesh` duck-type that the vendored mesh never satisfies (it set
 satisfy it are splat-text meshes, which D19's throwing stub keeps from existing until
 Phase 4. SAME OBLIGATION AS D19 AND D27: ticket 11 DELETES this file and replaces it;
 never left beside real code. The barrel name stays deferred until then. Detail:
-ticket 09 Comments.
+ticket 09 Comments. **DISCHARGED (2026-09-18, Phase 2 ticket 11):** the stub's content
+is gone — the pin's module was copied over it byte-identically and re-typed onto the
+seam's `bounds()` (D33); the barrel name returns with it.
 
 **D31 — DECIDED (2026-09-17, OWNER RULED at Phase 2 ticket 09's Stop 7): the
 backend neutralizes three's stock raycast on its splat meshes until Phase 3 §B.**
@@ -472,6 +486,76 @@ produced, on the same grounds as ticket 09 Stop 10. CONSEQUENCE for the Phase 0 
 `docs/plan/results/phase-0.md`'s "Raycast absence: CONFIRMED empirically … 0 hits" holds
 only for rays that MISS that quad — corrected there with a dated note. Detail: ticket 09
 Comments.
+
+**D32 — DECIDED (2026-09-18, OWNER RULED at Phase 2 ticket 11's stops D, S5 and S6):
+`StatsHUD` reads the seam's counters — config `{ container, backend, handles?,
+updateRate?, visible?, position? }`, line `fps | drawn | resident | src`.** The
+H-API-sanctioned divergence entry for the rebuilt `core/StatsHUD` (doc 05: "divergences
+allowed only via doc 06 entries"). The pin (`fd67153:src/core/StatsHUD.ts`) takes
+`{ container, spark: SparkRenderer, splats?: SplatMesh | SplatMesh[], … }` and prints
+`fps | drawn | lod-sel | src | trav | sort/lod | fetch`, every field but fps read from
+Spark internals. Here:
+1. **Config.** `spark` and `splats` are DELETED, not re-typed under their old names:
+   every call site's argument types change regardless (no `SparkRenderer` exists here),
+   so a kept name would only disguise the break. `backend` is typed as the
+   `SplatBackend` INTERFACE and `handles` as `SplatHandle | SplatHandle[]`;
+   `updateRate`, `visible` and `position` are unchanged.
+2. **Fields.** `lod-sel`, `trav`, `sort/lod` and `fetch` are DELETED — Spark internals
+   with no seam counter. `drawn` changes meaning: the sum over the given handles of
+   `counts().selected` (the last render's draw count), where the pin read the
+   renderer-wide `activeSplats`. `resident` is NEW: the sum of `counts().resident`.
+   `src` changes meaning: the sum of `counts().total`, where the pin printed the FIRST
+   readable mesh's total only (it `break`s after one). With no handles all three sums
+   are 0.
+3. **Number format kept (S5):** the pin's `(n / 1000).toFixed(0)K`. At 1K resolution any
+   whole-chunk residency error — 65,536 splats, or the hero's 5,502-splat tail chunk —
+   shows with margin to spare.
+4. **A disposed handle THROWS (S6):** `counts()` refuses it by name (`unknown-handle`)
+   and `update()` lets that propagate, where the pin's optional chaining never threw. A
+   diagnostics HUD that silently skipped a disposed handle would lie by omission.
+CAVEAT (D15): consuming sites are unsurveyed. The pin's three callers
+(`examples/all/main.ts:136`, `examples/main.ts:116`, `examples/path/main.ts:80`, each
+`{ container, spark: sparkScene.spark, splats: [splat] }`) and any external consumer
+fail to compile — D24's class: a loud break with a one-line fix. Detail: ticket 11
+Comments.
+
+**D33 — DECIDED (2026-09-18, OWNER RULED at Phase 2 ticket 11's stops A, B, C, S1 and
+S2): `computeSplatBounds(backend, handle, options?)` reads the seam's `bounds()`.** The
+H-API-sanctioned divergence entry for the rebuilt `core/SplatBounds`, which replaces
+D30's stub. The pin (`fd67153:src/core/SplatBounds.ts`) takes one `SplatMesh`, samples
+every Nth centre through Spark's `forEachSplat`, transforms each by `matrixWorld` and
+pads the box 5 % per axis. Here:
+1. **Signature (A1).** `bounds(handle)` needs the backend AND the handle, so both are
+   parameters; the pin's one-argument call fails to COMPILE — D24's principle, a loud
+   break. Rejected: an object→(backend, handle) registry filled at load (hidden global
+   mutable state).
+2. **World box (B1).** The seam's box is in `handle.object`'s local space (the backend
+   adds its mesh at identity inside that group, on both load paths). The world box is
+   its 8-corner transform by `handle.object.matrixWorld`, refreshed first through
+   `updateWorldMatrix(true, false, true)` — ancestors included, which the pin's
+   `updateMatrixWorld(true)` does not refresh, and FORCED, because three recomputes
+   `matrixWorld` only when `matrixWorldNeedsUpdate` is set and an object with
+   `matrixAutoUpdate = false` never sets it (adversarial review 2026-09-20, measured at
+   r185: a frozen handle under a moved ancestor framed at its stale position). Exact for
+   axis-aligned transforms,
+   conservative (never smaller) under arbitrary rotation; doc 03's Bounds paragraph is
+   amended with the grounds and the revisit trigger (per-page seam growth).
+3. **Options (C1).** `SplatBoundsOptions` is unchanged. `targetSamples` is `@deprecated`
+   and ignored (D22's precedent: nothing is sampled any more); `world` and `padFraction`
+   keep their meanings and defaults (`true`, 0.05). The pad's original justification,
+   sampling undershoot, died with the sampling, but pin callers keep compiling and keep
+   their framing margin.
+4. **Refusals (S2).** `null` — the pin's documented "no readable splat data yet" — for a
+   handle not built yet (`bounds-before-construct`), with no page resident
+   (`no-resident-pages`), or with an empty box. Every other refusal propagates, a
+   disposed handle's `unknown-handle` included: null is an answer, a throw is an
+   accusation, and a caller framing a disposed handle has a bug.
+5. **The dead call site (S1).** SiteRuntime's `sphereFromObject` (pin :3758-3771) also
+   sampled duck-typed `isSplatMesh` children, a branch no Phase 2 object reaches: nothing
+   sets `isSplatMesh` (the vendored mesh sets `isGaussianSplatMesh`), and splat-text
+   meshes cannot exist while D19's stub throws. The branch and its import are deleted;
+   Phase 4 re-adds splat-text framing with a real handle source (recorded under D19).
+Detail: ticket 11 Comments.
 
 **sRGB constraint — ACCEPTED (2026-08-20, ticket 03 close):** with the doc 04
 sRGB working space set (core/colorSpace.ts), assigning

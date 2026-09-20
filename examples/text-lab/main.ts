@@ -5,19 +5,20 @@
  *
  * The complete strip/add inventory lives in ticket 05's Comments
  * (.scratch/phase-1-foundation/issues/05-text-and-markers-cluster.md) — the
- * single home for this fixture's declared divergences. In brief: SparkScene →
- * ThreeSplatScene; the Phase-2-deferred loadSplat/computeSplatBounds are
- * replaced by a placeholder solid mesh as the layout obstacle; the splat-text
- * bench catches the D19 stub's constructor throw and displays it LOUDLY
- * (the splat text path is rebuilt in Phase 4, doc 03 §E).
+ * single home for this fixture's declared divergences (Phase 2 ticket 11's
+ * obstacle swap is recorded there too, dated). In brief: SparkScene →
+ * ThreeSplatScene; the obstacle loads through loadSplat + computeSplatBounds
+ * on the SplatBackend seam, from moss.ply — the pin's own scene in its closest
+ * loadable form (the pin's moss.spz is refused here — SPZ waits for r186);
+ * the splat-text bench catches the D19 stub's constructor throw and displays
+ * it LOUDLY (the splat text path is rebuilt in Phase 4, doc 03 §E).
  *
  * Sections (from the original):
  *  1. Font-parity bench — Pretext wrapLines vs native DOM wrap. UNCHANGED.
  *  2. Splat Text Bench — SplatTextMesh is the D19 stub: boot catches the
  *     throw and shows the stub error in the bench status. Fails loudly.
  *  3. Editorial Obstacle View — two Pretext columns flow around a live
- *     projected obstacle; obstacle is a placeholder box mesh until the
- *     splat loaders land in Phase 2.
+ *     projected splat obstacle, framed once at reveal as the pin does.
  */
 
 import * as THREE from "three";
@@ -37,6 +38,10 @@ import {
 } from "@toolkit/ui/ObstacleLayout";
 import { ThreeSplatScene } from "@toolkit/core/ThreeSplatScene";
 import { CameraSystem } from "@toolkit/core/CameraSystem";
+import { loadSplat } from "@toolkit/core/SplatLoader";
+import { computeSplatBounds } from "@toolkit/core/SplatBounds";
+import { ThreeGsBackend } from "@toolkit/backend/ThreeGsBackend";
+import { createDecodeWorker } from "@toolkit/backend/decode-url";
 
 // Backend toggle, matching the repo's fixture pattern (examples/scene,
 // examples/grade): ?webgl=1 forces the WebGL2 fallback on both scenes.
@@ -309,12 +314,11 @@ function bootBench(): void {
 
 // ─── Editorial Obstacle View ──────────────────────────────
 //
-// Two Pretext columns flow over a live viewport. Per frame: project the
-// obstacle's Box3 to a screen rect, carve each line band around it, place
-// one layoutNextLine result per band, and let LinePool.commit diff against
-// the previous frame (ADR-7: compute always, commit on change — idle frames
-// cost zero DOM writes). Obstacle: a placeholder solid mesh until the splat
-// loaders land in Phase 2 (loadSplat/computeSplatBounds are Phase-2 files).
+// Two Pretext columns flow over a live splat viewport. Per frame: project
+// the splat's Box3 (computeSplatBounds, taken once at reveal) to a screen
+// rect, carve each line band around it, place one layoutNextLine result per
+// band, and let LinePool.commit diff against the previous frame (ADR-7:
+// compute always, commit on change — idle frames cost zero DOM writes).
 
 const OB_COPY =
   "A photogrammetric capture starts as pure excess: thousands of photographs, most of them " +
@@ -343,6 +347,15 @@ const OB_FONT = `15px ${DEFAULT_FONT_STACK}`;
 const OB_LINE = 22;
 const OB_MARGIN = 24;
 const OB_GAP = 32;
+// Phase 2 ticket 11, ruling S7 (superseding S3-(b)): the pin's
+// "/examples/assets/moss.spz" is refused here (SPZ waits for r186 — doc 06
+// watch item 13), so the obstacle is the SAME SCENE as a PLY, served
+// read-only through /@fs like the labs' assets. NOT the paged hero: its exact
+// bounds are floater-dominated — the outermost centres set 94 % of the box —
+// so framing on them means nothing until Phase 4's percentile clamping
+// (doc 04, measured in ticket 11). The paged consumer proof lives in
+// examples/counters-lab/.
+const OB_SPLAT_URL = "/@fs/D:/Projects/sparkjs-toolkit/examples/assets/moss.ply";
 
 function bootObstacle(): void {
   const region = document.getElementById("obRegion") as HTMLDivElement;
@@ -388,32 +401,42 @@ function bootObstacle(): void {
     }
   }).observe(region);
 
-  // Placeholder obstacle (Phase 2 swaps in loadSplat + computeSplatBounds):
-  // a solid box in the splat cloud's stead; MeshNormalMaterial needs no
-  // lights, so the fixture stays light-free like the original.
-  const mesh = new THREE.Mesh(
-    new THREE.BoxGeometry(1.6, 1.1, 0.9),
-    new THREE.MeshNormalMaterial(),
-  );
-  mesh.rotation.set(0.3, 0.5, 0);
-  obScene.scene.add(mesh);
-  mesh.updateMatrixWorld(true);
-  const bounds: THREE.Box3 = new THREE.Box3().setFromObject(mesh);
+  let bounds: THREE.Box3 | null = null;
   let helper: THREE.Box3Helper | null = null;
+  let loadFailure: string | null = null;
 
-  {
-    const center = bounds.getCenter(new THREE.Vector3());
-    const size = bounds.getSize(new THREE.Vector3());
-    obCamera.setState({
-      yaw: 30,
-      pitch: 12,
-      distance: size.length(),
-      pivot: { x: center.x, y: center.y, z: center.z },
-    });
-  }
+  // The seam instance that loads and owns the obstacle (doc 06 D25); a paged
+  // .rad needs the renderer and a decode-worker factory.
+  const backend = new ThreeGsBackend({ renderer: obScene.renderer, createDecodeWorker });
+  const handle = loadSplat({
+    url: OB_SPLAT_URL,
+    backend,
+    extSplats: true,
+    quaternion: [1, 0, 0, 0], // OpenCV → OpenGL coord flip — exactly the loader's 180° X flip
+    onLoad: (loaded) => {
+      bounds = computeSplatBounds(backend, loaded);
+      if (bounds) {
+        const center = bounds.getCenter(new THREE.Vector3());
+        const size = bounds.getSize(new THREE.Vector3());
+        obCamera.setState({
+          yaw: 30,
+          pitch: 12,
+          distance: size.length(),
+          pivot: { x: center.x, y: center.y, z: center.z },
+        });
+      }
+    },
+    // Loud-not-fatal, like the scene's init failure above: a failed load
+    // would otherwise read as the pin's "none (fallback)" layout.
+    onError: (error) => {
+      loadFailure = error.reason;
+      console.error("[text-lab] obstacle load failed", error);
+    },
+  });
+  obScene.scene.add(handle.object);
 
   boundsToggle.addEventListener("change", () => {
-    if (boundsToggle.checked && !helper) {
+    if (boundsToggle.checked && bounds && !helper) {
       helper = new THREE.Box3Helper(bounds, 0x4ade80);
       obScene.scene.add(helper);
     } else if (!boundsToggle.checked && helper) {
@@ -431,7 +454,9 @@ function bootObstacle(): void {
   obScene.setOnFrame((_time, deltaTime) => {
     obCamera.update(deltaTime);
 
-    const rect = projectBox3ToScreen(bounds, obScene.camera, regionW, regionH);
+    const rect = bounds
+      ? projectBox3ToScreen(bounds, obScene.camera, regionW, regionH)
+      : null;
     const obstacles = rect ? [rect] : [];
     lastObstacle = rect !== null;
 
@@ -460,7 +485,7 @@ function bootObstacle(): void {
       stats.commitsPerWindow = commits;
       obStatus.textContent =
         `commits: ${commits}/60 frames · lines: ${allLines.length} · ` +
-        `obstacle: ${lastObstacle ? "projected" : "none (fallback)"}`;
+        `obstacle: ${lastObstacle ? "projected" : loadFailure ? `LOAD FAILED (${loadFailure})` : "none (fallback)"}`;
       frames = 0;
       commits = 0;
     }
@@ -473,11 +498,15 @@ function bootObstacle(): void {
     pool,
     stats,
     copy: OB_COPY,
+    // The seam pair, so a check can call computeSplatBounds(backend, handle)
+    // itself (ticket 11's pass criterion); `mesh` is the renderable, as at the pin.
+    backend,
+    handle,
     get bounds() {
       return bounds;
     },
     get mesh() {
-      return mesh;
+      return handle.object;
     },
   };
 }

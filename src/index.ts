@@ -3,15 +3,13 @@
 // exports under the SAME name; the deferred sources are listed below so the
 // trim is visible, not silent. Each later phase restores its names.
 //
-// ─── DEFERRED SOURCES (9 of the original 13 — the graph makes a full
+// ─── DEFERRED SOURCES (7 of the original 13 — the graph makes a full
 //     same-names barrel impossible until Phase 4; doc 04 / ticket 11. The four
 //     embed sources returned with Phase 2 ticket 09: embed/diagWiring (ruling
 //     Stop 1), embed/SiteRuntime, embed/SplatSiteElement and
-//     embed/FragmentRouter (ruling Stop 13, verbatim from the pin)) ───
-// Phase 2 (ticket 11): core/StatsHUD (StatsHUD)
-//          core/SplatBounds (computeSplatBounds — a D30 stub exists in-tree so
-//          SiteRuntime compiles; per the D19 precedent its BARREL name returns
-//          with ticket 11's rebuild, not as a stub)
+//     embed/FragmentRouter (ruling Stop 13, verbatim from the pin); core/StatsHUD
+//     and core/SplatBounds returned with Phase 2 ticket 11, rebuilt on the
+//     seam's counters (doc 06 D32, D33)) ───
 // Phase 3: core/SplatLoader (loadSplatAsync only — loadSplat returned with
 //          ticket 08; loadSplatAsync is a named refusal until SceneComposer's
 //          ticket settles it (ruling 08-S4), and per the D19 precedent a
@@ -49,6 +47,7 @@ export { CameraSystem, type CameraSystemConfig, type CameraState, type RecenterC
 export { type ColmapCamera, type ColmapImage, type ColmapData, type ColmapLoadOptions, type CameraPose, parseColmapText, parseColmapBinary, loadColmapData, colmapPoseToThreeJS, colmapPoseRaw, getFocalLengths, getPrincipalPoint } from "./core/ColmapData";
 export { FrustumRenderer, type FrustumRendererConfig } from "./core/FrustumRenderer";
 export { CameraPath, type CameraPathConfig, type CameraKeyframe, type EasingFn } from "./core/CameraPath";
+export { StatsHUD, type StatsHUDConfig } from "./core/StatsHUD";
 export { CameraRail, type CameraRailConfig, type RailStop } from "./core/CameraRail";
 export { ScrollRail, type ScrollRailConfig, type ScrollRailState } from "./core/ScrollRail";
 export { EnvironmentLoader, type EnvironmentConfig, type EnvironmentOptions } from "./core/EnvironmentLoader";
@@ -66,6 +65,7 @@ export { EditorialRegionEditor, type EditorialRegionEditorConfig } from "./ui/Ed
 export { publishReservedRegion, reservedRegions, subscribeReservedRegions, choosePanelBox, type Rect, type PanelCandidate, type PanelChoice } from "./ui/ReservedRegions";
 export { projectCornersToScreen, projectBox3ToScreen, rectIntervalsForBand, subtractIntervals, layoutObstacleColumn, LinePool, START_CURSOR, type ScreenRect, type Interval, type ColumnRegion, type PositionedLine, type ObstacleColumnOptions, type LinePoolOptions } from "./ui/ObstacleLayout";
 export { Annotations, type AnnotationsConfig, type AnnotationItem } from "./ui/Annotations";
+export { computeSplatBounds, type SplatBoundsOptions } from "./core/SplatBounds";
 
 // ─── Text style engine ───
 export type { ScreenRectNorm, TypeStyleLayer, InlineRun, TextStyle, StyleVariant, EaseName, VariantCondition, TextBlock, BlockBinding, PanelPlacement, FreePlacement, ColumnsPlacement, WorldPlacement, BlockPlacement, SiteFontFace, ResolveContext, CapabilitySet, ControlTier, Resolved } from "./text/TextModel";
