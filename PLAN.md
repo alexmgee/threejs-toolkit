@@ -157,9 +157,11 @@ links: [site-rules, embed-site, fixtures]
   by: claude
   from: roadmap
   tech: ticket 11; `computeSplatBounds(backend, handle)` over the seam's `bounds()`, world box by forced 8-corner transform (ruling B1, D33); exact against the fixture's own decoded union at 9 sampled moments and its per-point world box under the flip
-- [ ] Rewire diagnostics off Spark pager (§G) {#diag-rewire}
+- [!] Rewire diagnostics off Spark pager (§G) {#diag-rewire}
+  by: claude
   from: roadmap
   tech: ticket 12; delete SparkPagerAdapter (~1,362 lines) for good
+  stuck: inherited notes collected and briefed in the ticket; stopped on agenda G1-G7 — the recorded guidance on the diagnostics door conflicts (read-only vs three labs' drills), and AC3's feed-or-delete, the H-API telemetry input shape, markSceneFirstSplatReady's feed and the phase7 evaluator's home need rulings
 
 ## Ship splat sites in web pages {#embed-site}
 tech: `<splat-site>` web component, SiteRuntime, FragmentRouter, embed builds
