@@ -36,6 +36,13 @@ import { createCapture } from "../shared/capture";
 import { createSiteRuntime, type SiteReadyDetail, type SiteRuntimeHandle, type SiteStopDetail } from "@toolkit/embed/SiteRuntime";
 import { normalizeSiteConfig } from "@toolkit/site/SiteConfig";
 import { ThreeGsBackend } from "@toolkit/backend/ThreeGsBackend";
+import { ThreeSplatScene } from "@toolkit/core/ThreeSplatScene";
+import { loadSplat } from "@toolkit/core/SplatLoader";
+import { createDecodeWorker } from "@toolkit/backend/decode-url";
+import { wireLoadTelemetry } from "@toolkit/embed/diagWiring";
+import { PagerTelemetrySource } from "@toolkit/diag/PagerTelemetrySource";
+import { runSelfTest } from "@toolkit/diag/dev/selfTest";
+import { REVISION } from "three";
 import { SplatBackendError, type SplatHandle } from "@toolkit/backend/SplatBackend";
 import labSite from "./sites/lab.site.json";
 import lmLifetimeSite from "./sites/lm-lifetime.site.json";
@@ -52,6 +59,10 @@ const expectedBackend = params.get("webgl") === "1" ? "webgl2-fallback" : "webgp
 
 // Pager-lab's bound: 10 × the measured cold hero load (~12 s, ticket 05).
 const WAIT_BOUND_MS = 10 * 12_000;
+
+/** The same paged .rad the lab site's hero loads — read from the site config
+ *  rather than re-typed, so the two can never drift apart. */
+const PAGED_ASSET = (labSite as { scenes: { url: string }[] }).scenes[0]!.url;
 
 let passed = 0;
 let failed = 0;
@@ -85,6 +96,16 @@ function yieldMacrotask(): Promise<void> {
 
 // Every console.warn is recorded; the contract's own warnings carry these
 // prefixes, so counts are never polluted by unrelated library warnings.
+const logs: string[] = [];
+const originalLog = console.log.bind(console);
+console.log = (...args: unknown[]) => {
+  logs.push(args.map(String).join(" "));
+  originalLog(...args);
+};
+function telemetrySummariesSince(mark: number): string[] {
+  return logs.slice(mark).filter((l) => l.includes("Load telemetry summary:"));
+}
+
 const warnings: string[] = [];
 const originalWarn = console.warn.bind(console);
 console.warn = (...args: unknown[]) => {
@@ -170,7 +191,10 @@ interface Booted {
   rendererDisposed: boolean;
 }
 
-function boot(rawSite: unknown, options: { author?: boolean } = {}): Booted {
+function boot(
+  rawSite: unknown,
+  options: { author?: boolean; telemetry?: Parameters<typeof createSiteRuntime>[0]["telemetry"] } = {},
+): Booted {
   const host = document.createElement("div");
   host.style.cssText = "position:absolute;left:0;top:0;width:512px;height:256px";
   container.appendChild(host);
@@ -185,6 +209,7 @@ function boot(rawSite: unknown, options: { author?: boolean } = {}): Booted {
     container: host,
     rawSite: structuredClone(rawSite),
     author: options.author ?? false,
+    ...(options.telemetry ? { telemetry: options.telemetry } : {}),
     onReady: (detail) => {
       booted.ready = detail;
     },
@@ -563,6 +588,304 @@ const done = (async () => {
   );
   authored.handle.dispose();
   authored.host.remove();
+
+
+  // ─── §G — the rewired diagnostics stack on a REAL load (ticket 12) ────────
+  //
+  // Three claims, each on the backend this run selected:
+  //   1. the stack still produces a complete record of a real paged load, now
+  //      fed by our own counter door instead of a Spark adapter (AC2), with
+  //      the CPU-budget denominator non-zero (AC3) and the record's own
+  //      identity fields telling the truth (B2, B3);
+  //   2. SiteRuntime registers its paged scenes again and marks first-splat
+  //      at the reveal — A2 closed, G4 wired;
+  //   3. consent PENDING constructs nothing at runtime level (G5's phase7
+  //      evaluator), which is what un-defers the 21st self-test assertion.
+
+  // --- 1. the stack, end to end, on the same paged asset the site uses ------
+  const telemetryHost = document.createElement("div");
+  telemetryHost.style.cssText = "position:absolute;left:0;top:0;width:256px;height:128px";
+  container.appendChild(telemetryHost);
+  const diagScene = new ThreeSplatScene({ container: telemetryHost, forceWebGL: expectedBackend === "webgl2-fallback" });
+  await diagScene.ready.catch(() => {});
+  const diagBackend = new ThreeGsBackend({ renderer: diagScene.renderer, createDecodeWorker });
+  let diagRevealed = false;
+  const diagHandle = loadSplat({
+    url: PAGED_ASSET,
+    backend: diagBackend,
+    paged: true,
+    onLoad: () => { diagRevealed = true; },
+  });
+  diagScene.scene.add(diagHandle.object);
+
+  const telemetry = wireLoadTelemetry({
+    options: {
+      // Ephemeral only: the lab must not write to the browser's storage.
+      consentHook: () => ({ ephemeralMeasurement: "granted", localPersistence: "denied", remoteTransmission: "denied" }),
+    },
+    authorMode: false,
+    readCameraState: () => ({
+      position: diagScene.camera.position.toArray() as [number, number, number],
+      quaternion: diagScene.camera.quaternion.toArray() as [number, number, number, number],
+      projectionMatrix: diagScene.camera.projectionMatrix.toArray(),
+      verticalFovDegrees: diagScene.camera.fov,
+      viewportWidthCssPx: 256,
+      viewportHeightCssPx: 128,
+      dpr: window.devicePixelRatio,
+      foveation: {},
+      pivot: [0, 0, 0],
+    }),
+  });
+  telemetry.registerPagedScene({
+    sceneId: "diag-hero",
+    backend: diagBackend,
+    handle: diagHandle,
+    sceneUrl: PAGED_ASSET,
+    backendKind: diagScene.backend,
+  });
+
+  // Render AND tick: `tick()` is what samples the door, and it is internally
+  // throttled to 100 ms, so the pump has to actually spend wall time. The
+  // renders are what make the denominator non-zero — that is the whole point
+  // of AC3, so they are driven here rather than assumed.
+  const diagT0 = performance.now();
+  while (!diagRevealed && performance.now() - diagT0 < WAIT_BOUND_MS) {
+    diagScene.renderer.render(diagScene.scene, diagScene.camera);
+    telemetry.tick();
+    await yieldMacrotask();
+  }
+  // Keep sampling past the reveal so residency and decode differences land in
+  // the record rather than only the pre-reveal ramp.
+  // An independent observer, so "a long task happened" is measured rather
+  // than assumed by the same code under test.
+  let independentLongTasks = 0;
+  let independentLongestMs = 0;
+  let longTaskObserverSupported = true;
+  try {
+    new PerformanceObserver((list) => {
+      for (const entry of list.getEntries()) {
+        independentLongTasks += 1;
+        independentLongestMs = Math.max(independentLongestMs, entry.duration);
+      }
+    }).observe({ type: "longtask" });
+  } catch {
+    longTaskObserverSupported = false;
+  }
+  const settleUntil = performance.now() + 1_200;
+  while (performance.now() < settleUntil) {
+    diagScene.renderer.render(diagScene.scene, diagScene.camera);
+    telemetry.tick();
+    // A REAL main-thread block, not a synthesised number: >50 ms is the
+    // longtask threshold, so this is the thing the metric is meant to catch.
+    const blockUntil = performance.now() + 120;
+    while (performance.now() < blockUntil) { /* deliberate main-thread block */ }
+    await yieldMacrotask();
+  }
+
+  const records = telemetry.exportRecords() as ReadonlyArray<{
+    readonly identity: { readonly recordId: string };
+    readonly versioning: Record<string, string>;
+    readonly environment: Record<string, string>;
+    readonly evidence: {
+      readonly rawEvents: ReadonlyArray<{ readonly type: string }>;
+      readonly derivedBlocks: ReadonlyArray<{ readonly name: string; readonly value: Record<string, unknown> }>;
+    };
+    readonly status: { readonly declaredGaps: readonly string[]; readonly probeStatus: string };
+  }>;
+  const record = records[0];
+  // Snapshot the independent counter AT THE SAME INSTANT the record was
+  // exported: the record is frozen here while the observer keeps counting,
+  // so comparing the frozen snapshot against the live counter would fail for
+  // the passage of time rather than for a dropped event.
+  const independentAtExport = independentLongTasks;
+  const eventTypes = new Set((record?.evidence.rawEvents ?? []).map((e) => e.type));
+  const summaryBlock = record?.evidence.derivedBlocks.find((b) => b.name === "probe_summary");
+  const renderedSampleWindows = Number(summaryBlock?.value.renderedSampleWindows ?? 0);
+  const counts = diagBackend.counts(diagHandle);
+
+  assert(
+    "diag-record-produced-on-a-real-load",
+    records.length === 1 && eventTypes.has("pager_snapshot") && eventTypes.has("gpu_upload") && eventTypes.has("decode"),
+    `${records.length} record(s) from a real paged load (revealed=${diagRevealed}, resident=${counts.resident} of ${counts.total} splats); `
+    + `event types present: ${[...eventTypes].sort().join(", ")}; declared gaps: ${record?.status.declaredGaps.join(", ") ?? "none"}`,
+  );
+
+  // AC3 — the §G trap, closed. The denominator's ONLY production feeder is
+  // this source's `renderedFrame` flag, so that is what is measured here: a
+  // second source is attached directly to the same live handle and its
+  // events counted. (probe_summary.renderedSampleWindows is written only by
+  // finalize() — LoadProbe.ts:521 is its single call site — and
+  // exportRecords() is a checkpoint, so the block is legitimately absent
+  // from the record read above; it is reported rather than asserted.)
+  const flagProbe = new PagerTelemetrySource({
+    backend: diagBackend, handle: diagHandle, sceneUrl: PAGED_ASSET,
+    sceneLocalPagedId: "denominator-probe", now: () => performance.now(),
+  });
+  let flagTotal = 0;
+  let flagWithRenderedFrame = 0;
+  flagProbe.attach((event) => {
+    if (event.type !== "pager_snapshot") return;
+    flagTotal += 1;
+    if (event.renderedFrame === true) flagWithRenderedFrame += 1;
+  });
+  const rendersBeforeFlag = diagBackend.pagerDiagnostics(diagHandle).renders;
+  for (let index = 0; index < 12; index += 1) {
+    diagScene.renderer.render(diagScene.scene, diagScene.camera);
+    flagProbe.tick(performance.now());
+    await yieldMacrotask();
+  }
+  const rendersAfterFlag = diagBackend.pagerDiagnostics(diagHandle).renders;
+  flagProbe.dispose();
+  assert(
+    "diag-cpu-budget-denominator-fed",
+    flagWithRenderedFrame > 0 && flagWithRenderedFrame === flagTotal && rendersAfterFlag > rendersBeforeFlag,
+    `${flagWithRenderedFrame} of ${flagTotal} pager_snapshot event(s) declared renderedFrame while the pager's own counter `
+    + `moved ${rendersBeforeFlag} → ${rendersAfterFlag} on ${expectedBackend}; probe_summary.renderedSampleWindows in the `
+    + `checkpoint record=${renderedSampleWindows} (finalize-only block). One event per SAMPLE WINDOW, not per frame — the `
+    + `pin's own cadence, named for what it counts (D35 item 5). The pin's only feeder was the deleted Spark adapter — unfed, every one `
+    + `of these would read undefined and the ladder would sit at max(1, 0)`,
+  );
+
+  // B2 — the fossils are gone and the engine names itself.
+  assert(
+    "diag-record-versions-have-no-fossils",
+    record?.versioning.engineVersion !== undefined
+      && record?.versioning.engineVersion === REVISION
+      && !("sparkVersion" in (record?.versioning ?? {}))
+      && !("adapterVersion" in (record?.versioning ?? {}))
+      && record?.versioning.semanticsVersion === "2",
+    `versioning=${JSON.stringify(record?.versioning)}; three's own REVISION=${REVISION}; `
+    + `sparkVersion present=${"sparkVersion" in (record?.versioning ?? {})}, adapterVersion present=${"adapterVersion" in (record?.versioning ?? {})}`,
+  );
+
+  // B3 — the record names the renderer that actually produced it.
+  assert(
+    "diag-record-names-its-real-backend",
+    record?.environment.rendererClass === expectedBackend,
+    `environment.rendererClass=${JSON.stringify(record?.environment.rendererClass)} on a ${expectedBackend} run `
+    + `(today's pre-ticket code hardcoded "webgl" here, so a WebGPU run recorded itself as WebGL)`,
+  );
+
+  // Condition #11 (owner ruling 2026-09-20, option (c)): "longest main-thread
+  // block" is one of the four metrics doc 05 names for this stack, and it was
+  // STRUCTURALLY UNFED — LoadProbe aggregated longTaskDurationMs that nothing
+  // ever set, so every record reported 0. RED, measured on this tree before
+  // the observer existed: 20 real long tasks (longest 626 ms, confirmed by an
+  // independent observer) produced 110 record events, 0 carrying a duration.
+  //
+  // This check does NOT require the browser to produce a long task. Measured
+  // 2026-09-20: `longtask` is in `PerformanceObserver.supportedEntryTypes`
+  // and `observe()` succeeds, yet eight deliberate 130 ms blocks produced
+  // ZERO entries on the WebGL2 run of this hidden pane while the same code
+  // produced ten on the WebGPU run. Long-task REPORTING is environmental, so
+  // asserting that one occurs would make this fixture flaky for a reason that
+  // has nothing to do with the code under test. Asserted instead: the emitter
+  // works (deterministic), and nothing the browser DID report is dropped.
+  const emitted: Array<{ cpuMs: number; operation: string; tagged: boolean }> = [];
+  const emitterProbe = new PagerTelemetrySource({
+    backend: diagBackend, handle: diagHandle, sceneUrl: PAGED_ASSET,
+    sceneLocalPagedId: "long-task-emitter", now: () => performance.now(),
+  });
+  emitterProbe.attach((event) => {
+    if (event.type !== "overhead") return;
+    const payload = event.payload as { cpuMs: number; operation: string };
+    emitted.push({ cpuMs: payload.cpuMs, operation: payload.operation, tagged: event.longTaskDurationMs === 137 });
+  });
+  emitterProbe.recordLongTask(137, performance.now());
+  emitterProbe.recordLongTask(0, performance.now());   // refused: not a block
+  emitterProbe.dispose();
+  const recordedLongTasks = (record?.evidence.rawEvents ?? []).filter(
+    (e) => e.type === "overhead" && (e as { payload?: { operation?: string } }).payload?.operation === "long_task",
+  ).length;
+  assert(
+    "diag-longest-main-thread-block-fed",
+    emitted.length === 1
+      && emitted[0]!.cpuMs === 137
+      && emitted[0]!.operation === "long_task"
+      && emitted[0]!.tagged
+      && recordedLongTasks >= independentAtExport,
+    `emitter: ${emitted.length} event(s) from two calls (137 ms accepted, 0 ms refused), `
+    + `carrying longTaskDurationMs=${emitted[0]?.tagged ? 137 : "absent"} — the field LoadProbe aggregates into `
+    + `longTasks and that NOTHING in the tree set before this ticket. On this run the browser reported `
+    + `${independentLongTasks} long task(s) independently (longest ${Math.round(independentLongestMs)} ms) and the record `
+    + `carries ${recordedLongTasks}, so none were dropped`
+    + (longTaskObserverSupported ? "" : " (longtask unobservable in this browser — the aggregate stays at its honest zero)"),
+  );
+
+  telemetry.dispose();
+  diagBackend.dispose(diagHandle);
+  diagScene.dispose();
+  telemetryHost.remove();
+
+  // --- 2. SiteRuntime registers paged scenes again (A2 closed, G4 wired) ---
+  // Author mode wires the console report sink, and a record only reaches a
+  // sink if registerPagedScene ran — so the summary line IS the proof that
+  // the skip is gone. The site's hero is `paged: true`.
+  const regMark = logs.length;
+  const registered = boot(labSite, { author: true });
+  await pumpUntil(registered, () => registered.ready !== null || registered.errors.length > 0);
+  const registeredRevealed = registered.handle.loadedScenes[0]?.visible === true;
+  registered.handle.dispose();
+  registered.host.remove();
+  // finalize() hands the revision to the sink fanout WITHOUT awaiting it, so
+  // the console sink's line lands a microtask or two after dispose returns.
+  await yieldMacrotask();
+  await yieldMacrotask();
+  const summaries = telemetrySummariesSince(regMark);
+  assert(
+    "siteruntime-registers-paged-scenes",
+    registeredRevealed && summaries.length >= 1,
+    `paged hero revealed=${registeredRevealed}; load-telemetry summaries emitted by the runtime's own wiring=${summaries.length} `
+    + `(${summaries[0]?.slice(0, 140) ?? "none"}) — a record cannot exist unless registerPagedScene ran, which ticket 09's A2 skipped`,
+  );
+
+  // --- 3. G5 — the phase7 runtime-consent evaluator, here rather than on the
+  // renderer-free diag page. Consent PENDING must construct nothing at runtime
+  // level; the contrast case proves the check is not vacuous.
+  const phase7RuntimeEvaluator = async (): Promise<{ expected: unknown; actual: unknown }> => {
+    const pendingMark = logs.length;
+    const pending = boot(labSite, {
+      author: true,
+      telemetry: { consentHook: () => ({ ephemeralMeasurement: "pending", localPersistence: "denied", remoteTransmission: "denied" }) },
+    });
+    await pumpUntil(pending, () => pending.ready !== null || pending.errors.length > 0);
+    const pendingRevealed = pending.handle.loadedScenes[0]?.visible === true;
+    pending.handle.dispose();
+    pending.host.remove();
+    await yieldMacrotask();
+    await yieldMacrotask();
+    const pendingSummaries = telemetrySummariesSince(pendingMark).length;
+
+    const grantedMark = logs.length;
+    const granted = boot(labSite, {
+      author: true,
+      telemetry: { consentHook: () => ({ ephemeralMeasurement: "granted", localPersistence: "denied", remoteTransmission: "denied" }) },
+    });
+    await pumpUntil(granted, () => granted.ready !== null || granted.errors.length > 0);
+    granted.handle.dispose();
+    granted.host.remove();
+    await yieldMacrotask();
+    await yieldMacrotask();
+    const grantedSummaries = telemetrySummariesSince(grantedMark).length;
+
+    return {
+      expected: { pendingRecords: 0, grantedRecordsAtLeastOne: true, pendingSiteStillRevealed: true },
+      actual: {
+        pendingRecords: pendingSummaries,
+        grantedRecordsAtLeastOne: grantedSummaries >= 1,
+        pendingSiteStillRevealed: pendingRevealed,
+      },
+    };
+  };
+
+  const selfTest = await runSelfTest({ phase7AcceptanceEnabled: true, phase7RuntimeEvaluator });
+  const phase7 = selfTest.assertions.find((a) => a.id === "phase7-runtime-consent");
+  assert(
+    "selftest-with-phase7-runtime-evaluator",
+    selfTest.passed && selfTest.evaluatedCount === 16 && phase7?.status === "pass",
+    `${selfTest.summaryLine} with the runtime evaluator injected (the renderer-free diag page reports 15/15 and leaves phase7 deferred); `
+    + `phase7-runtime-consent=${phase7?.status}, actual=${JSON.stringify(phase7?.actual)}`,
+  );
 
   assert(
     "no-unhandled-rejections",

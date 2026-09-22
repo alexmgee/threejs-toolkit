@@ -152,11 +152,32 @@ interface LodDriver {
   rendersWithTraversalHook: number;
 }
 
-/** Ticket 12 (§G diagnostics) owns the final shape; this is the pager's
- *  public counter door so nothing ever needs to monkey-patch it. Not part
- *  of the seam interface (doc 02's method set is fixed). The numeric
- *  fields are a SNAPSHOT taken by the call — call `pagerDiagnostics` again
- *  for fresh values; the functions act on the live pager. */
+/** The pager's public counter door, so nothing ever needs to monkey-patch
+ *  it. Not part of the seam interface (doc 02's method set is fixed). The
+ *  numeric fields are a SNAPSHOT taken by the call — call
+ *  `pagerDiagnostics` again for fresh values; the functions act on the
+ *  live pager.
+ *
+ *  FINAL SHAPE, ruled by the owner 2026-09-20 (ticket 12, G1): ONE door
+ *  with TWO LABELED HALVES.
+ *
+ *  1. The READ-ONLY half — every field above `evictChunk` plus `lod`'s
+ *     readonly fields — is the production half. `src/diag`'s telemetry
+ *     source reads it through `PagerDiagnosticsProvider` below.
+ *  2. The TEST-ONLY half — `evictChunk`, `admitChunk`,
+ *     `lod.setLodRenderScale`, `lod.setSelectionEnabled`,
+ *     `lod.setCullingEnabled` and `lod.markDirty` — is the same species as
+ *     `ThreeGsBackendOptions.fetchImpl` and `pageBudgetOverride`: a seam
+ *     that exists so fixtures can drive states a real load reaches only by
+ *     luck. Each is marked TEST-ONLY at its own declaration.
+ *
+ *  This SUPERSEDES handoff 007's "ticket 12 should make the door
+ *  read-only", with grounds: that line was written before the three
+ *  fixtures existed and before ticket 11's AC2 eviction/admission samples
+ *  grew roots into the mutators. A read-only door would delete the
+ *  mechanism behind counters-lab's AC2 samples, loader-lab's
+ *  eviction-mid-load drill and pager-lab's residency drills — trading
+ *  proven coverage for tidiness. */
 export interface PagerDiagnostics {
   readonly budget: PageBudget;
   readonly pageSize: number;
@@ -184,10 +205,13 @@ export interface PagerDiagnostics {
    *  decode, or never landed). */
   isCached(chunk: number): boolean;
   slotOf(chunk: number): number;
-  /** Explicit eviction: the slot is zeroed on the GPU and freed. */
+  /** TEST-ONLY seam (owner ruling 2026-09-20, G1): explicit eviction — the
+   *  slot is zeroed on the GPU and freed. Never call from production code;
+   *  residency is the pager's to decide. */
   evictChunk(chunk: number): boolean;
-  /** Re-decode from cached bytes and upload (admission after deferral or
-   *  eviction). Resolves false when the pool refuses a slot. */
+  /** TEST-ONLY seam (owner ruling 2026-09-20, G1): re-decode from cached
+   *  bytes and upload (admission after deferral or eviction). Resolves
+   *  false when the pool refuses a slot. Never call from production code. */
   admitChunk(chunk: number): Promise<boolean>;
   readonly mesh: GaussianSplatMesh;
   /** Ticket 07 — LOD / selection / culling counters and controls. */
@@ -206,15 +230,32 @@ export interface PagerDiagnostics {
     readonly cullingEnabled: boolean;
     readonly admitting: number;
     readonly admittingChunks: readonly number[];
-    /** Change the render-scale knob (07-S2); marks the traversal dirty. */
+    /** TEST-ONLY seam (G1): change the render-scale knob (07-S2); marks the
+     *  traversal dirty. Never set in production code. */
     setLodRenderScale(scale: number): void;
-    /** Selection off draws every resident splat (the ticket-06 behaviour). */
+    /** TEST-ONLY seam (G1): selection off draws every resident splat (the
+     *  ticket-06 behaviour). Never set in production code. */
     setSelectionEnabled(enabled: boolean): void;
-    /** Frustum culling on/off (mesh.frustumCulled from the pager AABB sphere). */
+    /** TEST-ONLY seam (G1): frustum culling on/off (mesh.frustumCulled from
+     *  the pager AABB sphere). Never set in production code. */
     setCullingEnabled(enabled: boolean): void;
-    /** Force a traversal on the next render (fixture drills). */
+    /** TEST-ONLY seam (G1): force a traversal on the next render (fixture
+     *  drills). Never call from production code. */
     markDirty(): void;
   };
+}
+
+/** The ONE thing load telemetry needs from the backend beyond the seam
+ *  (owner ruling 2026-09-20, ticket 12 G3): read access to the pager's
+ *  counter door. Declared here because `ThreeGsBackend.ts` is one of the
+ *  five doors `backend-doors-only` permits `src/` to import, so a consumer
+ *  typed `SplatBackend & PagerDiagnosticsProvider` satisfies that rule by
+ *  construction while naming EXACTLY the extra reach it takes — the type
+ *  is the documentation. `pagerDiagnostics` throws `not-paged` on a
+ *  monolithic handle and `unknown-handle` on a disposed one; callers that
+ *  observe optional scenes must tolerate both. */
+export interface PagerDiagnosticsProvider {
+  pagerDiagnostics(handle: SplatHandle): PagerDiagnostics;
 }
 
 export interface ThreeGsBackendOptions {

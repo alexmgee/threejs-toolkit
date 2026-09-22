@@ -290,6 +290,40 @@ it from RadPager or delete the budget feature; never leave it silently self-disa
 **Scope:** inside §A's count + ~4,300 gross lines deleted. **Verify:** the diagnostics
 *are* verification tooling — H-LOAD consumes their output.
 
+> **CORRECTION 2026-09-20 (Phase 2 ticket 12, owner ruling G6 — measured, not
+> estimated).** The line counts above are wrong and the SHAPE of the boundary is
+> wrong; both are corrected here rather than left standing, because the deletion
+> they describe has now been performed and measured.
+>
+> - "pager-internal halves of LoadProbe/diagWiring/LaggardMapper (~2,900 gross)":
+>   those three files total **1,936 lines WHOLE** (752 + 624 + 560), so their
+>   halves cannot be 2,900. More importantly, two of the three had no such half.
+>   `LoadProbe.ts` contains **2** pager references, both in comments, and imports
+>   nothing from Spark or the backend; `LaggardMapper.ts` contains **0**
+>   occurrences of spark/pager/chunk/SplatMesh. **Both survived the rewire with
+>   ZERO deleted lines.**
+> - WHY the estimate missed: LoadProbe declares PORTS (`NetworkSourceFactory`,
+>   `SpatialMapperFactory`, `CameraStateProviderFactory`) and takes their
+>   implementations by injection. The Spark coupling was never structural inside
+>   the framework — it was dependency-injected into it, and lived entirely in the
+>   implementations (`SparkPagerAdapter`, `diagWiring`'s `PagerNetworkSource` and
+>   its event mapper). The estimate counted involvement as ownership.
+> - "Survives re-fed: … fixtures …" is also corrected: `faultInjector.ts` (375)
+>   and `fixtures/fixtureTypes.ts` (309) plus `lab-load-001.json` (496,472 B) are
+>   NOT re-feedable. `replayAdapterFault` builds a mock SPARK pager and attaches
+>   the adapter for all 11 faults, and the JSON is a recording of a Spark session
+>   keyed on `pagedMembers` / `pagerMembers`. All three were deleted (owner
+>   ruling B1). Fault-path coverage for THIS pipeline lives in the labs'
+>   injection seams (loader-lab's fetch faults, counters-lab's plants, the
+>   worker-fault drills); a recorded replay of OUR sessions would be a new
+>   recording, named as a future item rather than a reason to keep a Spark one.
+> - **"~4,300 gross lines deleted" → 2,271 measured**, in nine regions across four
+>   files, with the per-region counts and consumer-grep evidence in ticket 12.
+> - The **trap** above was real and is closed, not deleted: the CPU-budget
+>   denominator is now fed from our own render path (`pagerDiagnostics.renders`),
+>   and `selfTest`'s `budget-denominator-advances` assertion fails if a future
+>   change stops feeding it (owner ruling G2).
+
 ---
 
 ## §H — Accepted regressions  [no-path]  — the honest list

@@ -2,7 +2,16 @@ import type { EventTimeRange, EventType, JsonValue, ProbeStatus, RawEvent, Termi
 import { DEFAULT_RECORD_CAP_POLICY, type RecordCapPolicy } from "./policies";
 
 export const LOAD_RECORD_SCHEMA_VERSION = "1";
-export const LOAD_RECORD_SEMANTICS_VERSION = "1";
+/**
+ * Bumped 1 → 2 by Phase 2 ticket 12 (owner rulings B2 + sibling, doc 06
+ * D35): `LoadRecordVersioning` lost `sparkVersion` and `adapterVersion` and
+ * gained `engineVersion`. Both removed fields were fossils — their only
+ * source was `SparkPagerAdapter`, deleted by §G — and the versioning
+ * mechanism exists for exactly this: a record written under 1 and one
+ * written under 2 are not the same shape, and readers must know it.
+ * Ticket 13's H-LOAD reads this bump as expected, not as a surprise.
+ */
+export const LOAD_RECORD_SEMANTICS_VERSION = "2";
 
 export interface LoadRecordIdentity {
   recordId: string;
@@ -18,8 +27,11 @@ export interface LoadRecordVersioning {
   schemaVersion: string;
   semanticsVersion: string;
   probeVersion: string;
-  adapterVersion: string;
-  sparkVersion: string;
+  /** The rendering engine that produced this record — three's own
+   *  REVISION, read at runtime. Replaces the pin's `sparkVersion` (and the
+   *  `adapterVersion` beside it, deleted outright: with the ports
+   *  implemented directly there is no separable adapter to version). */
+  engineVersion: string;
   toolkitVersion: string;
 }
 

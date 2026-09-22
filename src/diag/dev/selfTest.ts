@@ -1,7 +1,5 @@
 export * from "./FrameDiffValidator";
 export * from "./reportUI";
-export * from "../faultInjector";
-export * from "../fixtures/fixtureTypes";
 
 import { CameraEpochObserver, type CameraState } from "../cameraEpochs";
 import { ConvergenceObserver, resolveTerminal, weightedDelta, type FinalEvidence } from "../convergence";
@@ -22,15 +20,6 @@ import {
 import { LoadRecord, type LoadRecordInit, type LoadRecordRevision } from "../LoadRecord";
 import { LaggardMapper, type SpatialEvidenceObservation, type SpatialPageEvidence } from "../LaggardMapper";
 import { NetworkObserver } from "../NetworkObserver";
-import {
-  ADAPTER_FAULT_NAMES,
-  createMockPagerHarness,
-  replayAdapterFault,
-  type AdapterFaultName,
-  type FaultReplayResult,
-  MockPagedSplats,
-} from "../faultInjector";
-import { validateFixtureSchema, type SparkPagerFixture } from "../fixtures/fixtureTypes";
 import { createBeaconSink } from "../sinkBeacon";
 import { createStoreSink } from "../sinkStore";
 import { createTelemetryFanout, type SinkCapabilities, type SinkFailureStatus, type TelemetrySink } from "../sinks";
@@ -51,7 +40,6 @@ export interface SelfTestAssertion {
 }
 
 export interface SelfTestOptions {
-  readonly fixture?: unknown;
   readonly phase7AcceptanceEnabled?: boolean;
   readonly phase7RuntimeEvaluator?: () => Promise<Readonly<{ expected: unknown; actual: unknown }>>;
 }
@@ -67,16 +55,11 @@ export interface SelfTestResults {
 
 export async function runSelfTest(options: Readonly<SelfTestOptions> = {}): Promise<Readonly<SelfTestResults>> {
   const assertions: SelfTestAssertion[] = [];
-  assertions.push(assertFixture(options.fixture));
-  assertions.push(assertFingerprintAndThrownGetter());
-  assertions.push(assertInvalidAdapterFaults());
-  assertions.push(assertMissingOptional());
-  assertions.push(assertReorderedLifecycle());
-  assertions.push(await assertRequestLedger());
   assertions.push(assertTerminalPrecedence());
   assertions.push(assertCameraHysteresis());
   assertions.push(assertPersistedLifecycle());
   assertions.push(assertBudgetLadder());
+  assertions.push(assertBudgetDenominatorAdvances());
   assertions.push(assertWeightedGap());
   assertions.push(assertLaggardMapper());
   assertions.push(assertNetworkAmbiguity());
@@ -125,168 +108,6 @@ export function renderSelfTestResults(container: HTMLElement, results: Readonly<
   }
   container.append(panel);
   return panel;
-}
-
-function assertFixture(fixture: unknown | undefined): SelfTestAssertion {
-  if (fixture === undefined) {
-    return skipped("fixture-schema", "lab-load-001 schema and malformed copy", "fixture missing — capture pending");
-  }
-  const valid = validateFixtureSchema(fixture);
-  const candidate = fixture as Partial<SparkPagerFixture>;
-  const malformed = isRecord(fixture) ? { ...fixture } : {};
-  delete (malformed as { schemaVersion?: unknown }).schemaVersion;
-  const snapshotSequences = Array.isArray(candidate.snapshots) ? candidate.snapshots.map((snapshot) => snapshot.sequence) : [];
-  const rowSequences = Array.isArray(candidate.rows) ? candidate.rows.map((row) => row.sequence) : [];
-  const actual = {
-    valid,
-    schemaVersion: candidate.schemaVersion,
-    assetUrl: candidate.assetUrl,
-    snapshotSequencesStrict: strictlyIncreasing(snapshotSequences),
-    rowSequencesStrict: strictlyIncreasing(rowSequences),
-    capabilityKeys: isRecord(candidate.capabilities)
-      && ["request", "bytesReceived", "decode", "gpuUpload", "renderEligible", "parentRetired"].every((key) => key in candidate.capabilities!),
-    topologyKeys: isRecord(candidate.fingerprint)
-      && ["pagedMembers", "pagerMembers", "pageSplats"].every((key) => key in candidate.fingerprint!),
-    requestKeys: Array.isArray(candidate.requests)
-      && candidate.requests.every((request) => ["requestId", "sceneLocalPagedId", "chunk", "attempt", "combinedStartMs"].every((key) => key in request)),
-    malformedValid: validateFixtureSchema(malformed),
-  };
-  const expected = {
-    valid: true,
-    schemaVersion: 1,
-    assetUrl: "/examples/assets/teleport-lab1-hd.rad",
-    snapshotSequencesStrict: true,
-    rowSequencesStrict: true,
-    capabilityKeys: true,
-    topologyKeys: true,
-    requestKeys: true,
-    malformedValid: false,
-  };
-  return compared("fixture-schema", "lab-load-001 schema and malformed copy", expected, actual);
-}
-
-function assertFingerprintAndThrownGetter(): SelfTestAssertion {
-  const names = ["fingerprint_change", "thrown_getter"] as const;
-  const results = names.map(replayAdapterFault);
-  const allFaults = ADAPTER_FAULT_NAMES.map(replayAdapterFault);
-  const record = makeRecord("fault-record", "fault-scene");
-  record.append(makeEvent("fault-record", "fault-scene", 1, "adapter_invalidation", { reason: "thrown_getter", terminal: true }));
-  const finalized = record.finalize("adapter_invalid");
-  const actual = {
-    statuses: results.map((result) => result.actualStatus),
-    reasons: results.map((result) => result.invalidReason),
-    invalidations: results.map((result) => result.invalidationCount),
-    postInvalidPagerReads: results.map((result) => result.postInvalidPagerReads),
-    recordFinalized: finalized.finalized,
-    recordOutcome: finalized.status.terminalOutcome,
-    faultMatrix: allFaults.map((result) => ({ name: result.name, status: result.actualStatus, reason: result.invalidReason ?? null })),
-  };
-  const expected = {
-    statuses: ["invalid", "invalid"],
-    reasons: ["fingerprint_changed", "thrown_getter"],
-    invalidations: [1, 1],
-    postInvalidPagerReads: [0, 0],
-    recordFinalized: true,
-    recordOutcome: "adapter_invalid",
-    faultMatrix: [
-      { name: "fingerprint_change", status: "invalid", reason: "fingerprint_changed" },
-      { name: "thrown_getter", status: "invalid", reason: "thrown_getter" },
-      { name: "decreasing_bytes", status: "invalid", reason: "counter_decreased" },
-      { name: "resident_over_requested", status: "invalid", reason: "resident_over_requested" },
-      { name: "invalid_level", status: "invalid", reason: "invalid_level" },
-      { name: "invalid_topology", status: "invalid", reason: "forward_reverse_disagreement" },
-      { name: "missing_optional_stage", status: "degraded", reason: null },
-      { name: "reordered_events", status: "invalid", reason: "reordered_lifecycle" },
-      { name: "sink_failure", status: "degraded", reason: null },
-      { name: "storage_denial", status: "degraded", reason: null },
-      { name: "persisted_lifecycle_suspension", status: "degraded", reason: null },
-    ],
-  };
-  return compared("adapter-fingerprint-getter", "fingerprint change and thrown getter fail closed", expected, actual);
-}
-
-function assertInvalidAdapterFaults(): SelfTestAssertion {
-  const names = ["decreasing_bytes", "resident_over_requested", "invalid_level", "invalid_topology"] as const;
-  const results = names.map(replayAdapterFault);
-  const actual = results.map((result) => ({
-    name: result.name,
-    snapshotUndefinedAfterFault: result.actualStatus === "invalid" && result.events.filter((event) => event.type === "pager_snapshot").length === 1,
-    reason: result.invalidReason,
-    invalidations: result.invalidationCount,
-    priorValidEventsUnchanged: result.events[0]?.type === "adapter_attached" && result.events.some((event) => event.type === "pager_snapshot"),
-  }));
-  const reasons = ["counter_decreased", "resident_over_requested", "invalid_level", "forward_reverse_disagreement"];
-  const expected = names.map((name, index) => ({
-    name,
-    snapshotUndefinedAfterFault: true,
-    reason: reasons[index],
-    invalidations: 1,
-    priorValidEventsUnchanged: true,
-  }));
-  return compared("adapter-invalid-faults", "four terminal adapter read faults", expected, actual);
-}
-
-function assertMissingOptional(): SelfTestAssertion {
-  const result = replayAdapterFault("missing_optional_stage");
-  const gap = "render_eligible_exact_frame_absent_page_level_only";
-  const actual = {
-    probeStatus: result.actualStatus,
-    namedCapabilityFalse: !result.events.some((event) => String(event.type) === "render_eligible"),
-    matchingGapCount: result.declaredGaps.filter((value) => value === gap).length,
-    fabricatedLifecycleEvents: result.events.filter((event) => /render_eligible|parent_retired/.test(String(event.type))).length,
-  };
-  const expected = { probeStatus: "degraded", namedCapabilityFalse: true, matchingGapCount: 1, fabricatedLifecycleEvents: 0 };
-  return compared("adapter-missing-optional", "missing optional stage degrades without fabrication", expected, actual);
-}
-
-function assertReorderedLifecycle(): SelfTestAssertion {
-  const result = replayAdapterFault("reordered_events");
-  const actual = {
-    snapshotUndefined: result.actualStatus === "invalid",
-    invalidReason: result.invalidReason,
-    invalidationCount: result.invalidationCount,
-    pagerSnapshotsAppended: result.events.filter((event) => event.type === "pager_snapshot").length,
-  };
-  const expected = { snapshotUndefined: true, invalidReason: "reordered_lifecycle", invalidationCount: 1, pagerSnapshotsAppended: 1 };
-  return compared("adapter-reordered", "contradictory transition is rejected before append", expected, actual,
-    "The installed adapter names the plan's contradictory_transition condition reordered_lifecycle.");
-}
-
-async function assertRequestLedger(): Promise<SelfTestAssertion> {
-  const original = MockPagedSplats.prototype.fetchDecodeChunk;
-  const harness = createMockPagerHarness();
-  await harness.paged.fetchDecodeChunk(0);
-  await Promise.resolve();
-  const observed = harness.events.flatMap((event) => event.type === "request_started" ? [{
-    requestId: event.request.requestId,
-    range: undefined as string | undefined,
-  }] : []);
-  for (const event of harness.events) {
-    if (event.type !== "request_range_joined") continue;
-    const row = observed.find((candidate) => candidate.requestId === event.requestId);
-    if (row) row.range = event.byteRange?.header;
-  }
-  const expectedLedger = [{ requestId: "fixture-paged-0:chunk:0:attempt:1", range: "bytes=64-191" }];
-  const ownWhileAttached = Object.prototype.hasOwnProperty.call(harness.paged, "fetchDecodeChunk");
-  harness.handle.detach();
-  const actual = {
-    beforeAfterLedgerEqual: deepEqual(expectedLedger, observed),
-    requestCounts: [expectedLedger.length, observed.length],
-    byteRanges: [expectedLedger.map((row) => row.range), observed.map((row) => row.range)],
-    canonicalOrder: observed.map((row) => row.requestId),
-    ownHookWhileAttached: ownWhileAttached,
-    descriptorRestored: !Object.prototype.hasOwnProperty.call(harness.paged, "fetchDecodeChunk")
-      && harness.paged.fetchDecodeChunk === original,
-  };
-  const expected = {
-    beforeAfterLedgerEqual: true,
-    requestCounts: [1, 1],
-    byteRanges: [["bytes=64-191"], ["bytes=64-191"]],
-    canonicalOrder: ["fixture-paged-0:chunk:0:attempt:1"],
-    ownHookWhileAttached: true,
-    descriptorRestored: true,
-  };
-  return compared("request-ledger", "attach/detach request ledger and descriptor restoration", expected, actual);
 }
 
 function assertTerminalPrecedence(): SelfTestAssertion {
@@ -435,6 +256,108 @@ function assertBudgetLadder(): SelfTestAssertion {
   };
   return compared("budget-ladder", "adaptive optional ladder preserves mandatory capture", expected, actual,
     "The executable LoadProbe API emits the production budget_action names; the plan sketch names are compared through an explicit normalization.");
+}
+
+/**
+ * THE DENOMINATOR GUARD (owner ruling G2, 2026-09-20; AC3).
+ *
+ * LoadProbe's optional-work allowance is
+ *   min(max(1, renderedFrames) * optionalCpuMsPerRenderedFrame,
+ *       optionalCpuMsPerWindow)
+ * and `renderedFrames` counts ONLY captured events carrying
+ * `renderedFrame: true` (LoadProbe.ts:364). Under Spark the sole production
+ * feeder was the adapter's pager_snapshot; §G deletes the adapter, so an
+ * unfed replacement would pin the denominator at max(1, 0) and the ladder
+ * would quietly throttle itself to a permanent one-frame window while still
+ * emitting entirely plausible budget numbers.
+ *
+ * Reading the counter directly is not possible — it is a closure local, and
+ * exporting it would only prove that the export works. So this asserts the
+ * denominator through its ONLY observable consequence, twice over: the same
+ * optional CPU cost, fed to two identical probes, must overrun the budget
+ * when the frames are NOT declared and stay within it when they ARE. A
+ * regression that stops feeding `renderedFrame` collapses the second run
+ * onto the first and this goes red.
+ */
+function assertBudgetDenominatorAdvances(): SelfTestAssertion {
+  // Each optional observation is made to cost COST_MS of measured time by
+  // advancing the fake clock INSIDE readSnapshot — which is where LoadProbe
+  // measures it (`start` is taken after the stride check, and readSnapshot
+  // is the first call in the try). Charging the event payload instead would
+  // land in capture()'s mandatory window and never touch this budget.
+  //
+  // With COST_MS < PER_FRAME_MS the two runs separate cleanly:
+  //   unfed  allowance = max(1, 0) * 10 = 10 ms fixed, cost = 6k  -> overruns at k = 2
+  //   fed    allowance = k * 10 ms,                   cost = 6k  -> never overruns
+  // The inequality is strict in both directions, so neither outcome is an
+  // accident of rounding.
+  const COST_MS = 6;
+  const PER_FRAME_MS = 10;
+  const FRAMES = 8;
+
+  const run = (declareRenderedFrames: boolean): number => {
+    let clockMs = 0;
+    const costingNetworkSource = (): NetworkSource => ({
+      capabilities: ["denominator_probe"],
+      declaredGaps: [],
+      attach: () => ({ dispose() {} }),
+      readSnapshot: () => {
+        clockMs += COST_MS;
+        return {
+          adapterStatus: "valid",
+          requiredReadingsValid: true,
+          workingSetStable: true,
+          relevantOutstanding: false,
+          recentContradictoryEvent: false,
+          qualifyingProgress: false,
+          value: { denominatorProbe: true },
+        };
+      },
+      dispose() {},
+    });
+    const attached = attach({
+      ...registration(`denominator-${declareRenderedFrames ? "fed" : "unfed"}`),
+      samplingPolicy: {
+        version: "self-test-denominator",
+        values: { optionalCpuMsPerRenderedFrame: PER_FRAME_MS, optionalCpuMsPerWindow: 10_000 },
+      },
+      networkSourceFactory: costingNetworkSource,
+      now: () => clockMs,
+      loadId: `self-test-denominator-${declareRenderedFrames}`,
+    });
+    if (!("status" in attached)) throw new Error("denominator probe failed to attach");
+    const control = getLoadProbeControl(attached as LiveLoadProbeHandle);
+    if (!control) throw new Error("denominator probe control unavailable");
+    for (let index = 0; index < FRAMES; index += 1) {
+      control.capture({
+        type: "pager_snapshot",
+        source: "pager",
+        eventTimeMs: clockMs,
+        ...(declareRenderedFrames ? { renderedFrame: true } : {}),
+        payload: { residentPageIds: [], requestCount: index, residentSplats: index },
+      });
+      clockMs += 1;
+    }
+    const final = control.finalize("converged");
+    return (final?.evidence.rawEvents ?? []).filter((raw) => raw.type === "budget_action").length;
+  };
+
+  const unfedActions = run(false);
+  const fedActions = run(true);
+  const actual = {
+    unfedOverrunsBudget: unfedActions > 0,
+    fedStaysWithinBudget: fedActions === 0,
+    denominatorChangesOutcome: unfedActions !== fedActions,
+  };
+  const expected = {
+    unfedOverrunsBudget: true,
+    fedStaysWithinBudget: true,
+    denominatorChangesOutcome: true,
+  };
+  return compared("budget-denominator-advances",
+    "rendered-frame denominator is fed, not pinned at one frame", expected, actual,
+    "Observed through the ladder because the counter itself is a closure local: identical optional cost, "
+    + "overrunning when frames are undeclared and within budget when they are declared.");
 }
 
 function assertWeightedGap(): SelfTestAssertion {
@@ -648,15 +571,20 @@ async function assertStoreBounds(): Promise<SelfTestAssertion> {
   for (let index = 0; index < 6; index += 1) await fallbackStore.onRecord(makeRevision(`fallback-${index}`, 1, true));
   await fallbackStore.onRecord(makeRevision("fallback-5", 2, true));
   const fallbackRecords = await fallbackStore.exportRecords();
-  const denialFault = replayAdapterFault("storage_denial");
   const persistentBytes = encodedBytes(persistentRecords);
   const fallbackBytes = encodedBytes(fallbackRecords);
   const persistentCurrent = persistentRecords.find((record) => record.identity.recordId === "persistent-50");
   const fallbackCurrent = fallbackRecords.find((record) => record.identity.recordId === "fallback-5");
   const persistentLastStatus = persistentCurrent?.status.sinkHistory[persistentCurrent.status.sinkHistory.length - 1];
   const fallbackLastStatus = fallbackCurrent?.status.sinkHistory[fallbackCurrent.status.sinkHistory.length - 1];
+  // The pin's `storageDenialSignal` key is GONE with faultInjector (ticket
+  // 12, B1): the "storage_denial" fault's whole body pushed the string
+  // "storage_denial:memory_fallback" into an array, and this assertion
+  // compared that array to the same literal — a tautology that could not go
+  // red. The real claim it gestured at, "a denied store falls back to
+  // memory", is asserted below for real by `deniedFallbackTier`, which
+  // reads the live store's own capabilities.
   const actual = {
-    storageDenialSignal: denialFault.externalSignals,
     persistentRecordCount: persistentRecords.length,
     persistentBytesWithin25MiB: persistentBytes <= 25 * 1024 * 1024,
     fallbackRecordCount: fallbackRecords.length,
@@ -669,7 +597,6 @@ async function assertStoreBounds(): Promise<SelfTestAssertion> {
     deniedFallbackTier: fallbackStore.capabilities().fallbackTier,
   };
   const expected = {
-    storageDenialSignal: ["storage_denial:memory_fallback"],
     persistentRecordCount: 50,
     persistentBytesWithin25MiB: true,
     fallbackRecordCount: 5,
@@ -902,7 +829,7 @@ function metadata(sceneId: string): AffirmativeAttachOptions["metadata"] {
     declaredGaps: [],
     capabilityFlags: ["self_test"],
     environment: defaultEnvironment(),
-    versions: { adapterVersion: "self-test", sparkVersion: "2.1.0", toolkitVersion: "0.1.0" },
+    versions: { engineVersion: "self-test-engine", toolkitVersion: "0.1.0" },
     revealPolicyObserved: { mode: "self_test" },
     featureFlags: ["self_test"],
     wallClockBucket: null,
@@ -950,7 +877,7 @@ function makeRecord(recordId: string, sceneId: string): LoadRecord {
 function recordInit(recordId: string, sceneId: string): LoadRecordInit {
   return {
     identity: { recordId, loadId: "self-test-load", sceneId, serverVersion: null, radFormatVersion: null, topologyFingerprint: null },
-    versioning: { probeVersion: "self-test", adapterVersion: "self-test", sparkVersion: "2.1.0", toolkitVersion: "0.1.0" },
+    versioning: { probeVersion: "self-test", engineVersion: "self-test-engine", toolkitVersion: "0.1.0" },
     policy: { convergencePolicy: {}, samplingPolicy: {}, revealPolicyObserved: null, featureFlags: [], capabilityFlags: [] },
     status: { probeStatus: "valid", reasons: [], declaredGaps: [], sinkHistory: [] },
     environment: defaultEnvironment(),

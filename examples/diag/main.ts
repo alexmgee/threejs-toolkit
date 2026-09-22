@@ -1,31 +1,42 @@
 /**
  * Diagnostics self-test runner — ticket 07 runtime proof.
  *
- * Runs diag/dev/selfTest in a browser page (its AC). The sparkjs runner
- * (examples/loadtest) also wires Spark meshes and embed/diagWiring — both
- * Phase 2 scope — so this page runs the renderer-free core: runSelfTest
- * with the copied lab-load-001 fixture. The Phase-7 acceptance assertion
- * needs diagWiring's runtime evaluator and is left at its built-in
- * "deferred" status (declared in ticket 07's Comments).
+ * Runs diag/dev/selfTest in a browser page (its AC). This page runs the
+ * RENDERER-FREE core and keeps doing so (owner ruling G5, 2026-09-20): the
+ * Phase-7 acceptance assertion needs a real SiteRuntime, so it is evaluated
+ * in examples/site-lab, which is already renderer-bound and already runs on
+ * both backends, and stays "deferred" here.
+ *
+ * The lab-load-001 fixture and its schema assertion are GONE with ticket
+ * 12's §G deletions (owner ruling B1): the JSON was a recording of a SPARK
+ * pager session, keyed on Spark's private member names, which no code in
+ * this toolkit can feed or reproduce.
  *
  * DEV hook: window.__diagSelfTest { done } — await done for the results.
  */
 
 import { renderSelfTestResults, runSelfTest } from "@toolkit/diag/dev/selfTest";
-import fixture from "@toolkit/diag/fixtures/lab-load-001.json";
+
+/**
+ * The denominator this page must report, stated as a NUMBER rather than
+ * inferred. selfTest excludes skipped/deferred assertions from its own
+ * denominator, so a lost or silently-skipping assertion would otherwise
+ * turn "15/15" into a green "14/14". Baseline after ticket 12: 16 pushed,
+ * of which phase7-runtime-consent is deferred here (it evaluates in
+ * site-lab), leaving 15 evaluated.
+ */
+const EXPECTED_EVALUATED = 15;
 
 const out = document.getElementById("out")!;
 
 const done = (async () => {
-  // Guard the vacuous-pass vector: assertFixture returns "skipped" for an
-  // undefined fixture and selfTest excludes skips from the denominator, so
-  // a lost JSON import would otherwise shrink "20/20" to a green "19/19".
-  if (fixture === undefined) {
-    throw new Error("lab-load-001 fixture import resolved undefined");
-  }
-  const results = await runSelfTest({ fixture });
-  if (results.assertions.find((a) => a.id === "fixture-schema")?.status === "skipped") {
-    throw new Error("fixture-schema was skipped — the fixture did not reach selfTest");
+  const results = await runSelfTest();
+  if (results.evaluatedCount !== EXPECTED_EVALUATED) {
+    throw new Error(
+      `self-test denominator is ${results.evaluatedCount}, expected ${EXPECTED_EVALUATED} — `
+      + `an assertion was lost or silently skipped: `
+      + results.assertions.map((a) => `${a.id}:${a.status}`).join(", "),
+    );
   }
   renderSelfTestResults(out, results);
   for (const line of results.machineLines) console.log(line);

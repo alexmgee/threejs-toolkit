@@ -523,6 +523,27 @@ function constructAffirmativelyConsentedProbe(
         policyVersion: samplingPolicy.version,
         value: {
           cpu: cpuWindow(now()),
+          /** The optional-budget DENOMINATOR, recorded so AC3's "shown
+           *  non-zero on a real load" is readable from the record itself
+           *  rather than inferred from the ladder's behaviour. Zero here on
+           *  a load that rendered means the feed is broken — which is the
+           *  §G trap, now visible in the artifact (ticket 12, G2).
+           *
+           *  NAMED FOR WHAT IT COUNTS (owner ruling 2026-09-22, doc 06 D35
+           *  item 5): SAMPLE WINDOWS in which rendering occurred, NOT
+           *  rendered frames. One entry is pushed per captured event
+           *  carrying `renderedFrame`, and the telemetry source emits one
+           *  such event per SNAPSHOT while rendering runs at frame rate —
+           *  measured at 120 frames against 19 flagged events, a 6.32x
+           *  ratio on this machine. That sampling cadence is the pin's own
+           *  (`fd67153:SparkPagerAdapter.ts:529` emits one `pager_snapshot`
+           *  per `readSnapshot`), so the ladder's behaviour is unchanged
+           *  from what shipped; only the name is corrected. The policy
+           *  constant it divides, `optionalCpuMsPerRenderedFrame`, keeps
+           *  its inherited name: recalibrating the allowance against true
+           *  frames is a POST-PARITY TUNING decision, recorded in ticket
+           *  13, not a rename. */
+          renderedSampleWindows: renderedFrameTimes.length,
           longTasks,
           requestedFrequency: { spatialStride: 1, snapshotStride: 1 },
           effectiveFrequency: { spatialStride, snapshotStride },

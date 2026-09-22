@@ -141,7 +141,7 @@ links: [text-markers, diagnostics, embed-site]
   tech: ticket 09 (moved from 08 by ruling 08-S0); byte-identical to fd67153 via `git show`
 
 ## Watch loads and report problems {#diagnostics}
-tech: LoadCoordinator, probes, sinks, SparkPagerAdapter (temporary)
+tech: LoadCoordinator, probes, sinks, PagerTelemetrySource over the backend's counter door
 files: [src/diag/**]
 needs: [backend-pager]
 links: [site-rules, embed-site, fixtures]
@@ -157,11 +157,10 @@ links: [site-rules, embed-site, fixtures]
   by: claude
   from: roadmap
   tech: ticket 11; `computeSplatBounds(backend, handle)` over the seam's `bounds()`, world box by forced 8-corner transform (ruling B1, D33); exact against the fixture's own decoded union at 9 sampled moments and its per-point world box under the flip
-- [!] Rewire diagnostics off Spark pager (§G) {#diag-rewire}
+- [x] Rewire diagnostics off Spark pager (§G) {#diag-rewire}
   by: claude
   from: roadmap
-  tech: ticket 12; delete SparkPagerAdapter (~1,362 lines) for good
-  stuck: inherited notes collected and briefed in the ticket; stopped on agenda G1-G7 — the recorded guidance on the diagnostics door conflicts (read-only vs three labs' drills), and AC3's feed-or-delete, the H-API telemetry input shape, markSceneFirstSplatReady's feed and the phase7 evaluator's home need rulings
+  tech: ticket 12; SparkPagerAdapter + faultInjector + the Spark fixture deleted (2,271 gross measured, not the inherited ~4,300 — LoadProbe and LaggardMapper had no pager-internal half); new `PagerTelemetrySource` reads the counter door; CPU denominator fed and renamed `renderedSampleWindows` for what it counts (D35 item 5), with a selfTest guard proven red by plant; long-task feed added, peak heap deferred to 13; records name their real backend and engine (D35, semantics 1→2); A2 registration and G4 first-splat restored; two review rounds landed (1 adversarial finding + 4 built-in, all confirmed and fixed); site-lab 19/19 on both backends, diag 15/15; embed shrinks 21,713 B
 
 ## Ship splat sites in web pages {#embed-site}
 tech: `<splat-site>` web component, SiteRuntime, FragmentRouter, embed builds
@@ -217,6 +216,28 @@ links: [scene-core, render-stack, text-markers, site-rules, diagnostics, backend
   tech: phase-1 ticket 11 done (51 sources); Phase 2 ticket 09 returned the four embed names and ticket 11 the two counter names (StatsHUD, computeSplatBounds) — 7 of the original 13 still deferred, each returning with its phase
 
 ## decisions
+
+- **Ticket 12 rulings (owner, 2026-09-20):** the diagnostics door KEEPS its six residency /
+  LOD mutators, declared a TEST-ONLY SEAM in the door's own doc comment — the same species as
+  the backend's `fetchImpl` and `pageBudgetOverride` — so one door carries two labeled halves:
+  read-only counters for production, mutators for fixtures only (G1). This SUPERSEDES handoff
+  007's "make the door read-only", which was written before the three fixtures existed and
+  before ticket 11's AC2 grew roots into the mutators (grounds recorded in ticket 12). The
+  CPU-budget denominator is FED from our own render path rather than the feature deleted, shown
+  red-first self-disabling while unfed, and selfTest now asserts the denominator ADVANCES during
+  a load so an unfed regression can never again read as a legitimate one-frame window (G2). The
+  barrel-exported telemetry input types are RE-TYPED to the seam pair — a loud compile break
+  with doc 06 **D34**, mirroring D32/D33 (G3). `markSceneFirstSplatReady` fires at the loader's
+  REVEAL with `counts().resident`, the moment this toolkit already defines as first-splat-
+  visible — no second definition (G4). The `phase7-runtime-consent` evaluator runs in
+  `examples/site-lab` against the real SiteRuntime with the selfTest count re-baselined there,
+  and `examples/diag` stays renderer-free (G5). The ~2,900-line deletion boundary comes to the
+  owner file-by-file with consumer-grep evidence and the gross count for a yes/no BEFORE
+  anything is deleted (G6). H-LOAD criterion 9's SH-output assertion stays ticket 13's, with a
+  note in 13 that the production stack now exists, so 13 chooses build-or-re-record with grounds
+  instead of inheriting the deferral (G7). Carried: the embed is re-measured BOTH ways after the
+  trim against the 3,932,160 B bound, and the rewired stack proves BY EXECUTION that it still
+  emits H-LOAD's four named metrics for ticket 13.
 
 - **Ticket 11 third-stop ruling — S7 (owner, 2026-09-19):** text-lab's obstacle is `moss.ply`,
   SUPERSEDING the S3-(b) hero ruling, which was made before the floater measurement: the hero's

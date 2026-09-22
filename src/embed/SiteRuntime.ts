@@ -2418,6 +2418,21 @@ for (const def of site.scenes) {
       },
       onLoad: () => {
         entry.visible = true;
+        // G4 (owner ruling 2026-09-20): first-splat-ready fires at the
+        // loader's REVEAL — the paint-observed moment this toolkit already
+        // DEFINES as "first splat on screen" (D26). The pin read Spark's
+        // `numSplats` at a paged scene's first coarse splat, which was
+        // earlier than anything painted; using the reveal means there is
+        // exactly one definition of first-splat-visible in the toolkit,
+        // not two that can drift. The number is the seam's own resident
+        // count at that instant.
+        if (entry.paged) {
+          try {
+            loadTelemetry?.markSceneFirstSplatReady(def.id, splatBackend.counts(handle).resident);
+          } catch {
+            // Observation never surfaces into the reveal path.
+          }
+        }
         onSceneRevealed();
       },
       onError: (error) => {
@@ -2451,14 +2466,16 @@ for (const def of site.scenes) {
   };
   sparkScene.scene.add(entry.mesh);
   if (entry.paged) {
-    // Telemetry registration is skipped until ticket 12 rewires telemetry onto
-    // the backend's public counters: the pin's adapter polls for a Spark
-    // `mesh.paged.pager` this backend never has, then gives up silently after
-    // 30 s (ticket 09 Stop 1, A2 — ticket 12 owns removing this note).
-    authorNote(
-      "telemetry",
-      `load telemetry does not register paged scene "${def.id}" — its adapter observes Spark's pager, which this backend does not have; ticket 12 rewires it onto the backend's public counters`,
-    );
+    // Paged-scene registration, restored by ticket 12's rewire (A2 closed —
+    // the author-mode note that stood here is deleted with it). The seam
+    // pair goes in directly: no poll, no Spark mesh, no adapter.
+    loadTelemetry?.registerPagedScene({
+      sceneId: def.id,
+      backend: splatBackend,
+      handle,
+      sceneUrl: def.url,
+      backendKind: sparkScene.backend,
+    });
   }
   loadedScenes.push(entry);
 }
@@ -2521,8 +2538,8 @@ function onSceneRevealed(): void {
   loading.hide();
   options.onLoadProgress?.(1);
   // The coordinator reveal event is THIS moment: all scenes visible, overlay
-  // dropped — not any single scene's first splat. (The pin's per-scene
-  // markSceneFirstSplatReady is skipped with A2; ticket 12 restores it.)
+  // dropped — not any single scene's first splat, which each scene reports
+  // for itself at its own reveal (G4, restored by ticket 12).
   loadTelemetry?.markAllScenesVisible();
   // THE ready moment: the scenes are actually on screen, not merely booted.
   settleReady();

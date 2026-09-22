@@ -5,37 +5,31 @@
  * `diagWiring.stub.ts` at config time so Rollup statically eliminates the
  * whole diagnostics graph (see vite.config.ts TELEMETRY_MEASURE).
  *
- * Ordering rule proven in Phase 0b/6: `mesh.paged.pager` exists only after
- * the first render tick, which also starts fetching — so scene registration
- * polls for the pager and the adapter attaches mid-load against its
- * pre-attach baseline. Consent gates everything: pending/denied construct
- * nothing beyond the coordinator-free static status inside the probe.
- *
- * The pager-source composite here intentionally mirrors the sandbox copy in
- * examples/loadtest/main.ts (recorded follow-up: consolidate once Phase 7
- * settles — the sandbox exercises its own copy by design today).
+ * Registration is IMMEDIATE (Phase 2 ticket 12, §G) — but the pager it
+ * observes still arrives later, and the source is built to expect that. The
+ * pin POLLED a private `mesh.paged.pager` for 30 s and then gave up in
+ * silence. Two different things were tangled in that poll: Spark hid the
+ * pager behind private names (gone — we read a published door), and a
+ * paged scene's state genuinely does not exist until its header lands
+ * (NOT gone — measured at ~910 ms for the lab hero). So the handle is
+ * registered at once and `PagerTelemetrySource` treats the door's
+ * `not-paged` as "not yet" rather than "never"; nothing is polled, nothing
+ * is guessed at, and no load is silently abandoned.
+ * Consent gates everything: pending/denied construct nothing beyond the
+ * coordinator-free static status inside the probe.
  */
 
-import type { SplatHandle as SplatMesh } from "../backend/SplatBackend";
-import {
-  attachSparkPagerAdapter,
-  type AdapterSnapshot,
-  type SparkPagerAdapterEvent,
-  type SparkPagerAdapterHandle,
-} from "../diag/SparkPagerAdapter";
-import { LaggardMapper, type SpatialPageEvidence } from "../diag/LaggardMapper";
+import { REVISION } from "three";
+import type { SplatBackend, SplatHandle } from "../backend/SplatBackend";
+import type { PagerDiagnosticsProvider } from "../backend/ThreeGsBackend";
+import { PagerTelemetrySource } from "../diag/PagerTelemetrySource";
+import { LaggardMapper } from "../diag/LaggardMapper";
 import {
   type AffirmativeAttachOptions,
-  type CapturedProbeEvent,
   type ConsentDecisions,
-  type DisposableSource,
-  type NetworkSnapshot,
-  type NetworkSource,
   type ProbeSceneMetadata,
 } from "../diag/LoadProbe";
 import { LoadCoordinator } from "../diag/LoadCoordinator";
-import { NetworkObserver } from "../diag/NetworkObserver";
-import type { JsonValue } from "../diag/events";
 import { createConsoleReportSink } from "../diag/sinkConsole";
 import { createStoreSink } from "../diag/sinkStore";
 import { createBeaconSink } from "../diag/sinkBeacon";
@@ -85,11 +79,24 @@ export interface WireLoadTelemetryInput {
   readonly readCameraState: () => Readonly<TelemetryCameraSample>;
 }
 
+/**
+ * The seam pair, re-typed from the pin's Spark mesh (owner ruling G3,
+ * 2026-09-20; doc 06 D34). The pin's input carried a Spark `SplatMesh`
+ * whose `paged.pager` this backend never has — a shape that could only
+ * ever be satisfied by lying. `backend` is the seam plus the one extra
+ * door telemetry needs, named in the type rather than assumed.
+ */
 export interface RegisterPagedSceneInput {
   readonly sceneId: string;
-  readonly mesh: SplatMesh;
-  readonly renderer: unknown;
+  readonly backend: SplatBackend & PagerDiagnosticsProvider;
+  readonly handle: SplatHandle;
   readonly sceneUrl: string;
+  /** Which renderer actually initialized, for the record's environment
+   *  (owner ruling B3 — "the scene already knows"). It travels with the
+   *  registration because scene metadata is fixed at attach time, while the
+   *  counter door that also carries it does not open until the header
+   *  lands; reading it here would record "unknown" on every paged load. */
+  readonly backendKind: "webgpu" | "webgl2-fallback" | null;
 }
 
 export interface TelemetryWiringStatus {
@@ -122,8 +129,6 @@ export interface LoadTelemetryHandle {
 }
 
 const SNAPSHOT_INTERVAL_MS = 100;
-const PAGER_WAIT_INTERVAL_MS = 200;
-const PAGER_WAIT_TIMEOUT_MS = 30_000;
 
 const DEFAULT_CONSENT: Readonly<ConsentDecisions> = Object.freeze({
   ephemeralMeasurement: "granted",
@@ -178,7 +183,10 @@ function inertHandle(consent: Exclude<TelemetryWiringStatus["consent"], "granted
 
 interface RegisteredScene {
   readonly sceneId: string;
-  source?: PagerNetworkSource;
+  /** performance.now() at registration — the left edge of this scene's
+   *  long-task attribution window (see the observer in the constructor). */
+  readonly registeredAtMs: number;
+  source?: PagerTelemetrySource;
   pendingFirstSplat?: number;
   cancelled: boolean;
 }
@@ -191,6 +199,7 @@ class SiteTelemetry implements LoadTelemetryHandle {
   private readonly timers = new Set<ReturnType<typeof setTimeout>>();
   private lastTickMs = Number.NEGATIVE_INFINITY;
   private disposed = false;
+  private longTasks: PerformanceObserver | undefined;
 
   constructor(
     private readonly input: Readonly<WireLoadTelemetryInput>,
@@ -213,31 +222,59 @@ class SiteTelemetry implements LoadTelemetryHandle {
       const persisted = (event as PageTransitionEvent).persisted === true;
       this.forwardLifecycle({ type: "pageshow", eventTimeMs: performance.now(), persisted });
     });
+    // ONE long-task observer per runtime (ticket 12, condition #11). It sits
+    // here rather than in the source because a long task is a property of the
+    // PAGE, not of a scene: two registered scenes must each see it once, not
+    // twice between them. `longtask` is Chromium-only, so an unsupported
+    // browser leaves the aggregate at its honest zero. `buffered: true` asks
+    // for entries predating the observer; they are still filtered by each
+    // scene's own registration time below, so in practice it only helps a
+    // scene that registers within the same task as the runtime is wired.
+    try {
+      this.longTasks = new PerformanceObserver((list) => {
+        if (this.disposed) return;
+        for (const entry of list.getEntries()) {
+          const endedAtMs = entry.startTime + entry.duration;
+          for (const registered of this.scenes.values()) {
+            // A scene's record says "longest main-thread block during THIS
+            // load", so only blocks that had not already finished when the
+            // scene registered count. `buffered: true` delivers the page's
+            // whole history, which would otherwise attribute boot-time
+            // blocks to every scene registered afterwards — measured in the
+            // site-lab fixture as 178 attributed events against 9 that
+            // actually occurred, and a "longest" of 1174 ms against 287.
+            if (endedAtMs < registered.registeredAtMs) continue;
+            try {
+              registered.source?.recordLongTask(entry.duration, endedAtMs);
+            } catch {
+              // Observation never surfaces into the page.
+            }
+          }
+        }
+      });
+      this.longTasks.observe({ type: "longtask", buffered: true });
+    } catch {
+      // No longtask support (Firefox, Safari): the record's longTasks block
+      // stays zero, which is true rather than merely convenient.
+      this.longTasks = undefined;
+    }
   }
 
   registerPagedScene(sceneInput: Readonly<RegisterPagedSceneInput>): void {
     if (this.disposed) return;
     const sceneId = sanitizeSceneId(sceneInput.sceneId);
     if (this.scenes.has(sceneId)) return;
-    const registered: RegisteredScene = { sceneId, cancelled: false };
+    const registered: RegisteredScene = { sceneId, cancelled: false, registeredAtMs: performance.now() };
     this.scenes.set(sceneId, registered);
-    const startedAt = performance.now();
-    const poll = (): void => {
-      if (this.disposed || registered.cancelled) return;
-      try {
-        const paged = (sceneInput.mesh as unknown as { paged?: { pager?: unknown } }).paged;
-        if (paged?.pager) {
-          this.attachScene(registered, sceneInput);
-          return;
-        }
-        if (performance.now() - startedAt > PAGER_WAIT_TIMEOUT_MS) return;
-      } catch {
-        return;
-      }
-      const timer = setTimeout(poll, PAGER_WAIT_INTERVAL_MS);
-      this.timers.add(timer);
-    };
-    poll();
+    // No poll: the seam's handle is live at registration (§G). Attach
+    // failures degrade to "no telemetry for this scene", never into the
+    // visitor path — the same contract the poll's silent give-up had, now
+    // reached in one step instead of after 30 s of guessing.
+    try {
+      this.attachScene(registered, sceneInput);
+    } catch {
+      registered.cancelled = true;
+    }
   }
 
   markSceneFirstSplatReady(sceneId: string, numSplats: number): void {
@@ -284,12 +321,16 @@ class SiteTelemetry implements LoadTelemetryHandle {
   sceneStatuses(): readonly Readonly<TelemetrySceneStatus>[] {
     const statuses: Readonly<TelemetrySceneStatus>[] = [];
     for (const registered of this.scenes.values()) {
-      const capabilities = registered.source?.adapter.capabilities;
+      const source = registered.source;
       statuses.push(Object.freeze({
+        // There is no adapter to be "invalid" any more: the door either
+        // reads or the scene was never attached. "not_attached" replaces
+        // the pin's "awaiting_pager", which named a wait that no longer
+        // exists.
+        adapterStatus: source ? "valid" : "not_attached",
         sceneId: registered.sceneId,
-        adapterStatus: capabilities?.probeStatus ?? "awaiting_pager",
-        reasons: capabilities?.reasons ?? Object.freeze([]),
-        declaredGaps: capabilities?.declaredGaps ?? Object.freeze([]),
+        reasons: Object.freeze([]),
+        declaredGaps: source?.declaredGaps ?? Object.freeze([]),
       }));
     }
     return Object.freeze(statuses);
@@ -309,6 +350,8 @@ class SiteTelemetry implements LoadTelemetryHandle {
     this.disposed = true;
     for (const timer of this.timers) clearTimeout(timer);
     this.timers.clear();
+    try { this.longTasks?.disconnect(); } catch { /* already gone */ }
+    this.longTasks = undefined;
     for (const registered of this.scenes.values()) {
       registered.cancelled = true;
       try { registered.source?.dispose(); } catch { /* isolated */ }
@@ -327,8 +370,18 @@ class SiteTelemetry implements LoadTelemetryHandle {
   }
 
   private attachScene(registered: RegisteredScene, sceneInput: Readonly<RegisterPagedSceneInput>): void {
-    const source = new PagerNetworkSource(sceneInput.mesh, sceneInput.renderer, sceneInput.sceneUrl, registered.sceneId);
+    const source = new PagerTelemetrySource({
+      backend: sceneInput.backend,
+      handle: sceneInput.handle,
+      sceneUrl: sceneInput.sceneUrl,
+      sceneLocalPagedId: registered.sceneId,
+      now: () => performance.now(),
+    });
     registered.source = source;
+    // The record states which renderer produced it (owner ruling B3),
+    // replacing the pin's hardcoded "webgl". "unknown" survives as the
+    // honest answer for a runtime whose renderer has not initialized.
+    const backendIdentity = sceneInput.backendKind ?? "unknown";
     const endpoint = this.options?.telemetryEndpoint;
     const authorMode = this.input.authorMode;
     const localGranted = this.decisions.localPersistence === "granted";
@@ -338,9 +391,9 @@ class SiteTelemetry implements LoadTelemetryHandle {
       consentHook: this.consentHook,
       ...(this.options?.telemetryEndpoint ? { telemetryEndpoint: this.options.telemetryEndpoint } : {}),
       scene: null,
-      mesh: sceneInput.mesh,
-      renderer: sceneInput.renderer,
-      metadata: buildSceneMetadata(registered.sceneId, sceneInput.sceneUrl, source.adapter, this.input),
+      mesh: sceneInput.handle,
+      renderer: undefined,
+      metadata: buildSceneMetadata(registered.sceneId, sceneInput.sceneUrl, backendIdentity, source, this.input),
       sinkFactories: {
         ...(authorMode ? { ephemeral: [() => createConsoleReportSink({ development: true })] } : {}),
         ...(localGranted ? { local: [() => createStoreSink({ ephemeralMeasurementConsent: "granted", localPersistenceConsent: "granted" })] } : {}),
@@ -362,7 +415,8 @@ class SiteTelemetry implements LoadTelemetryHandle {
 function buildSceneMetadata(
   sceneId: string,
   sceneUrl: string,
-  adapter: SparkPagerAdapterHandle,
+  backendIdentity: string,
+  source: PagerTelemetrySource,
   input: Readonly<WireLoadTelemetryInput>,
 ): Readonly<ProbeSceneMetadata> {
   const navigatorLike = navigator as Navigator & {
@@ -370,18 +424,20 @@ function buildSceneMetadata(
     connection?: { effectiveType?: string };
   };
   const camera = safeCameraSample(input);
-  const capabilities = adapter.capabilities;
   return {
     sceneId,
     sceneUrl: stripSceneUrl(sceneUrl, location.href),
     sceneUrlBase: location.origin,
     serverVersion: null,
     radFormatVersion: null,
-    topologyFingerprint: capabilities.fingerprint ? JSON.stringify(capabilities.fingerprint) : null,
-    adapterStatus: capabilities.probeStatus,
-    statusReasons: capabilities.reasons,
-    declaredGaps: capabilities.declaredGaps,
-    capabilityFlags: Object.keys(capabilities.stages),
+    // No private shape is being tracked, so there is nothing to fingerprint
+    // and nothing that can silently change under us: topology invalidation
+    // was a Spark-adapter concern that dies with it.
+    topologyFingerprint: null,
+    adapterStatus: "valid",
+    statusReasons: Object.freeze([]),
+    declaredGaps: source.declaredGaps,
+    capabilityFlags: source.capabilities,
     environment: {
       browserBucket: browserFamilyBucket(navigator.userAgent),
       osClass: osClassBucket(navigator.userAgent),
@@ -391,11 +447,20 @@ function buildSceneMetadata(
       connectionBucket: bucketConnection(navigatorLike.connection?.effectiveType),
       deviceMemoryBucket: String(bucketDeviceMemory(navigatorLike.deviceMemory)),
       logicalCoreBucket: String(bucketLogicalCores(navigator.hardwareConcurrency)),
-      rendererClass: "webgl",
+      // Owner ruling B3 (2026-09-20): the runtime's ACTUAL backend, read
+      // from the counter door's PageBudget.backend, replacing the pin's
+      // hardcoded "webgl" — which made every WebGPU run record itself as
+      // WebGL (RED quoted in ticket 12).
+      rendererClass: backendIdentity,
     },
     versions: {
-      adapterVersion: capabilities.adapterVersion,
-      sparkVersion: capabilities.sparkVersion,
+      // `sparkVersion` and `adapterVersion` are GONE (owner rulings B2 and
+      // its sibling, 2026-09-20; doc 06 D35). Both were fossils: their only
+      // source was the deleted SparkPagerAdapter. `engineVersion` is what
+      // the field always meant — the engine that produced the record —
+      // taken from three's own REVISION rather than hardcoded, so it cannot
+      // drift from the engine actually running.
+      engineVersion: REVISION,
       toolkitVersion: "0.1.0",
     },
     revealPolicyObserved: { marker: LOAD_TELEMETRY_MARKER, mode: "site-runtime" },
@@ -428,197 +493,4 @@ function osClassBucket(userAgent: string): string {
   if (/iphone|ipad|ios/i.test(userAgent)) return "ios";
   if (/linux/i.test(userAgent)) return "linux";
   return "other";
-}
-
-// ─── Pager source composite (mirrors examples/loadtest/main.ts; see header) ───
-
-class PagerNetworkSource implements NetworkSource {
-  readonly adapter: SparkPagerAdapterHandle;
-  readonly capabilities: readonly string[];
-  readonly declaredGaps: readonly string[];
-
-  private readonly network: NetworkObserver;
-  private readonly pending: CapturedProbeEvent[] = [];
-  private receiver: ((event: Readonly<CapturedProbeEvent>) => void) | undefined;
-  private networkSubscription: DisposableSource | undefined;
-  private lastSnapshot: AdapterSnapshot | undefined;
-  private previousCounters: readonly number[] | undefined;
-  private readonly resourceUrl: string;
-
-  constructor(mesh: SplatMesh, renderer: unknown, sceneUrl: string, private readonly pagedId: string) {
-    this.resourceUrl = stripSceneUrl(sceneUrl, location.href);
-    this.network = new NetworkObserver({ resourceUrl: this.resourceUrl, resourceUrlBase: location.href });
-    this.adapter = attachSparkPagerAdapter({
-      pagedMesh: mesh,
-      renderer,
-      installedVersion: "2.1.0",
-      expectedVersion: "2.1.0",
-      sceneLocalPagedId: this.pagedId,
-      eventReceiver: (event) => this.acceptAdapterEvent(event),
-      now: () => performance.now(),
-    });
-    this.capabilities = Object.freeze([
-      ...Object.keys(this.adapter.capabilities.stages),
-      ...this.network.capabilities,
-    ]);
-    this.declaredGaps = Object.freeze([...new Set([
-      ...this.adapter.capabilities.declaredGaps,
-      ...this.network.declaredGaps,
-    ])]);
-  }
-
-  attach(receiver: (event: Readonly<CapturedProbeEvent>) => void): DisposableSource {
-    this.receiver = receiver;
-    this.networkSubscription = this.network.attach(receiver);
-    for (const event of this.pending.splice(0)) this.emit(event);
-    return Object.freeze({ dispose: () => this.detach() });
-  }
-
-  tick(atMs: number): AdapterSnapshot | undefined {
-    const snapshot = this.adapter.readSnapshot(atMs);
-    if (snapshot) this.lastSnapshot = snapshot;
-    return snapshot;
-  }
-
-  readSnapshot(atMs: number): Readonly<NetworkSnapshot> | undefined {
-    const adapterSnapshot = this.tick(atMs) ?? this.lastSnapshot;
-    const timing = this.network.readSnapshot(atMs);
-    if (!adapterSnapshot) return timing;
-    const counters = [
-      adapterSnapshot.requestedChunkAttempts,
-      adapterSnapshot.decodedChunkCount,
-      adapterSnapshot.decodedSplatCount,
-      adapterSnapshot.uploadedPageCount,
-    ] as const;
-    const qualifyingProgress = this.previousCounters !== undefined
-      && counters.some((value, index) => value > (this.previousCounters?.[index] ?? value));
-    this.previousCounters = counters;
-    const outstanding = adapterSnapshot.queueLengths.fetchers
-      + adapterSnapshot.queueLengths.fetched
-      + adapterSnapshot.queueLengths.newUploads
-      + adapterSnapshot.queueLengths.readyUploads;
-    const maxLevel = Math.max(0, ...adapterSnapshot.residentPages.map((candidate) => candidate.level ?? 0));
-    const pages: SpatialPageEvidence[] = adapterSnapshot.residentPages.map((page) => ({
-      canonicalPageId: page.pageId,
-      ...(page.parentPageId ? { parentPageId: page.parentPageId } : {}),
-      ...(page.childPageIds ? { childPageIds: page.childPageIds } : {}),
-      pageLevel: page.level ?? 0,
-      maxLevel,
-      resident: true,
-      renderEligibilityObservable: false,
-      replacementAmbiguity: 1,
-      occlusionEvidence: 0,
-      confidence: 0.5,
-    }));
-    return Object.freeze({
-      adapterStatus: adapterSnapshot.probeStatus,
-      requiredReadingsValid: true,
-      workingSetStable: outstanding === 0,
-      relevantOutstanding: outstanding > 0,
-      recentContradictoryEvent: false,
-      qualifyingProgress,
-      value: {
-        adapterSnapshot: adapterSnapshot as unknown as JsonValue,
-        resourceTiming: timing?.value ?? null,
-        spatialEvidence: {
-          pages: pages as unknown as JsonValue,
-          nearPlane: 0.01,
-          topologyFingerprint: this.adapter.capabilities.fingerprint
-            ? JSON.stringify(this.adapter.capabilities.fingerprint)
-            : null,
-        },
-      },
-    });
-  }
-
-  dispose(): void {
-    this.detach();
-    try { this.adapter.detach(); } catch { /* already detached */ }
-    this.network.dispose();
-  }
-
-  private detach(): void {
-    this.networkSubscription?.dispose();
-    this.networkSubscription = undefined;
-    this.receiver = undefined;
-  }
-
-  private acceptAdapterEvent(event: Readonly<SparkPagerAdapterEvent>): void {
-    if (event.type === "request_range_joined" && event.byteRange) {
-      try {
-        this.network.registerRequestKey({
-          requestId: event.requestId,
-          resourceName: event.expectedUrl ?? this.resourceUrl,
-          startTimeLowerBoundMs: Math.max(0, event.atMs - 25),
-          startTimeUpperBoundMs: performance.now() + 25,
-        });
-      } catch {
-        // Enrichment linking is best-effort; ambiguity stays unlinked.
-      }
-    }
-    const converted = adapterEventToProbeEvent(event);
-    if (!converted) return;
-    this.emit(converted);
-  }
-
-  private emit(event: Readonly<CapturedProbeEvent>): void {
-    if (this.receiver) {
-      this.receiver(event);
-      return;
-    }
-    if (this.pending.length < 2_000) this.pending.push(event);
-  }
-}
-
-function adapterEventToProbeEvent(event: Readonly<SparkPagerAdapterEvent>): CapturedProbeEvent | undefined {
-  const common = { eventTimeMs: event.atMs, adapterStatus: event.probeStatus, declaredGaps: event.declaredGaps } as const;
-  switch (event.type) {
-    case "adapter_attached":
-      return { ...common, type: "shape_fingerprint", source: "adapter", payload: { fingerprint: JSON.stringify(event.fingerprint) } };
-    case "adapter_invalidated":
-      return { ...common, type: "adapter_invalidation", source: "adapter", payload: { reason: event.code, terminal: true } };
-    case "request_started":
-      return { ...common, type: "request_created", source: "adapter", payload: {
-        requestId: event.request.requestId,
-        pageId: `${event.request.sceneLocalPagedId}:chunk:${event.request.chunk}`,
-        ...(event.request.byteRange ? { byteRange: event.request.byteRange.header } : {}),
-      } };
-    case "request_range_joined":
-      return { ...common, type: "request_ownership", source: "adapter", payload: {
-        requestId: event.requestId,
-        pageId: event.requestId,
-        canonicalPageId: event.requestId,
-        ...(event.byteRange ? { byteRange: event.byteRange.header } : {}),
-      } };
-    case "decode_combined_completed":
-      return { ...common, type: "decode", source: "adapter", payload: {
-        phase: "complete", requestId: event.request.requestId, pageId: event.request.requestId,
-        ...(event.request.numSplats === undefined ? {} : { decodedBytes: event.request.numSplats }),
-      } };
-    case "request_failed":
-      return { ...common, type: "request_failure", source: "adapter", payload: {
-        requestId: event.request.requestId, pageId: event.request.requestId,
-        reason: event.request.error ?? event.request.outcome ?? "unknown", terminal: true,
-      } };
-    case "gpu_upload_started":
-    case "gpu_upload_completed":
-      return { ...common, type: "gpu_upload", source: "adapter", payload: {
-        phase: event.type === "gpu_upload_started" ? "start" : "complete",
-        pageId: event.pageId,
-        ...(event.requestId ? { requestId: event.requestId } : {}),
-      } };
-    case "gpu_upload_failed":
-      return { ...common, type: "gpu_upload", source: "adapter", payload: {
-        phase: "failure", pageId: event.pageId,
-        ...(event.requestId ? { requestId: event.requestId } : {}), reason: event.error,
-      } };
-    case "selection_changed":
-      return { ...common, type: "first_render_contribution", source: "renderer", payload: { numSplats: event.selection.numSplats } };
-    case "pager_snapshot":
-      return { ...common, type: "pager_snapshot", source: "pager", renderedFrame: true, payload: {
-        residentPageIds: event.snapshot.residentPages.map((page) => page.pageId),
-        requestCount: event.snapshot.requestedChunkAttempts,
-        residentSplats: event.snapshot.residentPages.reduce((sum, page) => sum + (page.numSplats ?? 0), 0),
-      } };
-  }
 }

@@ -557,6 +557,102 @@ pads the box 5 % per axis. Here:
    Phase 4 re-adds splat-text framing with a real handle source (recorded under D19).
 Detail: ticket 11 Comments.
 
+**D34 — DECIDED (2026-09-20, OWNER RULED at Phase 2 ticket 12's stop G3): the
+barrel-exported load-telemetry input types are RE-TYPED to the seam pair.** The
+H-API-sanctioned divergence entry for `embed/diagWiring`'s registration surface,
+mirroring D32/D33's form. The pin's `RegisterPagedSceneInput` carries
+`{ sceneId, mesh: SplatMesh, renderer: unknown, sceneUrl }`, where `mesh` is a Spark
+`SplatMesh` whose `paged.pager` the wiring polls for 30 s before giving up in silence.
+This backend never has that object, so the pin's shape could only ever be satisfied by
+lying about what it holds. Here:
+1. **The input is `{ sceneId, backend, handle, sceneUrl, backendKind }`.** A loud
+   compile break, exactly D24's principle. Rejected: passing a duck-typed adapter built
+   from the seam (the type would still name a mesh it does not hold), and adding the
+   seam pair as optional fields beside the pin's (two shapes to keep honest forever).
+2. **`backend` is typed `SplatBackend & PagerDiagnosticsProvider`, not the concrete
+   class.** Telemetry needs one thing beyond doc 02's fixed method set — the pager's
+   counter door — because `LaggardMapper` consumes PER-PAGE evidence that aggregate
+   `counts()` cannot produce. `PagerDiagnosticsProvider` is a new one-method interface
+   exported from `ThreeGsBackend.ts`, itself one of the five doors `backend-doors-only`
+   permits, so the rule is satisfied by construction and the type states exactly which
+   extra reach telemetry takes. Rejected: the concrete `ThreeGsBackend` (a concrete
+   class on the public API for the first time) and `SplatBackend` alone (type-checks
+   clean while silently killing a §G survivor).
+3. **`backendKind` travels with the registration** rather than being read from the door.
+   Scene metadata is fixed at attach time, but the counter door does not open until the
+   asset's header lands — measured at ~910 ms for the lab hero — so reading it at
+   registration recorded `"unknown"` on every paged load. The runtime passes
+   `sparkScene.backend`, which is exactly the "the scene already knows" the B3 ruling
+   named.
+4. **Registration no longer polls.** The pin's 30 s poll tangled two things: Spark hid
+   the pager behind private names (gone — we read a published door), and a paged scene's
+   state genuinely does not exist yet when `load()` returns (NOT gone). The handle is
+   registered at once and the source treats the door's `not-paged` refusal as "not yet"
+   rather than "never"; `unknown-handle` is the only refusal that closes it. Collapsing
+   those two refusals silenced an entire load's telemetry in this ticket's own build,
+   caught by the site-lab fixture, which is why the distinction is written into the
+   source's contract rather than left to a comment.
+Detail: ticket 12 Comments.
+
+**D35 — DECIDED (2026-09-20, OWNER RULED at Phase 2 ticket 12's stops B2 and its
+sibling): the load record's versioning block drops its two Spark fossils and gains
+`engineVersion`; `LOAD_RECORD_SEMANTICS_VERSION` goes 1 → 2.** The pin's
+`LoadRecordVersioning` carries `adapterVersion` and `sparkVersion` beside
+`probeVersion`/`toolkitVersion`. Both were fed from one place — `SparkPagerAdapter`'s
+`capabilities` — and §G deletes it, so both fields would have outlived their only
+source. Measured before the change, on a WebGPU run of the real production wiring
+(quoted in ticket 12 as the RED state):
+
+    versioning.sparkVersion   : "2.1.0"
+    versioning.adapterVersion : "spark-pager-2.1.0.1"
+    environment.rendererClass : "webgl"          <- on a WebGPU run (B3)
+
+1. **`sparkVersion` → `engineVersion`**, fed from three's own `REVISION` at runtime,
+   never hardcoded: the value is the engine's own claim about itself, so it cannot drift
+   from the engine actually running. Rejected: `rendererVersion` — `environment.
+   rendererClass` already exists and answers a different question (which backend), and
+   two "renderer" fields in one schema is a reader trap.
+2. **`adapterVersion` is DELETED outright**, not renamed. Its concept has no successor:
+   with LoadProbe's ports implemented directly there is no separable adapter to version,
+   and a renamed fossil is still a fossil. If ticket 13's record-reading later wants a
+   toolkit-identity field, that is a new field with its own justification.
+3. **The semantics version bumps.** A record written under 1 and one written under 2 are
+   not the same shape and readers must know it; the mechanism exists for exactly this
+   moment, and dodging the bump to avoid the churn would be schema drift. Ticket 13's
+   H-LOAD reads the bump as expected, not as a surprise (noted in ticket 13's file).
+4. **`environment.rendererClass` is fixed in the same change (B3).** The pin hardcoded
+   `"webgl"`, so every WebGPU run recorded itself as WebGL — AC2 asks for a COMPLETE
+   record on BOTH backends, which that defeats by construction. It now carries the
+   runtime's actual backend identity (`"webgpu"` | `"webgl2-fallback"`). The GPU bucket
+   beside it (`bucketGpu(undefined, undefined, "unknown")`) is NOT fixed here: feeding it
+   requires choosing a GPU-identification mechanism inside a deliberately
+   privacy-bucketed stack. **Ruled 2026-09-20: it stays all-`unknown`, recorded as
+   FAITHFUL rather than as a defect** — the pin's own production call is
+   `bucketGpu(undefined, undefined, "unknown")` (`fd67153:src/embed/diagWiring.ts:388`,
+   verified), and its only call with real values is a hardcoded `"NVIDIA"` literal in
+   `selfTest.ts:728`, so all-unknown is the pin's production privacy posture and not
+   something this rewire broke. Feeding it is a fingerprinting-surface PRODUCT decision
+   reserved to the owner post-parity — never a port improvement.
+5. **The optional-budget denominator is RENAMED, not re-policied (added 2026-09-22 after the
+   adversarial review round).** `probe_summary.renderedFrames` becomes
+   **`renderedSampleWindows`**, because that is what it counts: one entry is pushed per
+   captured event carrying `renderedFrame`, and the telemetry source emits one such event per
+   SNAPSHOT while rendering runs at frame rate. Measured on a real paged load: **120 frames
+   drawn against 19 flagged events, a 6.32x ratio** (environment-dependent). This cadence is
+   the PIN's own — `fd67153:src/diag/SparkPagerAdapter.ts:529` emits one `pager_snapshot` per
+   `readSnapshot` — so the ladder's behaviour is unchanged from what shipped, and the field was
+   simply misnamed. Emitting true frame counts was REJECTED: it would loosen the optional-work
+   throttle roughly sixfold past any behaviour the pin ever ran, "a policy change wearing a bug
+   fix's clothes". The policy constant `optionalCpuMsPerRenderedFrame` KEEPS its inherited name
+   and value; whether the allowance should be recalibrated against true frames is a
+   post-parity tuning decision recorded in ticket 13, to be made once against evidence rather
+   than drifting per ticket. The G2 advance-assertion is unchanged — it tests feed liveness,
+   which is orthogonal to the unit. This rename rides the `LOAD_RECORD_SEMANTICS_VERSION`
+   1 → 2 bump already in this entry, at no extra cost.
+   *Provenance:* found by `astra-review` in ticket 12's adversarial round, confirmed
+   independently on the real backend, and shown inherited by checking the pin.
+Detail: ticket 12 Comments.
+
 **sRGB constraint — ACCEPTED (2026-08-20, ticket 03 close):** with the doc 04
 sRGB working space set (core/colorSpace.ts), assigning
 `renderer.outputColorSpace` on a CLASSIC WebGLRenderer throws inside three —
