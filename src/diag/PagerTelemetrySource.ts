@@ -299,11 +299,11 @@ export class PagerTelemetrySource implements NetworkSource {
     // measured at 120 frames against 19 flagged events (6.32x) on a real
     // paged load. This is the PIN's own cadence, not a regression
     // (`fd67153:SparkPagerAdapter.ts:529` emits one `pager_snapshot` per
-    // `readSnapshot`), and it is kept deliberately: emitting true frame
-    // counts would loosen the optional-work throttle roughly sixfold past
-    // any behaviour the pin ever shipped — a policy change wearing a bug
-    // fix's clothes. Whether the allowance should be recalibrated against
-    // true frames is ticket 13's post-parity tuning item.
+    // `readSnapshot`), kept deliberately for parity. Counting true frames
+    // would loosen the throttle: no effect at or below 10 fps, ~2x from 10-20
+    // fps, up to ~3x just above 20 fps (samples are renders >=100 ms apart,
+    // diagWiring.ts:301-302; the allowance is capped, LoadProbe.ts:465-469).
+    // CORRECTED from "at most roughly twofold" 2026-09-27 (ticket 13 R1-F2).
     const renderedFrame = next.renders > previous.renders;
     this.emit({
       ...common,

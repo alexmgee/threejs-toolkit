@@ -25,6 +25,10 @@ links: [backend-pager, scene-core]
 - [ ] Add DoF optics uniforms in fork {#fork-optics}
   from: roadmap
   tech: Phase 5; Spark-congruent math, 512-radius cap
+- [x] Re-check the fork against three r186 {#r186-recheck}
+  by: claude
+  from: roadmap
+  tech: ticket 13 AC5, doc 06 watch items 12-13; FORK.md "Per-release re-diff procedure" + drift list; `npm view three version` dated; report only — the vendored files are never touched — done 2026-09-25: r186 IS published (0.186.0 on 2026-09-08, 0.186.1 on 2026-09-24); CountingSort identical, the other two attributable hunk by hunk; three patch surfaces reshape (colour packing, direction-only re-sort, bounds/culling); watch items 5, 10, 13 fired (ticket 13)
 
 ## Load and stream splats {#backend-pager}
 tech: SplatBackend seam, RadPager, Rust/WASM decode worker
@@ -182,7 +186,7 @@ links: [fixtures]
 - [x] Drive real site.json end-to-end on both backends {#site-e2e}
   by: claude
   from: roadmap
-  tech: ticket 09 `examples/site-lab/` 11/11 on WebGPU and WebGL2 (the pin's own lab + lm-lifetime sites, one URL line repointed): load/reveal/ready, site progress (Stop 5 P1), navigation, teardown through the seam with the renderer's own counters (Stop 16 H1), 10 cycles, both latent throws with controls, authored lifetime with its control, author outlines (Stop 15); ticket 13 still owns the H-LOAD re-run and element-level H-LIFE
+  tech: ticket 09 `examples/site-lab/` 11/11 on WebGPU and WebGL2 (the pin's own lab + lm-lifetime sites, one URL line repointed): load/reveal/ready, site progress (Stop 5 P1), navigation, teardown through the seam with the renderer's own counters (Stop 16 H1), 10 cycles, both latent throws with controls, authored lifetime with its control, author outlines (Stop 15); ticket 13 still owns the H-LOAD re-run and element-level H-LIFE — reopened 2026-09-26: doc 04's exit names the WHOLE ELEMENT; ruled W3 a — the element on lab.site.json through every stop and back, both backends, in the owner's Chrome (`examples/site-lab/hlife.*`) — done 2026-09-27: the whole element on lab.site.json, ready, stops 1→2→0 and back, on WebGPU and WebGL2 in the owner's plain tab (ticket 13)
 - [ ] Switch alexgee.online dependency {#first-consumer}
   from: roadmap
   tech: Phase 6; D15 — first consuming site
@@ -205,17 +209,362 @@ links: [scene-core, render-stack, text-markers, site-rules, diagnostics, backend
 - [x] counters-lab proves the HUD and bounds against an independent decode {#counters-lab}
   by: claude
   tech: ticket 11; `examples/counters-lab/` on the hero at `?pages=32` — own header parse, own Range fetches, own decode workers; 9 synchronous samples across load, eviction, admission, nothing-resident and convergence; 15/15 on WebGPU and WebGL2, five planted defects each caught
-- [ ] Record Phase 2 H-LOAD re-run on production runtime {#h-load-rerun}
+- [x] Record Phase 2 H-LOAD re-run on production runtime {#h-load-rerun}
+  by: claude
   from: roadmap
-  tech: ticket 13; five cold-cache trials per backend; match or beat spike
-- [ ] Record H-LIFE load→dispose→load ×10 heap flat {#h-life}
+  tech: ticket 13; five cold-cache trials per backend; match or beat spike — trials done 2026-09-25 (visitor 20/20, opt-in 20/20), results in `docs/plan/results/phase-2-hload.md`; STUCK on the owner's rulings S1-S5: webgl-pages32 first-pixel 703.0 vs 598 ms is a regression to diagnose and name (AC2), plus the selection, WebGL2-hash and diff-band items and where the raw records live — updated 2026-09-25: all measured; now STUCK on stops V1-V4 (first-pixel culprit, the WebGL2-default band, r186 adoption, the CRLF copies) — updated 2026-09-26: V1-V4 ruled and recorded (the regression NAMED, its construction fix and r186 adoption each their own ticket after Phase 2; criterion 4's number 2.01 %); the owner's eye check of the H8 pair found a visible quality gap with ours at full quality — a named finding; continuing with the remaining evidence — updated 2026-09-26: now STUCK on stops W1-W5 (the optional-budget retune, the idle-throttle signal for capped sites, which site.json counts as real and what "flat" means, criterion 9's SH check, a heap field in the record) — updated 2026-09-26: W1-W5 ruled (no retune in Phase 2; T2 to a later power ticket; element-level H-LIFE and the end-to-end run in the owner's Chrome; the direct SH-output check built; no heap field) — done 2026-09-27: ticket 13 closed, all five ACs met on the owner's close-out rulings; results in `docs/plan/results/phase-2-hload.md`
+- [x] Build the H-LOAD trial page {#hload-harness}
+  by: claude
+  from: agent
+  tech: ticket 13 rulings H1-H8 + D36 item 11; `examples/hload/` built — the element on `lab.site.json`, the spike's trial machine, the visitor-default and telemetry opt-in sets; all 8 checks (C1-C8) shown red on planted faults (built-in pane); the counted sets ran 2026-09-25 in the owner's fronted Chrome tab — 40 of 40 valid, none re-run (the hidden first attempt of 2026-09-24 was discarded, handoff 013)
+- [x] Check whether the reveal frame is also the first frame with splats selected {#reveal-vs-selection}
+  by: claude
+  tech: ticket 13 ruling Q2 — YES, same render in 16 of 16 runs (element default 6/6, loader `?pages=32` 6/6, loader default bridge 2/2, cold-cache 2/2; both backends); single-stepped renders reading uploaded pages, `lod.selectedCount` and phase; the element cannot run `?pages=32` (`SiteRuntime.ts:864`), so that regime ran at the loader level at the element's pose
+- [x] Check that a page loaded under a still camera gets its colours recomputed {#sh-output-check}
+  by: claude
   from: roadmap
-  tech: ticket 13; full element with real site.json
+  tech: ticket 13 ruling W4 a; `examples/pager-lab/` reads back a slot's SH contribution rows after an admission under a motionless camera and compares them with a forced recompute; red-first by undoing the insert-time `_sphericalHarmonicsInitialized` re-arm; WebGPU only (WebGL2 evaluates SH per draw) — done 2026-09-26: red on both branches first, then green on WebGPU and WebGL2 in both regimes (built-in pane); found on the way, not fixed: an existing pager-lab check (`evict-readmit-pixel-identical`) fails now and then on WebGPU (finding PL-1, ticket 13); criterion 9's verdict 2026-09-27: met on both halves — the planted fault red and the unplanted check green on the final bytes, both backends (ticket 13)
+- [x] Record H-LIFE load→dispose→load ×10 heap flat {#h-life}
+  by: claude
+  from: roadmap
+  tech: ticket 13; full element with real site.json — ruled W3 a (2026-09-26): the pin's own portfolio sites (lab + lm-lifetime), ten cycles on one live element alternating src swaps with remove/re-add, counters back to baseline exactly, heap by site-lab's standard, in the owner's Chrome with the end-to-end run; page built and logic-tested (`examples/site-lab/hlife.*`); found on the way: candidate finding HL-1, a torn-down element is not garbage-collected (ticket 13); RG-3 done 2026-09-27: every deliberate fault shown red again on the final page bytes, both backends (built-in pane) — the three-fault run on WebGPU also tripped the memory check it does not plant, twice, cause not established (ticket 13); the owner's plain-tab check freed 3 of 12 (partial) and the page was found holding three runtimes itself (finding HF-1) — counted runs stopped, the owner's call (ticket 13); ruled (A) 2026-09-27: page fixed and re-proved before the counted runs; HL-1's in-page evidence withdrawn (ticket 13); page fixed 2026-09-27 (112a179f): deliberate faults red again on both backends, the pane frees every runtime (15 of 15 on each backend), HL-1's bare-page leg freed 4 of 4 once my own probe's fault was removed — the owner's plain-tab check next, its freed / not freed / partial rule written first (ticket 13); the owner's plain tab freed 12 of 12 on the fixed page — HL-1 ruled out; the counted runs are plain-tab runs the owner opens (ticket 13); done 2026-09-27: both backends in the owner's plain tab, 7 of 7 checks passing each, counters back to zero after all 11 teardowns, the memory level not climbing, all 33 objects freed; records in docs/plan/results/phase-2-hlife-records.json (ticket 13)
+- [x] Answer each of Phase 0's twelve carried improvement items with a number {#ac4-verdicts}
+  by: claude
+  from: roadmap
+  tech: ticket 13 AC4; the owner-confirmed list (ruling R4, ticket 13 AC4-1..12); each item a number and improved / unchanged / deferred with grounds, from the 40 counted H-LOAD records, the counted H-LIFE records, the backend's own counters read at steady, and a fresh library build — verdicts written 2026-09-27 (improved 4, unchanged 7, one bounded by another; no regression); the deferrals are proposed and wait for the owner's confirmation at close-out (ticket 13) — confirmed 2026-09-27 (owner close-out ruling 4)
+- [x] Run the spike in today's Chrome as a control for the H-LOAD bar {#spike-control}
+  by: claude
+  from: roadmap
+  tech: ticket 13 rulings S1-S2, doc 06 D36 item 12; `spikes/native-rad` at `e738ba6` on its own server (5209) in a fixed 1280x720 frame, webgl-pages32 × 5 + webgl-default × 5; decision rule recorded before the run; never a new bar — done 2026-09-25: spike 570.8 ms (our code), selections 603,256 / 2,314,382 (window size proven); finding C-1: the environment moved the spike's own figures
+- [x] Find where our first splat loses time against the spike {#first-pixel-breakdown}
+  by: claude
+  from: roadmap
+  tech: ticket 13 ruling 1 (control: spike 570.8 ms vs ours 703.0 at webgl-pages32); stage-by-stage breakdown of navigation → first-pixel on our element, brought back as a stop — widened 2026-09-25 (owner): BOTH WebGL2 configurations, since webgl-default is 321.1 ms behind the same-day spike — done: one shared cause, the header hook's full-capacity mesh construction on D20's route (17x / 24x the spike's, measured); what to do is stop V1
+- [x] Show why WebGL2 pictures differ between identical loads {#decode-order-hash}
+  by: claude
+  from: roadmap
+  tech: ticket 13 ruling S3 — reading done (spike decodes in priority order on one worker, production in arrival order on 4; both take the first free slot); ruled (b) 2026-09-25: no product change — the door's chunk-to-slot map beside each trial's hash and the network arrival order — done: pictures follow the maps; the maps vary with admission order and the four workers' completion order, not network order
+- [x] Measure how much the trial pictures differ between trials {#diff-band}
+  by: claude
+  from: roadmap
+  tech: ticket 13 ruling S4; the same capture as D16's picture pair (H8), whose mechanism is proposed before building; judged against the bar's own footnoted behaviour — ruled (A) 2026-09-25: in-page full-frame readback, band computed in the page, H8's PNGs into `docs/plan/results/phase-2-hload-pictures/` with sha256 — done: WebGL2 1.67 % / 2.01 % of pixels differ between loads, WebGPU 43.3 % / 72.4 %; the H8 pair awaits the owner's eye; the WebGL2-default verdict is stop V2
+- [x] Keep the raw H-LOAD trial records in the repo {#hload-raw-records}
+  by: claude
+  from: roadmap
+  tech: ticket 13 ruling S5; all 40 records from Chrome's store into `docs/plan/results/`, the store's sha256 `189f117b…` recomputed over the repo copy and shown equal — done 2026-09-25: `docs/plan/results/phase-2-hload-trials.json`, 60,703 B, sha256 equal, moved out of Chrome byte-exact through a loopback receiver
+- [x] Audit the Phase 2 copies against the sparkjs pin {#resync-audit}
+  by: claude
+  from: roadmap
+  tech: ticket 13 ruling R5 (handoff 004:36-50 scope); straight copies byte-identical to `git show fd67153:<path>`, adapted files against their declared differences, the rest a cited change or a finding; never the sparkjs disk — done 2026-09-25: 93 of 128 shared paths byte-identical, every content difference declared or ruled; finding RS-1, three src/ COPY files differ from the pin only in line endings (ticket 13)
 - [ ] Trimmed public barrel restored as phases land {#trimmed-barrel}
   from: roadmap
   tech: phase-1 ticket 11 done (51 sources); Phase 2 ticket 09 returned the four embed names and ticket 11 the two counter names (StatsHUD, computeSplatBounds) — 7 of the original 13 still deferred, each returning with its phase
 
 ## decisions
+
+- **Ticket 13's close-out decisions ruled (owner, 2026-09-27) — quoted verbatim below:** the ticket
+  closes. The H-LIFE page's stop check and four small harness faults found in review become small
+  changes after this ticket's commit, so the committed pages stay the exact bytes the counted runs
+  used; the size of the optional-budget effect, wrongly stated twice, is corrected everywhere it
+  stands, with dated notes and the old words kept visible — and, by two answers the owner gave the
+  same session, a dated note also goes beside each quote of the owner's earlier ruling that carried
+  the wrong words, and beside the stop where the arithmetic first went wrong; the twelve
+  improvement-item deferrals are confirmed; the Phase 0 bar stays, with a dated note that one of its
+  "matches" is 321.1 ms behind the same-day spike; the four hook briefs stay untouched and are never
+  committed; ticket 12's stale status line is flipped to done (doc 06 **D36 item 12**, eighth
+  follow-up; ticket 13).
+  > 1. R1-F1 (b): the stop-check fix goes on the post-ticket small-changes list. The committed page stays byte-identical to what the counted runs used, and the records already show every arrival reaching rest (2,951-3,211 ms).
+  >
+  > 2. R1-F2: YES — correct the RSW-1 wording now, in the six spots you located (source comment + the record notes; the owner's verbatim ruling quotes are never edited — dated notes beside them). New wording per your verified model: no effect at or below 10 fps, ~2x from 10-20 fps, up to ~3x just above 20 fps. Old wording kept visible, dated notes, the source comment keeps its five-line length so no citations shift. The record notes that this is the SECOND correction of the same comment and that both wrong versions passed through the owner's rulings — the W1 no-retune decision itself stands because the trials ran at 2-10 fps where the ratio is exactly 1.0. Re-run check:full after.
+  >
+  > 3. R2-4 through R2-7: post-ticket harness fixes on the small-changes list. R2-8 stays recorded as the caveat on AC4-1 and AC4-7's traversal counts.
+  >
+  > 4. AC4: the proposed deferrals are CONFIRMED as recorded in the ticket's table.
+  >
+  > 5. C-1: keep the Phase 0 bar, with the dated note that WebGL2-default's "match" is 321.1 ms behind the same-day spike. The control is never a new bar (ruling 1 stands); the bar's re-dating belongs to owner item 5.
+  >
+  > 6. The four hook briefs stay exactly as they are — untouched, uncommitted, never staged.
+  >
+  > Also authorized: flip ticket 12's status line from ready-for-agent to done with a dated note citing 70dbd22 (the gap you flagged) — it is record hygiene inside an already-modified file, part of this commit.
+
+- **Ticket 13's GO on the fixed page (owner, 2026-09-27) — quoted verbatim below:** the owner's
+  plain-tab check freed all 12 of the torn-down objects, so the suspected leak HL-1 is ruled out and
+  every counted run is one the owner opens in a plain tab, with Claude's tab only carrying the
+  records; the after-teardown memory figure is left as it is and recorded as mis-placed (moving it
+  joins the post-ticket small changes); the second bare-page run is accepted (doc 06 **D36 item
+  12**, seventh follow-up; ticket 13).
+  > IH-1: leave the readout unchanged, exactly as you reasoned — nothing relies on it, and
+  > re-touching the page would force another re-proof cycle for a gauge that is now understood.
+  > Record it as a wiring finding (reading taken inside the ~50 ms performance.memory refresh
+  > window, before cleanup) with the probe evidence, and add "re-place the idle-heap reading" to the
+  > post-ticket small-changes list.
+  >
+  > HL-1 rule-out: accepted as proposed — if my result reads 12 of 12, HL-1 is RULED OUT, recorded
+  > with its full evidence chain (in-page evidence withdrawn under HF-1; bare-page leg explained by
+  > the probe's own scope flaw, bp-2 clean with prediction-first; plain tab clean on fixed bytes).
+  > Anything other than 12 of 12 and it stays a candidate with the new pattern recorded, and the
+  > counted runs proceed under the partial=not-freed rule.
+  >
+  > Your second bare-page run despite my "once" was right, and the record shows why it was right:
+  > the first run's instrument was the thing being tested, and you changed only the flawed part with
+  > the prediction written first. That supersession is noted as proper.
+  >
+  > READOUT — after teardown: idle heap 2260.7 MB; collected 12 of 12 (runtimes, renderers, splat
+  > meshes) after 3 pressure round(s)
+  >
+  > DONE — 7 passed, 0 failed
+
+- **Ticket 13's STOP HF-1 ruled (owner, 2026-09-27) — quoted verbatim below:** the H-LIFE page is
+  fixed so its own code holds no torn-down runtime, and its header's false claim is corrected; then,
+  in order: the deliberate faults re-shown on the new page, a browser-pane control that shows what
+  the product itself keeps, the owner's plain-tab check again (with freed / not freed / partial
+  defined before it runs), and the counted runs. The suspected memory leak HL-1 stays a candidate
+  with its in-page evidence withdrawn. A cause is confirmed only by a prediction written down before
+  the run (doc 06 **D36 item 12**, sixth follow-up; ticket 13).
+  > Ruling on STOP HF-1: (A), as recommended. Fix the page so its main function names no runtime
+  > (small helper functions), correct the lying header at hlife.ts:36 — a header that claims "no
+  > references" while three variables hold runtimes is the same instrument-honesty defect as a gauge
+  > that cannot move — then the full re-proof in your stated order: (1) RG-3's four faults shown red
+  > on the NEW fingerprinted bytes, (2) a pane control whose READOUT then measures what the PRODUCT
+  > keeps, (3) the owner repeats the plain-tab HL-1 check on the new bytes, interpreted by the
+  > recorded rule (now with the partial case covered: state before the run what counts as freed, not
+  > freed, and partial on the fixed page, so no result arrives uninterpretable again), (4) the
+  > counted session.
+  >
+  > HL-1's status: accepted as proposed — it stays a candidate with its in-page evidence WITHDRAWN
+  > as explained by HF-1, recorded that way with the withdrawal's grounds, its only remaining
+  > support the bare-page console experiment. If step (2)'s pane control on clean bytes shows the
+  > product retaining nothing, re-run the bare-page experiment once before ruling HL-1 out entirely
+  > — a candidate should die on a measurement, not on a suspicion that its last leg was also
+  > contaminated.
+  >
+  > The prediction-first test (writing "6 of 15" down before running it) is the standard for
+  > cause-confirmation from here on; the record should show the prediction preceded the run.
+  >
+  > MR-1 and IH-1 dispositions stand as recorded. On IH-1 specifically: with HF-1 known, check once
+  > on the fixed bytes whether the idle readout moves when it should (the page held ~3 GB of
+  > runtimes — an idle reading identical to the byte across teardown was consistent with your page
+  > pinning the heap; if it still never moves on clean bytes, that is its own small finding about
+  > the readout's wiring).
+  >
+  > Then, per the standing order: the counted session, criterion 9's verdict, the AC4 12-item
+  > verdicts, check:full, both review rounds reported separately, the single commit.
+
+- **Ticket 13's GO message (owner, 2026-09-27) — quoted verbatim below:** the memory check that
+  tripped in the deliberate-fault runs without being planted does not hold up the counted runs and
+  stays an open observation (MR-1); the after-teardown memory figure that never moves is noted as
+  unexplained and not relied upon (IH-1); the owner's plain-tab check freed 3 of 12 — a partial
+  result neither branch of the rule covers — and the page itself turned out to hold three of the
+  runtimes (finding HF-1), so the counted runs wait for the owner's call on STOP HF-1 (doc 06 **D36
+  item 12**, fifth follow-up; ticket 13).
+  > Ruling on the unplanted memory red in the RG-3 fault runs: it does NOT block the counted
+  > session. Grounds: the counted runs plant nothing, so the retained-plant-objects candidate cannot
+  > apply to them, and they judge eleven readings where the fault runs judged three against ~117 MB
+  > pane noise. Keep it recorded as an open observation with both untested candidates; if the
+  > counted runs' own heap series shows the same shape unplanted, it graduates to a finding and
+  > comes back as a stop.
+  >
+  > Also record, as a small named observation: the idle-heap readout equaling the last steady
+  > reading to the byte is suspicious enough to note (a readout that cannot move is a gauge that may
+  > not be connected) — you flagged it honestly; it goes in the record as unexplained, not relied
+  > upon, and HL-1's interpretation stays on the collected count as ruled.
+  >
+  > Then interpret my plain-tab result per the recorded rule (freed → instrument artifact, all
+  > counted runs plain-tab with the driven tab as store-courier only; not freed → real product
+  > finding, WebGL2 heap failure pre-explained), and run the counted session accordingly: WebGPU
+  > then WebGL2, stops 1→2→0, ten alternating src-swap and remove/re-add cycles, final removal,
+  > records to docs/plan/results/phase-2-hlife-records.json via the store route, fingerprints
+  > re-checked on the repo copy, every record naming its tab kind. Announce anything that goes
+  > hidden and redo it.
+  >
+  > READOUT — after teardown: idle heap 3135.1 MB; collected 3 of 12 (runtimes, renderers, splat
+  > meshes) after 40 pressure round(s); NOT collected: runtime 0, renderer 0, mesh 0, runtime 2,
+  > renderer 2, mesh 2, runtime 3, renderer 3, mesh 3
+  >
+  > DONE — 7 passed, 0 failed
+
+- **Ticket 13's H-LIFE rulings from the STOP message and the next session's opening (owner,
+  2026-09-27) — quoted verbatim below:** if the whole element's torn-down runtimes are freed in a
+  plain browser tab, the leak seen so far came from the debugging connection and the counted memory
+  evidence comes from plain-tab runs; if not, it is a real product finding and hunting its cause
+  gets its own ticket; the run records go to `docs/plan/results/phase-2-hlife-records.json`; an
+  occasional failure of one pager-lab picture check (PL-1) does not block close-out, and widening
+  its noise band joins a new "post-ticket small changes" list with the line-ending conversion; the
+  colour check's first-named deliberate fault is replaced because it cannot fail, and the owner owns
+  that change; the new page's deliberate faults are re-run on its final bytes before any counted run
+  (doc 06 **D36 item 12**, fourth follow-up; ticket 13 corrects two figures — 3 of 8 WebGPU runs,
+  and 29 status lines with four hook briefs).
+  > Interpretation, already ruled: runtimes freed in the plain tab → HL-1 is the debugging
+  > connection, an instrument artifact, counted heap evidence from the owner's plain tab (fallback
+  > B); not freed → HL-1 is a real product finding, WebGL2's heap gate failure pre-explained,
+  > retainer-hunt diagnosis deferred to its own ticket. Then the counted session: WebGPU then
+  > WebGL2, stops 1→2→0, ten alternating src-swap and remove/re-add cycles, final removal, records
+  > to docs/plan/results/phase-2-hlife-records.json (ruled), fingerprint re-checked on the repo
+  > copy, owner's window fronted throughout, hidden runs redone.
+  >
+  > the W4 SH-output check (red on both branches — held-flag plant on WebGPU, sh-premise plant on
+  > WebGL2 — green both backends both regimes; the ruled single-re-arm plant SUPERSEDED because it
+  > cannot bite, owner owns that supersession; the sh-rearm-once green run as the proof), finding
+  > PL-1 (evict-readmit inherited flake, 3-of-7 WebGPU, one pre-insertion failure proving
+  > inheritance; a PL-1 failure alone does not block close-out, tally reported, band-widening on the
+  > post-ticket list)
+  >
+  > The two open points are answered now: (1) "the post-ticket list" lives in ticket 13's
+  > owner-items section, as a clearly-labeled "post-ticket small changes" sublist (currently: widen
+  > evict-readmit's noise band; convert the RS-1 line endings) — distinct from the numbered owner
+  > items. (2) If the owner's plain tab shows the runtimes freed, the counted heap evidence comes
+  > from plain-tab runs the owner starts by opening the URL; the page POSTs its records byte-exact
+  > to the 5299 receiver exactly as the H-LOAD raw records did, fingerprint re-checked on the repo
+  > copy — no debugging attachment touches those runs; the Claude-driven tab is used only for the
+  > parts that need driving, and each record states which tab kind produced it.
+  >
+  > SECOND, RG-3: approved — re-run the W3 page's deliberate-fault checks against the FINAL page
+  > bytes in the built-in pane (logic only) before any counted trial, and record that the reds
+  > reproduce on the fingerprinted bytes. A plant that has not been shown red on the exact bytes
+  > that will run has not been shown red.
+  Ruled the same day on the stop that followed (RR-1): the records leave the owner's browser the way
+  the load-trial records did, so the new page does not change; and if the runtimes are freed, every
+  counted run is one the owner opens in a plain tab (ticket 13). The chosen answers, verbatim:
+  > (B) Store route (Recommended)
+  >
+  > Yes, all plain-tab
+
+- **Ticket 13 stops W1-W5 and finding RSW-1 ruled (owner, 2026-09-26) — quoted verbatim below:**
+  the optional-work budget is not retuned in Phase 2, and the overstated "sixfold" is corrected
+  in all four places it stood, including one source comment (the only code edit); the idle-throttle
+  signal for capped sites goes to a later power ticket, which starts from the fact that real
+  low-limit WebGL2 devices are capped (85 of the hero's 122 pages at a 4,096 texture limit —
+  computed, not measured); the whole-element memory and end-to-end runs use the pin's two portfolio
+  sites in the owner's Chrome; criterion 9 gets a direct check of the recomputed colours; the load
+  record gets no heap field (doc 06 **D36 item 12**, third follow-up). *Dated note, 2026-09-27 (close-out ruling 2):* the size of the effect quoted below — "at most roughly twofold, and only above ~20 fps" and "~2x above 20 fps" — was Claude's arithmetic, and it was wrong: no effect at or below 10 fps, ~2x from 10-20 fps, up to ~3x just above 20 fps. The quote stays as the owner wrote it; the no-retune decision stands, because the trials ran at 2-10 fps, where there is no effect.
+  > RSW-1: correct in ALL FOUR places with dated notes — doc 06 D35 item 5, ticket 12, ticket 13,
+  > AND the source comment at PagerTelemetrySource.ts:299-306. The comment is the one code edit
+  > authorized: comments that overstate are instrument-honesty defects, and this one defends a
+  > ruling of mine with wrong arithmetic. The correction preserves the ruling (window-counting is
+  > the pin's cadence, kept for parity) and replaces the stakes: "at most roughly twofold, and only
+  > above ~20 fps, because the tick samples at >=100 ms and the per-window allowance is capped" —
+  > cite your trace. My D35 grounds carried the same overstatement; the dated note owns that.
+  >
+  > W1 (a): no retune in Phase 2. Grounds recorded: RSW-1 shrinks the maximum effect to ~2x above 20
+  > fps; the trials' drag regime ran at 2-10 fps where a retune changes nearly nothing; and the
+  > owner's telemetry-price item already covers the whole cost. Retune later only against a profile,
+  > as a post-parity item — record it as CLOSED for this ticket with these grounds, discharging the
+  > D35 item 5 deferral.
+  >
+  > W2 (b): record and defer to a later power ticket, WITH your new fact prominently recorded:
+  > capped sites are a real-device regime, not a test artifact — the product's own formula puts a
+  > 4,096-texture WebGL2 device at 85 of the hero's 122 pages, and a capped site never
+  > idle-throttles. Label the 85/122 as computed-not-measured. That fact is what the power ticket
+  > opens with.
+  >
+  > W3 (a): lab.site.json + lm-lifetime.site.json, swap partner as recommended — they are the pin's
+  > own portfolio sites, which is as "real" as this repo can get without shipping assets, and the
+  > src-swap is the product's actual swap mechanism. H-LIFE x10 on one live element alternating src
+  > swaps with remove/re-add, counters back to baseline EXACTLY, heap reported against site-lab's
+  > existing not-strictly-increasing standard — no new tolerance invented. End-to-end through every
+  > stop on both backends. In the owner's Chrome, one window session — announce when ready and wait
+  > for go.
+  >
+  > W4 (a): the direct SH-output check in pager-lab, shown failing on a planted fault first (your
+  > invalidate()/_sphericalHarmonicsInitialized plant), no product change. WebGL2 recomputing
+  > per-draw is recorded as the reason the check only needs to bite on WebGPU.
+  >
+  > W5 (b): no field. Grounds recorded: Chrome-only API, page-scoped where the record is
+  > scene-scoped, and the harness already measured heap in all 40 preserved trials. The named gap
+  > from ticket 12 is discharged as decided-with-grounds, not forgotten. The semantics version stays
+  > at 2.
+
+- **Ticket 13 stops V1-V4 ruled (owner, 2026-09-26) — quoted verbatim below:** the first-pixel
+  regression is NAMED, and its fix (building the mesh without the full-size construction) gets
+  its own ticket after Phase 2; criterion 4's number is 2.01 % of pixels; adopting three r186 is
+  its own ticket after Phase 2; the three copies with Windows line endings are converted in
+  their own small change after this ticket (doc 06 **D36 item 12**, second follow-up). Also on
+  2026-09-26: the owner's eye check of the H8 picture pair found a VISIBLE quality gap — the
+  pin clearly sharper — and ours was captured at full quality, so it is a named finding and an
+  owner item; its diagnosis belongs to a later ticket.
+  > V1 (a): name it, don't fix it here. Record with the full measurements: the shared cause
+  > (full-capacity source-array construction through the byte-frozen vendored constructor, required
+  > by D20), the side-by-side (243 vs 14 ms at 32 pages, 897 vs 37 ms at 122), the estimate labeled
+  > as an estimate (~85 of 132.2 ms, ~298 of 321.1 ms), the ~47 ms remainder named as unexplained,
+  > and the chunk-0-bytes stage (270-690 ms, longest tasks 231/822 ms) named as unattributed. The
+  > fix is (b)'s shape — placeholder mesh plus empty full-size storage inside D20's rules — in its
+  > own post-Phase-2 ticket; add it to the owner-items list with these numbers.
+  >
+  > V2 (a): record 2.01% as criterion 4's number, with the verdicts as presented — WebGPU variation
+  > is the bar's own † kind; WebGL2-pages32 is the ‡ kind, more frequent; WebGL2-default's
+  > cross-load variation is new behavior with a proven mechanism (slot = decode-completion order
+  > under 4-worker scheduling, not network order), accepted as the price of 3-5x faster full-quality
+  > loading. Record (b) and (c) as post-parity options with (c)'s cost quoted (54 s vs 15.5 s).
+  >
+  > V3 (a): r186 adoption is its own post-Phase-2 ticket. Record the per-item dispositions (item 13
+  > deletes the SPZ refusal at adoption; item 5 is a recorded reason to KEEP doc 03 §B; item 10
+  > drops the JS type-guessing reliance at adoption), the four breaking changes as that ticket's
+  > known scope, and the six stale "unpublished" lines as its doc corrections — none edited now. Add
+  > r186 adoption to the owner-items list.
+  >
+  > V4 (b): record RS-1 and convert the line endings in their own small change after this ticket.
+  > The audit (93 byte-identical, 24 traced, 11 native, zero unexplained) closes the re-sync item
+  > with a finding.
+
+- **Ticket 13 control run and item rulings (owner, 2026-09-25):** the same-day spike control read
+  570.8 ms at WebGL2 `?pages=32` first-pixel — so the 703.0 ms regression is OUR CODE, and a
+  stage-by-stage breakdown of our first-pixel path comes back as a stop; at 1280x720 the spike
+  selects exactly our figures, PROVING the window-size explanation. The WebGL2 hash question is
+  measured with no product change (the diagnostics door's chunk-to-slot map beside each hash and
+  the network arrival order — a one-worker pool would still submit in arrival order, so it could
+  not have isolated anything). Criterion 4's band and the H8 picture pair use in-page full-frame
+  readback, the PNGs kept in `docs/plan/results/phase-2-hload-pictures/` with their sha256 (doc 06
+  **D36 addendum item 12**, follow-up).
+
+- **Ticket 13 results rulings (owner, 2026-09-25):** the one timing regression (WebGL2
+  `?pages=32` first-pixel, 703.0 against the bar's 598 ms) is diagnosed by a same-day CONTROL
+  run of the spike's own measuring page in Chrome at 1280x720 — never a new bar — with its
+  decision rule written down first (spike ~700 ms → environment drift, bar re-dated; ~600 ms →
+  our code, instrumented stage by stage); the same run settles whether the window size explains
+  the selection difference; the WebGL2 cross-trial hashes get a code reading, then a one-worker
+  decode run only through an existing seam (none exists → a stop); criterion 4's difference band
+  is measured with D16's picture-pair capture; all 40 raw trial records are copied into
+  `docs/plan/results/` with their fingerprint shown equal; the opt-in telemetry price joins the
+  Phase 2 owner items; the r186 re-check and the re-sync audit start in parallel (doc 06 **D36
+  addendum item 12**).
+
+- **Ticket 13 blocker rulings (owner, 2026-09-24):** the counted H-LOAD trials run at the VISITOR
+  default — telemetry off, the product as shipped — because the bar is what a visitor experiences;
+  a separate full opt-in set (the site's own `settings.telemetry`), never mixed into the visitor
+  medians, supplies the load record's figures, the evidence for the optional-budget retune, and the
+  measured cost of telemetry itself, checking the code's claim that opt-in telemetry is "now
+  bounded" (doc 06 **D36 addendum item 11**). Trials run only in the owner's Chrome; if it is not
+  connected, the session stops and reports. The throttle-direction and cold-check corrections are
+  recorded as dated notes beside their original rulings.
+
+- **Ticket 13 harness rulings (owner, 2026-09-24):** the H-LOAD trial page `examples/hload/` hosts
+  the element on `lab.site.json`; the `?pages=32` regime is set through the probe's observation
+  hook with EVERY trial asserting the backend's own reported budget, and no product change (H1);
+  the spike's pose (0,0,3) and quarter-orbit through the element's public camera system, the
+  near-plane difference declared (H2); the spike's real window size recovered read-only from the
+  built-in pane's storage if it survives, else pixel ratio 1 and a fixed 1280x720 box, the
+  unrecorded-size caveat declared either way (H3); a synthetic pointermove per frame keeps the
+  10 fps idle throttle off and every trial proves it never engaged, the guard shown biting first
+  (H4); the spike's full-quality and steady definitions, per-trial cold cache, the dev server, and
+  D16's picture pair for the owner's eye (H5-H8). Doc 06 **D36 addendum**. The D26 empty-paint
+  reveal (F1) is RECORDED, NOT FIXED — an owner item for the Phase 2 boundary beside the
+  unminified embed, because background-tab loading is a real user regime (doc 06 D26 note).
+
+- **Ticket 13 reconciliation rulings (owner, 2026-09-24):** the record gaps are fixed IN PLACE
+  with dated notes, never silently: ticket 13's stale "longest block unfed" line is kept and
+  marked SUPERSEDED (fed since `70dbd22`), and ticket 12's two overclaims — the heap instruction
+  "written into ticket 13" and the embed "named for ticket 13" — are corrected where they stand
+  (R1, R2, R6). Ticket 13 now carries the owner's peak-heap instruction verbatim (R2); the T2
+  throttle decision as its own stop, with `lod.wantedChunks` as the candidate signal (R3); a
+  12-item AC4 list from an exhaustive sweep — the five Phase 0 named items, `getMaxAnisotropy()`,
+  ticket 07's four and ticket 09's two, each to get a number and a verdict, with picking-route
+  timing left to Phase 3 (R4); and the Phase 2 re-sync audit against `fd67153` (R5). The embed's
+  shipping form stays the OWNER's item (R6). How H-LOAD is measured is doc 06 **D36**: trials in
+  the owner's Chrome through a visible tab, with the spike's discard-and-rerun of hidden trials
+  (fallback: the owner runs the harness); hosted on the `<splat-site>` element with the hero's
+  `lab.site.json`; first-pixel on the spike's selection definition with the D26 reveal beside
+  it; long tasks measured page-wide with the spike's method beside the record's per-scene
+  figure (Q1, Q1b, Q2, Q3).
 
 - **Ticket 12 rulings (owner, 2026-09-20):** the diagnostics door KEEPS its six residency /
   LOD mutators, declared a TEST-ONLY SEAM in the door's own doc comment — the same species as

@@ -986,6 +986,132 @@ const done = (async () => {
     `off drawCount=${dSelOffAfter.lod.drawCount} residentSplats=${dSelOffAfter.residentSplats} restored drawCount=${dSelOnAfter.lod.drawCount} S0=${poseS0}`,
   );
 
+  // ─── Criterion 9's direct SH-output check (ticket 13, owner ruling W4 a) ───
+  // doc 05 criterion 9: a page uploaded under a motionless camera becomes visible
+  // with sort + SH re-dispatched. On WebGPU the vendored mesh keeps ONE
+  // precomputed SH contribution per splat in a storage buffer
+  // (GaussianSplatMesh.js:422-435; the pass at :592-607 writes every row of the
+  // capacity) and SKIPS that pass while camera and mesh matrices are unchanged
+  // (:207-220) — so a page admitted under a still camera gets fresh
+  // view-dependent colour only because the backend re-arms the pass (residency
+  // change → ThreeGsBackend.ts:959 → patches/paged.ts:330-332; the traversal the
+  // insertion triggers re-arms it again, ThreeGsBackend.ts:1046, and runs BEFORE
+  // the pass, paged.ts:198-203). WebGL2 evaluates SH per vertex on every draw
+  // (GaussianSplatMesh.js:176-178) and never allocates the buffer (:426-429):
+  // nothing stored can go stale there, so on WebGL2 the check asserts that premise.
+  // It runs AFTER every pixel drill above, so none of them ever sees the slot
+  // layout it leaves behind.
+  // Drill (WebGPU): hold the page's own loop (throttleGate) so only the renders
+  // below run; evict two resident non-root chunks — A at the lowest slot, B at
+  // the highest — and admit B, which takes the first free slot: A's. Render once
+  // under the unchanged camera and read that slot's contribution rows back (R1);
+  // then force the pass (the flag reset) and read them again (R2). Same inputs,
+  // so R1 must equal R2 bit for bit — and R2 must differ from the slot's rows
+  // before the drill (R0, A's contributions), or the drill proved nothing.
+  // Plants (URL only, never source): `?plant=sh-rearm-held` holds the flag at true
+  // through the drill, swallowing every re-arm, so R1 keeps A's rows and the check
+  // must FAIL; `?plant=sh-rearm-once` undoes only the insertion's re-arm, which the
+  // traversal's own re-arm repairs in the same render — green by design;
+  // `?plant=sh-premise` (WebGL2) puts the precomputed-SH node into the material,
+  // as if that path read stored contributions — the premise check must FAIL.
+  const shPlant = new URLSearchParams(location.search).get("plant");
+  const meshRecord = diag.mesh as unknown as Record<string, unknown>;
+  const shBuffers = meshRecord._buffers as
+    | { sphericalHarmonicsContributionRead?: { value: THREE.StorageBufferAttribute } }
+    | undefined;
+  if (!isWebGpu) {
+    const allocated = shBuffers?.sphericalHarmonicsContributionRead !== undefined;
+    const material = (diag.mesh as unknown as { material: { vertexNode?: unknown } }).material;
+    // The next render puts the backend's own node back (GaussianSplatMesh.js:176-185).
+    if (shPlant === "sh-premise") material.vertexNode = meshRecord._precomputedSphericalHarmonicsVertexNode;
+    const perVertex = material.vertexNode === meshRecord._sphericalHarmonicsVertexNode;
+    assert(
+      "sh-output-fresh-after-admission",
+      !allocated && perVertex,
+      `backend=${scene3.backend}: exempt by design — SH is evaluated per vertex on every draw; ` +
+        `contribution buffer allocated=${allocated}, per-vertex SH node in use=${perVertex}` +
+        (shPlant === null ? "" : shPlant === "sh-premise" ? "; plant sh-premise" : `; plant ${shPlant} has nothing to act on here`),
+    );
+  } else {
+    const heldGate = scene3.throttleGate;
+    scene3.throttleGate = () => true; // hold the loop: only the renders below run
+    let shOk = false;
+    let shDetail = "";
+    try {
+      const attribute = shBuffers?.sphericalHarmonicsContributionRead?.value;
+      if (attribute === undefined) throw new Error("no SH contribution buffer on WebGPU");
+      const cameraAtDrill = scene3.camera.matrixWorld.clone();
+      const snap = backend.pagerDiagnostics(handle);
+      const rows = attribute.count / snap.budget.pages;
+      if (!Number.isInteger(rows)) {
+        throw new Error(`capacity ${attribute.count} is not ${snap.budget.pages} whole slots`);
+      }
+      const readSlotRows = async (slot: number): Promise<Uint32Array> => {
+        const bytes = rows * 16; // one vec4 of float32 per splat
+        const data = await scene3.renderer.getArrayBufferAsync(attribute, null, slot * bytes, bytes);
+        return new Uint32Array(data.slice(0)); // bit patterns, so equal floats compare exactly
+      };
+      const differing = (a: Uint32Array, b: Uint32Array): number => {
+        let n = 0;
+        for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) n++;
+        return n;
+      };
+      const residents: Array<[number, number]> = [];
+      for (let chunk = 1; chunk < snap.budget.pAsset - 1; chunk++) {
+        const slot = snap.slotOf(chunk);
+        if (slot !== -1) residents.push([chunk, slot]);
+      }
+      residents.sort((x, y) => x[1] - y[1]);
+      const [chunkA, slotA] = residents[0]!;
+      const [chunkB, slotB] = residents[residents.length - 1]!;
+      const r0 = await readSlotRows(slotA);
+      if (shPlant === "sh-rearm-held") {
+        Object.defineProperty(meshRecord, "_sphericalHarmonicsInitialized", {
+          configurable: true,
+          get: () => true,
+          set: () => {},
+        });
+      }
+      const evicted = snap.evictChunk(chunkA) && snap.evictChunk(chunkB);
+      const admitted = await snap.admitChunk(chunkB);
+      const landed = backend.pagerDiagnostics(handle).slotOf(chunkB);
+      if (shPlant === "sh-rearm-once") meshRecord._sphericalHarmonicsInitialized = true;
+      resetInvalidationCounts();
+      scene3.renderer.render(scene3.scene, scene3.camera);
+      const passesOnAdmissionRender = shDispatches;
+      const r1 = await readSlotRows(slotA);
+      if (shPlant === "sh-rearm-held") delete meshRecord._sphericalHarmonicsInitialized;
+      meshRecord._sphericalHarmonicsInitialized = false; // force the pass over every row
+      scene3.renderer.render(scene3.scene, scene3.camera);
+      const r2 = await readSlotRows(slotA);
+      const d12 = differing(r1, r2);
+      const d02 = differing(r0, r2);
+      let nonZero = 0;
+      for (let i = 0; i < r2.length; i++) if (r2[i] !== 0) nonZero++;
+      const cameraUnchanged = scene3.camera.matrixWorld.equals(cameraAtDrill);
+      const restored = await spinUntilLodResidencyConverged(handle);
+      const aBack = backend.pagerDiagnostics(handle).isResident(chunkA);
+      shOk =
+        evicted && admitted && landed === slotA && d12 === 0 && d02 > 0 && nonZero > 0 &&
+        cameraUnchanged && restored.converged && aBack;
+      shDetail =
+        `backend=webgpu plant=${shPlant ?? "none"}: chunk ${chunkB} (slot ${slotB}) admitted into chunk ${chunkA}'s ` +
+        `vacated slot ${slotA} → landed in ${landed}; SH passes on the admission render=${passesOnAdmissionRender}; ` +
+        `R1 vs R2 (forced pass): ${d12} of ${r1.length} words differ; R0 (A's rows) vs R2: ${d02} differ; ` +
+        `R2 non-zero words=${nonZero}; camera unchanged=${cameraUnchanged}; A resident again=${aBack} ` +
+        `(converged=${restored.converged}, ${restored.spins} spins)`;
+    } catch (error) {
+      shDetail = `backend=webgpu plant=${shPlant ?? "none"}: the drill threw — ${String(error)}`;
+    } finally {
+      if (Object.getOwnPropertyDescriptor(meshRecord, "_sphericalHarmonicsInitialized")?.get !== undefined) {
+        delete meshRecord._sphericalHarmonicsInitialized;
+        meshRecord._sphericalHarmonicsInitialized = false;
+      }
+      scene3.throttleGate = heldGate;
+    }
+    assert("sh-output-fresh-after-admission", shOk, shDetail);
+  }
+
   const evLod = backend.pagerDiagnostics(handle);
   console.log(
     `pager-lab EVIDENCE\n` +

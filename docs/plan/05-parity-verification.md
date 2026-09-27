@@ -82,10 +82,15 @@ this toolkit's own baseline (ADR 0001); no Spark control trials run.
 9. a page uploaded under a motionless camera becomes visible with sort + SH
    explicitly re-dispatched (verified via selection growth + the invalidate()
    path; a direct SH-output assertion is deferred to the production diag
-   stack — recorded as a gap, not a pass);
+   stack — recorded as a gap, not a pass); *(2026-09-27, ticket 13 ruling W4 a: the gap is CLOSED — the direct assertion is pager-lab's `sh-output-fresh-after-admission`, red on its planted fault and green on the final bytes, both backends; it lives in the fixture because the diag stack has no GPU-buffer readback. Criterion 9 ✓, both halves.)*
 10. a page/selection change updates visible order without camera motion.
 Instrumented by `measure.ts` (spike) then the rewired diag stack (production):
 navigation-start→first-pixel, →full-quality, longest main-thread block, peak JS heap.
+*(2026-09-24) For the Phase 2 re-run's comparison with the spike, how each metric is measured is
+doc 06 D36 and its addendum — the spike's own definitions and methods, the stack's figures alongside.*
+*(2026-09-26, ticket 13 ruling W5 b) Peak JS heap is fixture-measured by ruling — the spike's 500 ms
+`performance.memory` poll, in the harness — and the production record carries no heap field
+(`LOAD_RECORD_SEMANTICS_VERSION` stays `"2"`; doc 06 D36 item 5).*
 **Peak GPU memory is NOT measured** — no browser API reports it; `measure.ts` records
 `gpuPoolBytes`, an analytic model of the WebGPU pool's allocation layout
 (`capacity × GPU_BYTES_PER_SPLAT + GPU_FIXED_BYTES`, each term named at its

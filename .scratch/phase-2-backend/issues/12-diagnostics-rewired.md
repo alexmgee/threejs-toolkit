@@ -1,6 +1,6 @@
 # 12 — Diagnostics rewired (§G); Spark-era instruments deleted for good
 
-**Status:** ready-for-agent
+**Status:** done *(corrected 2026-09-27 at ticket 13's close-out, owner-authorized: this line still read `ready-for-agent` after the ticket closed at commit `70dbd22` with every AC ticked)*
 **Blocked by:** 07 — the pager surface is complete; 09 — diagWiring.stub landed.
 
 **What to build:** the diagnostics that produced the original tuning wins run
@@ -686,7 +686,9 @@ for the first time). **Peak JS heap is a NAMED GAP handed to ticket 13** with th
 quoted: it has no field in the record and no sampler in the production stack, and never did; 13
 samples heap with its own fixture instruments (the spike's own method) and decides whether the
 production schema earns the field, with grounds, under its own semantics bump if so. Written into
-ticket 13's file.
+ticket 13's file. **[CORRECTED 2026-09-24 (owner ruling R2, ticket 13's reconciliation stop): was
+not written at the time; written 2026-09-24 — ticket 13 Comments, "Carried item — peak JS
+heap", quoting this paragraph verbatim.]**
 
 **`gpuBucket` stays all-`unknown` — RECORDED AS FAITHFUL, not as a defect (owner ruling).**
 Verified against the pin rather than assumed: `fd67153:src/embed/diagWiring.ts:388` is
@@ -728,7 +730,9 @@ honestly-unknown bucket.
   reasonably assume otherwise. **Reported, NOT fixed**: turning on minification would change
   the product artifact and every recorded size baseline at once, which is nobody's business
   to do inside a diagnostics-rewire ticket. Named here for ticket 13 or whoever owns the
-  embed's shipping form.
+  embed's shipping form. **[CORRECTED 2026-09-24 (owner ruling R6, ticket 13's reconciliation
+  stop): not ticket 13's — the embed's shipping form is the OWNER's item, decided at the
+  Phase 2 boundary.]**
 
 ## Review rounds (2026-09-20) — reported SEPARATELY, never merged
 
@@ -769,6 +773,12 @@ cmd-level, per the recipe) and it ran correctly. The hung session was killed, no
    intend. **NOT a regression** — verified at the pin: `fd67153:src/diag/SparkPagerAdapter.ts:529`
    emits exactly one `pager_snapshot` per `readSnapshot`, the same cadence, so the undercount
    is inherited. **Raised to the owner rather than fixed** — see the open decision below.
+   *CORRECTED 2026-09-26 (ticket 13, FINDING RSW-1 — owner ruling):* "roughly six times" above is
+   the uncapped ratio. The tick samples at >= 100 ms (`src/embed/diagWiring.ts:131`) and the
+   allowance is capped at 50 ms per 5,000 ms window (`src/diag/LoadProbe.ts:465-469`), so with
+   rendering sustained the ladder is at most roughly twice as aggressive as per-frame counting
+   would make it, and only above ~20 fps. The 6.32x itself stands as measured: six renders per
+   sample, by design. *CORRECTED AGAIN 2026-09-27 (ticket 13, FINDING R1-F2 — owner close-out ruling 2):* "at most roughly twice as aggressive … and only above ~20 fps" is wrong as well — the second wrong version, and like the first it passed through the owner's rulings. Because the tick fires on the first render at least 100 ms after the last sample and times the next from it (`src/embed/diagWiring.ts:301-302`), above 10 fps it samples less often than every 100 ms: counting true frames would loosen the throttle — no effect at or below 10 fps, ~2x from 10-20 fps, up to ~3x just above 20 fps. Detail: ticket 13, R1-F2.
 2. **CONFIRMED, ALREADY FIXED — historical deferrals treated as outstanding work.** The same
    defect the built-in round found and fixed (round 2, finding 2). Astra ran against a
    revision that had the `loadSettled` guard but not yet the deferred fix, and said so

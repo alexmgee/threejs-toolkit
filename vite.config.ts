@@ -72,6 +72,8 @@ export default defineConfig({
         "camera-lab": resolve(__dirname, "examples/camera-lab/index.html"),
         "site-lab": resolve(__dirname, "examples/site-lab/index.html"),
         "site-lab-element": resolve(__dirname, "examples/site-lab/element.html"),
+        "site-lab-hlife": resolve(__dirname, "examples/site-lab/hlife.html"),
+        hload: resolve(__dirname, "examples/hload/index.html"),
       },
     },
   },

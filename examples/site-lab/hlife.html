@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>hlife — &lt;splat-site&gt; H-LIFE ×10 and end to end (ticket 13, W3)</title>
+  <style>
+    html, body { margin: 0; background: #111; color: #ccc; font: 13px/1.5 ui-monospace, monospace; }
+    body { padding: 740px 16px 16px; }
+    #viewer { position: fixed; left: 0; top: 0; width: 1280px; height: 720px; }
+    splat-site { display: block; width: 100%; height: 100%; }
+    #hud { position: fixed; right: 8px; top: 8px; max-width: 40vw; padding: 4px 8px; background: #000c; white-space: pre-wrap; }
+    .pass { color: #7c7; } .fail { color: #f77; }
+    #out pre { white-space: pre-wrap; word-break: break-word; }
+  </style>
+  <script>
+    // Ticket 09 Stop 11: `?webgl=1` hides navigator.gpu before any toolkit module
+    // loads, so a WebGPU-capable browser takes the fallback a visitor without
+    // WebGPU would (examples/site-lab/element.html's pattern).
+    if (new URLSearchParams(location.search).get("webgl") === "1") {
+      Object.defineProperty(navigator, "gpu", { value: undefined, configurable: true });
+    }
+  </script>
+</head>
+<body>
+  <div id="viewer"></div>
+  <div id="hud">hlife — starting</div>
+  <div id="out"></div>
+  <script type="module" src="./hlife.ts"></script>
+</body>
+</html>
