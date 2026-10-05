@@ -22,7 +22,7 @@ The five canonical triage roles, each named after its role, recorded as a `Statu
 
 ### Domain docs
 
-Single-context: `CONTEXT.md` and `docs/adr/` at the repo root. New ADRs continue from the highest existing number + 1; 0001 and 0002 pre-date the skills and are never renumbered or rewritten. See `docs/agents/domain.md`.
+Single-context: `GLOSSARY.md` and `docs/adr/` at the repo root. New ADRs continue from the highest existing number + 1; 0001 and 0002 pre-date the skills and are never renumbered or rewritten. See `docs/agents/domain.md`.
 
 <!-- agenttrail -->
 ## agenttrail plan convention
