@@ -29,9 +29,9 @@ comparisons — the spike's own numbers are the bar).
 
 ## Comments
 
-**`CONTEXT.md` stays absent — not a gap (owner, 2026-09-18, at ticket 11's second
-stop).** The repo's CLAUDE.md names a root `CONTEXT.md` that does not exist; that is by
-recorded design (`docs/agents/domain.md`: "There is no `CONTEXT.md` yet. Layout is
+**`GLOSSARY.md` stays absent — not a gap (owner, 2026-09-18, at ticket 11's second
+stop).** The repo's CLAUDE.md names a root `GLOSSARY.md` that does not exist; that is by
+recorded design (`docs/agents/domain.md`: "There is no `GLOSSARY.md` yet. Layout is
 **single-context**."). The owner schedules `/domain-modeling` at the Phase 2 boundary,
 which is where the file first gets written. Recorded here so the absence stops
 resurfacing as a finding in the meantime.
@@ -648,7 +648,7 @@ The D26 reveal can fire on a paint that draws ZERO splats.**
 **OWNER ITEMS FOR THE PHASE 2 BOUNDARY — recorded here, not this ticket's to act on.**
 1. The embed's shipping form — `dist-embed/embed.js` is unminified (ticket 12:721-731; ruling R6).
 2. F1 above — whether the D26 reveal waits for a drawn splat.
-3. `CONTEXT.md` via the owner's `/domain-modeling` (top of these Comments).
+3. `GLOSSARY.md` via the owner's `/domain-modeling` (top of these Comments).
 4. The opt-in telemetry price (added 2026-09-25, owner ruling on the post-trials stop) — bounded
    and repeatable but not small: up to +32.7 % first-pixel and +538 MB median peak heap in the
    constrained regime (`docs/plan/results/phase-2-hload.md`, "The cost of telemetry"); the
@@ -1018,7 +1018,7 @@ your report").
 >
 > Telemetry cost: your reading is accepted and the table stands — bounded and repeatable, but not
 > small (up to +33% first-pixel, +538 MB heap in the constrained regime). Add "opt-in telemetry
-> price" to the owner-items list for the Phase 2 boundary alongside the embed, F1 and CONTEXT.md; the
+> price" to the owner-items list for the Phase 2 boundary alongside the embed, F1 and GLOSSARY.md; the
 > 6.32x retune stop later in this ticket should cite these same numbers.
 >
 > Parallel work: yes — start the r186 re-check (report-only, never touch the vendored files) and the

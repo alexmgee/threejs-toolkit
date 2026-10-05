@@ -159,7 +159,7 @@ by Claude with direct reads:**
   doc 06 gets D32 (StatsHUD, ruling D1) and D33 (`computeSplatBounds`, rulings A1/B1/C1, required by
   doc 05); the AC1 fixture parses the header with its own code, not `parseRadHeader`.
 - Noticed, not touched: doc 06's D23 heading still says `OPEN (2026-08-20)` though spec.md:85 records
-  its ruling; the `CONTEXT.md` named in this repo's CLAUDE.md does not exist.
+  its ruling; the `GLOSSARY.md` named in this repo's CLAUDE.md does not exist.
 
 **Second stop agenda (owner rulings requested before building):**
 - **S1 — SiteRuntime's call site under A1.** `computeSplatBounds(child)` (`SiteRuntime.ts:3710`)
@@ -205,7 +205,7 @@ by Claude with direct reads:**
   whole-chunk error with margin to spare.
 - **S6 — throw;** a diagnostics HUD that silently skips a disposed handle lies by omission.
 - **Plus:** fix doc 06's D23 heading in this ticket's doc pass (same stale-heading class as the D22
-  catch). `CONTEXT.md` stays absent — the owner schedules `/domain-modeling` at the Phase 2 boundary;
+  catch). `GLOSSARY.md` stays absent — the owner schedules `/domain-modeling` at the Phase 2 boundary;
   noted in ticket 13's file so it stops resurfacing.
 - **Scoped commit delegation for this ticket only:** commit after green `check:full` + both review
   rounds (registry-first; check Astra's trace for claimed-but-never-run verifications), staged list
@@ -227,7 +227,7 @@ pane's WebGPU adapter probed on a real page: `nvidia` / `ampere`, pane `hidden`.
   `handle.object` local-space dependency, C1, S2, S1), D19's Phase 4 framing addition (S1), D23's
   stale `OPEN` heading → RULED AND DONE with its ruling (spec.md "D23 reconciliation", owner
   2026-08-23, commit `5f30d27`; executed by Phase 2 ticket 03, `b9af209`). Ticket 13 notes that
-  `CONTEXT.md` stays absent until the owner's `/domain-modeling`. D30's discharge note waits for
+  `GLOSSARY.md` stays absent until the owner's `/domain-modeling`. D30's discharge note waits for
   the deletion itself (step 3).
 - **Step 2, lint rule E2 — red-first.** Baseline under the old config: EXIT 0, 185 modules / 585
   dependencies. PLANT FIRST, rule absent: a value import of `backend/PagePool` and a type-only

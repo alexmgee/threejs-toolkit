@@ -609,7 +609,7 @@ links: [scene-core, render-stack, text-markers, site-rules, diagnostics, backend
   hero `.rad`, the pin's `[1, 0, 0, 0]` quaternion kept as the loader's own flip (S3). The new lab
   proves the 8-corner world box both ways — exact under the flip at pad 0, never smaller under a tilt
   (S4). The HUD keeps the pin's K format (S5) and throws on a disposed handle (S6). Doc 06's D23
-  heading is fixed in this ticket's doc pass; `CONTEXT.md` stays absent until the owner's
+  heading is fixed in this ticket's doc pass; `GLOSSARY.md` stays absent until the owner's
   `/domain-modeling` at the Phase 2 boundary (noted in ticket 13).
 
 - **Ticket 11 rulings (owner, 2026-09-18):** `computeSplatBounds(backend, handle, options?)` (A1, the

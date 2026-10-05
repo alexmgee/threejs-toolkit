@@ -18,7 +18,7 @@
 
 import { EFFECT_KINDS, type RuleEffect } from "./RuleModel";
 
-/** The channel vocabulary (CONTEXT.md, Channel). The single source for both the
+/** The channel vocabulary (GLOSSARY.md, Channel). The single source for both the
  *  type and any membership check, so a declaration can never name a resource
  *  the system does not have. */
 export const KNOWN_CHANNELS = ["camera", "blocks", "audio", "memory"] as const;

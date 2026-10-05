@@ -273,7 +273,7 @@ export interface SequenceWaypoint {
  *  real waypoint field is a compile error (the ADR-0001 growth rule). */
 const KNOWN_WAYPOINT_KEYS: readonly (keyof SequenceWaypoint)[] = ["stop", "annotation", "pose", "hold"];
 
-/** The two ways a sequence may end (CONTEXT.md, Effect / spec stories 6–7):
+/** The two ways a sequence may end (GLOSSARY.md, Effect / spec stories 6–7):
  *  `return` glides back to the composed still; `stay` leaves the camera at the
  *  last waypoint — the frozen frame is now a different photograph. Equal
  *  citizens: neither is a default, the author always writes one. */

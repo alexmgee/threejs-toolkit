@@ -345,7 +345,7 @@ kept picture), so the pin's own picture is not byte-identical across loads eithe
    ticket :287-289). Quote any embed size as unminified and move on.
 2. **F1** — whether the D26 reveal waits for a drawn splat (ticket :605-626; doc 06 :367).
    Record-only; the reveal is not changed.
-3. `CONTEXT.md` — absent BY DESIGN until the owner's `/domain-modeling` (ticket :32-37). Do not
+3. `GLOSSARY.md` — absent BY DESIGN until the owner's `/domain-modeling` (ticket :32-37). Do not
    create it.
 4. **The opt-in telemetry price** — bounded and repeatable but not small (ticket :632-635; results
    doc :174-176).

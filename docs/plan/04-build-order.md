@@ -165,7 +165,7 @@ DebugPanel optics folder rewired. **Exit:** H-OPTICS focus-ramp parity.
 
 Device matrix (desktop WebGPU, desktop forceWebGL, one real mobile, one iOS/Safari —
 Q4/Q6 decide weight); full H-suite on the kitchen-sink example; TOOLKIT-GUIDE /
-CLAUDE.md / CONTEXT.md for this repo; then **one** consuming site switches its `file:`
+CLAUDE.md / GLOSSARY.md for this repo; then **one** consuming site switches its `file:`
 dependency — **alexgee.online first, per doc 06 D15** (the owner's call; order is
 inconsequential to the build plan) — runs its own content through the harness, and
 ships. Remaining sites follow.

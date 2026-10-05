@@ -185,7 +185,7 @@ Reading — the empirical check on the source comment's "opt-in/author telemetry
   dynamic imports in `src/embed/` are the author tools, `SiteRuntime.ts:3868-3870`), so both sets
   load the same modules.
 - **Ruled (owner, 2026-09-25):** the reading stands — bounded and repeatable, not small. The opt-in
-  telemetry price is an owner item for the Phase 2 boundary, beside the embed, F1 and `CONTEXT.md`;
+  telemetry price is an owner item for the Phase 2 boundary, beside the embed, F1 and `GLOSSARY.md`;
   the `renderedSampleWindows` retune stop cites these numbers.
 
 ### The load record's own figures, alongside (rulings Q3 and H5)

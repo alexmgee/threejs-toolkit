@@ -432,7 +432,7 @@ Then commit the handoff file ALONE: staged list first — exactly that one file 
 1. The embed's shipping form — `dist-embed/embed.js` is unminified (ticket 12:721-731; ruling R6).
    Quote any embed size as unminified and move on.
 2. F1 — whether the D26 reveal waits for a drawn splat (ticket 13 :427, :625; doc 06 :367).
-3. `CONTEXT.md` — absent BY DESIGN until the owner's `/domain-modeling`. Do not create it.
+3. `GLOSSARY.md` — absent BY DESIGN until the owner's `/domain-modeling`. Do not create it.
 4. The opt-in telemetry price — up to +32.7 % first-pixel and +538 MB median peak heap (results
    doc § The cost of telemetry, :154).
 5. The first-pixel construction fix — its own post-Phase-2 ticket, in V1 (b)'s shape, with the

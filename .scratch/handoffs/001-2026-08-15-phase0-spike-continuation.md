@@ -142,7 +142,7 @@ Spark control: sparkjs-toolkit loadtest sandbox (`npm run dev` there, or launch 
 - Owner working rules that don't carry via files: plain-English explanations
   (git especially); verify before claiming; no feature cuts, no laziness (D2);
   never offer time estimates; ask only load-bearing questions.
-- `CONTEXT.md` at repo root is expected by CLAUDE.md but missing — seed it when pager
+- `GLOSSARY.md` at repo root is expected by CLAUDE.md but missing — seed it when pager
   terms (page, frontier, resident, preserve-at-decode) first hit code review.
 - Interactive findings page (artifact e96a65eb-…): source at
   `sparkjs-toolkit/docs/research/threejs-port-findings.html` — update only from over there.
