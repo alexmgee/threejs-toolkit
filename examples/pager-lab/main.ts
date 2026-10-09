@@ -690,7 +690,8 @@ const done = (async () => {
   // nondeterministic (measured live 2026-09-12: 1–11 channel units at the
   // same points a plain re-render leaves pixel-exact); the WebGL2 CPU sort
   // is deterministic (band 0). The evict/re-admit criterion below is
-  // "within this measured band" — derived from this run, not invented.
+  // "within this measured band", never narrower than the measured floor on
+  // WebGPU (readmitBand, below).
   const SORT_CONTROL_RUNS = 5;
   const meshRec = diag.mesh as unknown as Record<string, unknown>;
   let sortBand = 0;
@@ -702,8 +703,22 @@ const done = (async () => {
       sortBand = Math.max(sortBand, maxChannelDiff(px(P0, name), px(Pc, name)));
     }
   }
+  // The evict/re-admit band (ticket 13, FINDING PL-1; owner ruling SC-1 2 c,
+  // 2026-10-09). One re-admit frame against the max of the 5 re-sorts above
+  // failed a healthy WebGPU run 12-14 % of the time: the re-admitted frame is
+  // one more draw of the same sort noise, and a draw beats the max of five
+  // others about one time in six. Re-measured 2026-10-05: 5 loads per regime
+  // (?pages=32 and default), each 200 re-sorts and 40 drill cycles with 5
+  // re-sorts after each re-admit — 4,400 draws, the largest 10 (none above);
+  // this rule failed 0 of 400 healthy cycles (raw numbers:
+  // docs/plan/results/phase-2-pl1-sort-noise.json). So on WebGPU the band is
+  // never narrower than that floor and still widens itself when this run's
+  // noise is larger; WebGL2's CPU sort is deterministic, so its band stays
+  // this run's own (0) and the check stays exact.
+  const SORT_NOISE_FLOOR_WEBGPU = 10;
+  const readmitBand = isWebGpu ? Math.max(sortBand, SORT_NOISE_FLOOR_WEBGPU) : sortBand;
   // Evict chunks in index order, one at a time, until the sampled pixels
-  // move by MORE than the sort band — the drill must be able to tell an
+  // move by MORE than readmitBand — the drill must be able to tell an
   // eviction from sort noise before "restored" means anything (at full
   // residency a single 65,536-splat chunk moved the ten points by 6 with a
   // band of 13; measured 2026-09-12). The count is whatever the band
@@ -719,7 +734,7 @@ const done = (async () => {
     for (let c = 0; c < 122; c++) if (dRes.isResident(c)) residentForDrill.push(c);
   }
   for (const chunk of residentForDrill) {
-    if (evictedMax > sortBand) break;
+    if (evictedMax > readmitBand) break;
     slotsBefore.set(chunk, backend.pagerDiagnostics(handle).slotOf(chunk));
     if (!backend.pagerDiagnostics(handle).evictChunk(chunk)) break;
     evictedChunks.push(chunk);
@@ -729,7 +744,7 @@ const done = (async () => {
       evictedMax = Math.max(evictedMax, maxChannelDiff(px(P0, name), px(P1, name)));
     }
   }
-  const gridChanged = evictedMax > sortBand;
+  const gridChanged = evictedMax > readmitBand;
   // Re-admission restores RESIDENCY, not slot identity: with several slots
   // free the pool hands out the first free one, so multi-chunk re-admits
   // land in a permutation of the freed slots (observed live 2026-09-12;
@@ -742,6 +757,13 @@ const done = (async () => {
     if (!diag.isResident(chunk)) allResident = false;
     if (diag.slotOf(chunk) === slotsBefore.get(chunk)) sameSlot++;
   }
+  // Plant (URL only, never source): `?plant=readmit-lost` evicts the drilled
+  // chunks again after the residency check above, before the comparison frame —
+  // residency read "all back" while the picture lacks them, so the check must
+  // FAIL on its pixels (ticket 13, PL-1).
+  if (new URLSearchParams(location.search).get("plant") === "readmit-lost") {
+    for (const chunk of evictedChunks) backend.pagerDiagnostics(handle).evictChunk(chunk);
+  }
   scene3.renderer.render(scene3.scene, scene3.camera);
   const P2 = await meteredCapture();
   let readmitMax = 0;
@@ -751,13 +773,13 @@ const done = (async () => {
     if (d > 0) diffDetails.push(`${name}=${d}`);
     readmitMax = Math.max(readmitMax, d);
   }
-  const evictReadmitOk = gridChanged && allResident && readmitMax <= sortBand;
+  const evictReadmitOk = gridChanged && allResident && readmitMax <= readmitBand;
   backend.pagerDiagnostics(handle).lod.setSelectionEnabled(true);
   await spinUntilLodResidencyConverged(handle);
   assert(
     "evict-readmit-pixel-identical",
     evictReadmitOk,
-    `backend=${scene3.backend} evicted ${evictedChunks.length} chunk(s) [${evictedChunks.join(",")}], all resident again=${allResident} (${sameSlot} in their original slot); sort-only control band=${sortBand} over ${SORT_CONTROL_RUNS} re-sorts; evicted max diff=${evictedMax} (${gridChanged ? "above band" : "NOT above band — drill blind"}); re-admit max diff=${readmitMax}${diffDetails.length > 0 ? ` [${diffDetails.join(", ")}]` : " (exact)"} — ${readmitMax <= sortBand ? "within" : "OUTSIDE"} the measured band`,
+    `backend=${scene3.backend} evicted ${evictedChunks.length} chunk(s) [${evictedChunks.join(",")}], all resident again=${allResident} (${sameSlot} in their original slot); sort-only control band=${sortBand} over ${SORT_CONTROL_RUNS} re-sorts; band used=${readmitBand}${isWebGpu ? ` (the larger of that and the measured floor ${SORT_NOISE_FLOOR_WEBGPU})` : ""}; evicted max diff=${evictedMax} (${gridChanged ? "above band" : "NOT above band — drill blind"}); re-admit max diff=${readmitMax}${diffDetails.length > 0 ? ` [${diffDetails.join(", ")}]` : " (exact)"} — ${readmitMax <= readmitBand ? "within" : "OUTSIDE"} the band`,
   );
 
   // The partial-path flag is LIVE; `diag` above is a snapshot taken at
