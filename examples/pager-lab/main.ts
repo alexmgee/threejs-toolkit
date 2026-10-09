@@ -1013,7 +1013,9 @@ const done = (async () => {
   // must FAIL; `?plant=sh-rearm-once` undoes only the insertion's re-arm, which the
   // traversal's own re-arm repairs in the same render — green by design;
   // `?plant=sh-premise` (WebGL2) puts the precomputed-SH node into the material,
-  // as if that path read stored contributions — the premise check must FAIL.
+  // as if that path read stored contributions — the premise check must FAIL;
+  // `?plant=drill-one-candidate` (WebGPU) keeps one candidate chunk, so the guard
+  // must FAIL the check by name (ticket 13, R2-7).
   const shPlant = new URLSearchParams(location.search).get("plant");
   const meshRecord = diag.mesh as unknown as Record<string, unknown>;
   const shBuffers = meshRecord._buffers as
@@ -1056,10 +1058,15 @@ const done = (async () => {
         for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) n++;
         return n;
       };
+      // Every non-root chunk, the last one included (ticket 13, R2-6).
       const residents: Array<[number, number]> = [];
-      for (let chunk = 1; chunk < snap.budget.pAsset - 1; chunk++) {
+      for (let chunk = 1; chunk < snap.budget.pAsset; chunk++) {
         const slot = snap.slotOf(chunk);
         if (slot !== -1) residents.push([chunk, slot]);
+      }
+      if (shPlant === "drill-one-candidate") residents.length = Math.min(residents.length, 1);
+      if (residents.length < 2) {
+        throw new Error(`the drill needs two resident non-root chunks; ${residents.length} found`);
       }
       residents.sort((x, y) => x[1] - y[1]);
       const [chunkA, slotA] = residents[0]!;
