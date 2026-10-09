@@ -17,3 +17,11 @@ spikes/native-rad/src/GaussianSplatMesh.fork.js -text
 # (03, 05-09) land, and costs hand-written files nothing.
 src/** -text
 examples/** -text
+# Records carry sha256 values of their own verbatim blocks and of evidence files
+# (the .sha256 sidecars, the results docs); core.autocrlf=true would turn them
+# CRLF at checkout and break every one of those hashes (ticket 13, owner ruling
+# SC-1 1 B, 2026-10-09 — e.g. ticket 13's close-out block: 1,382 B e208d380 as
+# stored, 1,391 B 319e0903 in a fresh copy). Same byte-preservation as above.
+docs/** -text
+.scratch/** -text
+PLAN.md -text
