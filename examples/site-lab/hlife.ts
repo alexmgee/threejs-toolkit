@@ -41,18 +41,22 @@
  * not this page (a retained WebGL2 runtime holds its texture arrays). CORRECTED
  * 2026-09-27 (ticket 13, finding HF-1): an earlier version made this claim while
  * its run function still held runtime 0 and the last cycle's old and new runtimes.
- * READOUTS after the final teardown (reported, not gated — the ruling set the gates): the
- * idle heap (site-lab's empty state), and which of the runtimes, renderers and splat meshes
- * the garbage collector actually freed under allocation pressure (a FinalizationRegistry,
- * which keeps nothing alive) — whether anything still holds a torn-down runtime.
+ * READOUTS after the final teardown (reported, not gated — the ruling set the gates): which
+ * of the runtimes, renderers and splat meshes the garbage collector actually freed under
+ * allocation pressure (a FinalizationRegistry, which keeps nothing alive) — whether anything
+ * still holds a torn-down runtime — and then the idle heap (site-lab's empty state), read
+ * after those collection rounds and more than 50 ms after the page's previous heap reading
+ * (HEAP_REFRESH_MS; ticket 13, OBSERVATION IH-1). The reading counts ArrayBuffer memory too,
+ * so it can still hold the last pressure round's dropped arrays if they are not yet collected.
  * Frames: by default the element's own loop — a VISIBLE tab (the owner's Chrome);
  * `?pump=1` drives rail + render from the page for the hidden built-in pane, which
  * runs no animation frames (logic only). `?webgl=1` hides navigator.gpu before any
  * module loads (hlife.html). `?cycles=N` shortens a logic or plant run.
- * Plants (URL only, never source; red-first): `gpu-leak` renders a mesh the
- * runtime does not own into each runtime before its disposal; `heap-grow` retains
+ * Plants (URL only, never source; red-first): `gpu-leak` uploads a texture the runtime
+ * does not own on each runtime's renderer before its disposal; `heap-grow` retains
  * `?leakmb=` (default 512) MB per cycle; `skip-stop` skips stop 1; `expect-other`
- * flips the expected backend.
+ * flips the expected backend; `restless` (pumped runs only) keeps the rail moving once
+ * stop 2 is announced, so that arrival never comes to rest.
  * Results: the page (assertions, then the JSON record and its sha256), the console,
  * and localStorage `t13-hlife-v1` (one record per run).
  */
@@ -137,12 +141,13 @@ interface Runtime {
       info: { memory: unknown; render: { calls: number } };
       dispose: () => void;
       render: (scene: unknown, camera: unknown) => unknown;
+      initTexture: (texture: THREE.Texture) => void;
     };
     scene: THREE.Scene;
     camera: THREE.Camera;
     backend?: string;
   };
-  cameraRail: { update: (deltaSeconds: number) => void };
+  cameraRail: { update: (deltaSeconds: number) => void; setProgress: (t: number) => void; readonly progress: number };
   loadedScenes: ReadonlyArray<{ mesh: object }>;
   motionState: string;
   dispose: () => void;
@@ -151,11 +156,20 @@ function runtimeOf(el: Element): Runtime | null {
   return (el as unknown as { runtime?: Runtime | null }).runtime ?? null;
 }
 
+/** Plant `restless`: the event index after which an announced stop starts the nudge in
+ *  pump(); null when the plant is not acting. */
+let restlessFrom: number | null = null;
+
 /** Pumped mode only: advance the rail and paint the CURRENT runtime once. */
 function pump(el: Element): void {
   const runtime = runtimeOf(el);
   if (runtime === null) return;
   runtime.cameraRail.update(1 / 60);
+  // Plant `restless`: once its leg's stop is announced, scrub the rail in place every
+  // frame (after the update, before the arrival is read), so it never comes to rest.
+  if (restlessFrom !== null && events.slice(restlessFrom).some((e) => e.type === "stopchanged")) {
+    runtime.cameraRail.setProgress(runtime.cameraRail.progress);
+  }
   try {
     runtime.sparkScene.renderer.render(runtime.sparkScene.scene, runtime.sparkScene.camera);
   } catch {
@@ -211,7 +225,14 @@ const summarize = (c: GpuCounters | null): string =>
     ? "—"
     : `storage ${c.storageAttributes}/${c.storageAttributesSize}B, attributes ${c.attributes}, geometries ${c.geometries}, textures ${c.textures}/${c.texturesSize}B`;
 
+/** Chromium refreshes performance.memory at most once per 50 ms, counted from its last
+ *  refresh, and refreshes only when it is read (kFiftyMs and HeapSizeCache::MaybeUpdate,
+ *  third_party/blink/renderer/core/timing/memory_info.cc; probe 2 measured changes 50.0-52.2 ms
+ *  apart — ticket 13, IH-1). So a read more than 50 ms after the previous read is fresh. */
+const HEAP_REFRESH_MS = 50;
+let lastHeapReadMs = Number.NEGATIVE_INFINITY;
 function heapBytes(): number | null {
+  lastHeapReadMs = performance.now();
   return (performance as unknown as { memory?: { usedJSHeapSize: number } }).memory?.usedJSHeapSize ?? null;
 }
 
@@ -289,12 +310,16 @@ function observe(runtime: Runtime, index: number, site: SiteKey, cause: Observed
   };
   const originalDispose = runtime.dispose;
   runtime.dispose = () => {
-    originalDispose();
-    // Synchronously after dispose() returns: the backend has freed its buffers and
-    // the renderer's own teardown (which resets info) is still a microtask away.
-    obs.after = gpuMemoryCounters(renderer);
-    obs.windowOpen = !obs.rendererDisposed;
-    obs.runtime = null;
+    try {
+      originalDispose();
+      // Synchronously after dispose() returns: the backend has freed its buffers and
+      // the renderer's own teardown (which resets info) is still a microtask away.
+      obs.after = gpuMemoryCounters(renderer);
+      obs.windowOpen = !obs.rendererDisposed;
+    } finally {
+      // Even when dispose() throws, the page must not keep the runtime it tore down.
+      obs.runtime = null;
+    }
   };
   return obs;
 }
@@ -332,11 +357,19 @@ function steadyProbe(obs: Observed): () => boolean {
 // ─── Plants ───
 
 const heapLeak: Uint8Array[] = [];
+/** `gpu-leak`: a texture the runtime does not own, uploaded on its renderer — its dispose()
+ *  cannot free it, so the counters must show it. CHANGED 2026-10-05 (ticket 13, R2-4): the plant
+ *  used to draw a small mesh into the runtime's scene, and that kept the last runtime alive.
+ *  three's shared TSL node `modelWorldMatrix` keeps the last object it drew
+ *  (`this.object3d = frame.object`, three/src/nodes/accessors/ModelNode.js:44); a drawn mesh's
+ *  geometry and material keep the dispose listeners its render object registered
+ *  (three/src/renderers/common/RenderObject.js:346-347), and a render object holds its renderer
+ *  (:106). The splat mesh never draws through that node, so only the page's mesh was left in it.
+ *  An upload touches no shared node. */
 function plantGpuLeak(obs: Observed): void {
-  const runtime = obs.runtime!;
-  const box = new THREE.Mesh(new THREE.BoxGeometry(0.01, 0.01, 0.01), new THREE.MeshBasicNodeMaterial());
-  runtime.sparkScene.scene.add(box);
-  runtime.sparkScene.renderer.render(runtime.sparkScene.scene, runtime.sparkScene.camera);
+  const texture = new THREE.DataTexture(new Uint8Array(4), 1, 1);
+  texture.needsUpdate = true;
+  obs.runtime!.sparkScene.renderer.initTexture(texture);
 }
 
 // ─── The run's steps that hold a runtime (helpers, so the run's frame never does) ───
@@ -468,9 +501,11 @@ const done = (async () => {
   const stopMark = events.length;
   const targets = PLANTS.has("skip-stop") ? [2, 0] : [1, 2, 0];
   const arrivals: string[] = [];
+  let everyArrivalAtRest = true;
   for (const target of targets) {
     hud(`end to end — travelling to stop ${target}`);
     const before = eventsSince(stopMark, "stopchanged").length;
+    restlessFrom = PLANTS.has("restless") && target === 2 ? events.length : null;
     (el as unknown as { goToStop(index: number): void }).goToStop(target);
     const arrived = await waitFor(
       el,
@@ -478,6 +513,8 @@ const done = (async () => {
         eventsSince(stopMark, "stopchanged").length > before &&
         runtimeOf(el)?.motionState === "idle",
     );
+    restlessFrom = null;
+    if (!arrived.ok) everyArrivalAtRest = false;
     const last = eventsSince(stopMark, "stopchanged").slice(-1)[0]?.detail as { index?: number; id?: string } | undefined;
     arrivals.push(`${target}→${arrived.ok ? `${last?.index}/${last?.id} in ${arrived.ms.toFixed(0)} ms` : "never"}`);
   }
@@ -503,10 +540,9 @@ const done = (async () => {
   el.remove();
   await yieldMacrotask();
 
-  // ─── Readouts after the teardown: the idle heap, then what the collector frees ───
-  hud("after teardown — idle heap, then the collection readout");
+  // ─── Readouts after the teardown: what the collector frees, then the idle heap ───
+  hud("after teardown — the collection readout, then the idle heap");
   await drain();
-  const idleHeap = heapBytes();
   let pressureRounds = 0;
   while (pressureRounds < COLLECTION_ROUNDS && collected.size < watched.length) {
     let junk: Float64Array[] | null = [];
@@ -516,6 +552,9 @@ const done = (async () => {
     pressureRounds++;
   }
   const notCollected = watched.filter((key) => !collected.has(key));
+  // After the collection rounds, and past performance.memory's refresh window (IH-1).
+  while (performance.now() - lastHeapReadMs <= HEAP_REFRESH_MS) await yieldMacrotask();
+  const idleHeap = heapBytes();
   const readout =
     `after teardown: idle heap ${idleHeap === null ? "null" : (idleHeap / 1048576).toFixed(1)} MB; ` +
     `collected ${watched.length - notCollected.length} of ${watched.length} (runtimes, renderers, splat meshes) ` +
@@ -545,8 +584,8 @@ const done = (async () => {
   );
   assert(
     "e2e-every-stop-and-back",
-    JSON.stringify(announced) === JSON.stringify([1, 2, 0]),
-    `goToStop ${targets.join(" → ")}: ${arrivals.join("; ")}; announced [${announced.join(", ")}] (expected [1, 2, 0])`,
+    everyArrivalAtRest && JSON.stringify(announced) === JSON.stringify([1, 2, 0]),
+    `goToStop ${targets.join(" → ")}: ${arrivals.join("; ")}; every arrival at rest=${everyArrivalAtRest}; announced [${announced.join(", ")}] (expected [1, 2, 0])`,
   );
 
   const perRuntime = observed.map((o) => {
