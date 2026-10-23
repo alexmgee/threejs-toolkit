@@ -2,7 +2,7 @@
 
 Gaussian-splat website toolkit on three.js native rendering (`GaussianSplatMesh` +
 `WebGPURenderer`). Sibling of `sparkjs-toolkit` — same site model, different renderer.
-**Phase 1 closed 2026-08-23.** **Phase 2 underway** (tickets 01–11 done; 12 and 13 remain).
+**Phase 1 closed 2026-08-23.** **Phase 2:** tickets 01–13 done (ticket 13, the exit evidence, closed 2026-09-27); eight owner items for the Phase 2 boundary open (ticket 13).
 Phase map and exit criteria live in `docs/plan/04-build-order.md`; ticket detail in
 `.scratch/phase-2-backend/`.
 
@@ -256,12 +256,47 @@ links: [scene-core, render-stack, text-markers, site-rules, diagnostics, backend
   by: claude
   from: roadmap
   tech: ticket 13 ruling R5 (handoff 004:36-50 scope); straight copies byte-identical to `git show fd67153:<path>`, adapted files against their declared differences, the rest a cited change or a finding; never the sparkjs disk — done 2026-09-25: 93 of 128 shared paths byte-identical, every content difference declared or ruled; finding RS-1, three src/ COPY files differ from the pin only in line endings (ticket 13)
+- [x] Fix the four small faults in the H-LIFE page {#hlife-small-fixes}
+  by: claude
+  from: roadmap
+  tech: ticket 13's post-ticket list (R1-F1, IH-1, R2-4, R2-5); `examples/site-lab/hlife.ts` — every arrival must reach rest, the idle heap read after collection and outside the 50 ms window, the `gpu-leak` plant as a texture, `obs.runtime` cleared in a finally; a new `restless` plant; every plant red again on the new bytes — STUCK 2026-10-05 on stop SC-2: in today's pane the last runtime stays uncollected with or without any plant, so R2-4 cannot be shown fixed there (ticket 13) — unblocked 2026-10-09 (owner ruling: keep the change, prove R2-4 in the owner's plain tab; the pane's behaviour is observation LR-1) — done 2026-10-09: commit `decac02`; R2-4 proven in the owner's plain tab (collected 9 of 9); every plant red again on the new bytes; unplanted 7 of 7 on both backends
+- [x] Guard pager-lab's colour-recompute drill against too few chunks {#drill-guard}
+  by: claude
+  from: roadmap
+  tech: ticket 13 R2-6, R2-7; the drill's scan reaches the last chunk; fewer than two candidates fails by name; a new `drill-one-candidate` plant — done 2026-10-09: commit `38a0bdd`; the three drill plants red, the drill green unplanted on both backends
+- [x] Stop the evict/re-admit check failing on sort noise {#pl1-band}
+  by: claude
+  from: roadmap
+  tech: ticket 13 FINDING PL-1; band = the larger of the run's own and 10 on WebGPU, from 4,400 measured draws; a new `readmit-lost` plant — done 2026-10-09: commit `7e1dc0a`; `readmit-lost` red at band 10, every other plant red, unplanted 27 of 27 on both backends and both WebGPU regimes
+- [x] Judge a re-admitted picture by its closest re-sort, not one frame {#pl1-closest-frame}
+  by: claude
+  from: roadmap
+  tech: ticket 13 STOP SC-6 ruling (b); `evict-readmit-pixel-identical` passes when min(re-admit frame, 5 forced re-sorts) <= max(band, 10); the derivation records that capture() renders offscreen and that frame 1 = frame 2 in 200 of 200 cycles — STUCK 2026-10-23 on stop SC-7: the `readmit-lost` plant went green, because the drill certifies an eviction from one frame and a noise spike certified a sub-noise eviction (ticket 13) — ruled (a) 2026-10-23: the eviction side uses the same six-frame standard — done 2026-10-23: commit `36f84e0`; `readmit-lost` red in both regimes, all four plants red, unplanted 27 of 27 on both backends in both regimes
+- [x] Keep recorded hashes valid in a fresh copy of the repo {#fresh-copy-bytes}
+  by: claude
+  from: roadmap
+  tech: ticket 13 RS-1 (ruling V4 b) and the close-out line-ending leftover; `.gitattributes` `-text` on `docs/**`, `.scratch/**`, `PLAN.md`; `src/core/{CameraPath,CameraRail,LoadingUI,CameraSystem}.ts` to LF — done 2026-10-09: commit `a0bdc49`; after it, 86 of 86 covered files check out byte-identical in a fresh copy, the sidecars pass `sha256sum -c`
 - [ ] Trimmed public barrel restored as phases land {#trimmed-barrel}
   from: roadmap
   tech: phase-1 ticket 11 done (51 sources); Phase 2 ticket 09 returned the four embed names and ticket 11 the two counter names (StatsHUD, computeSplatBounds) — 7 of the original 13 still deferred, each returning with its phase
 
 ## decisions
 
+- **pager-lab's evict/re-admit comparison changed (owner, 2026-10-23; ticket 13, STOP SC-6),
+  superseding SC-1's band rule:** the check passes when the closest of six frames — the re-admit
+  frame and five re-sorts of the re-admitted state — is within the larger of the run's own band and
+  10. A real loss stays in every re-sorted frame; noise only sometimes pushes one frame high.
+  Measured: the floor-plus-band rule still false-failed 3 of 600 cycles; this one 0 of 600.
+
+- **The post-ticket small changes ruled (owner, 2026-10-05; ticket 13, STOP SC-1):** five commits,
+  one per change, the records last. Recorded hashes must survive a fresh copy of the repo:
+  `docs/**`, `.scratch/**` and `PLAN.md` keep their exact bytes (`-text`, the rule `src/**` and
+  `examples/**` already follow), and the RS-1 copies are converted to the pin's LF bytes.
+  pager-lab's evict/re-admit check uses the larger of the run's own sort band and a measured floor
+  of 10 on WebGPU (WebGL2 stays exact); the measurement's raw numbers live in `docs/plan/results/`.
+  The H-LIFE page's `gpu-leak` plant uploads a texture instead of drawing a mesh — three's shared
+  `modelWorldMatrix` node kept the last drawn mesh, and through it the last runtime. Three new URL
+  plants, so every new failure path is shown red on the exact bytes that run.
 - **Ticket 13's close-out decisions ruled (owner, 2026-09-27) — quoted verbatim below:** the ticket
   closes. The H-LIFE page's stop check and four small harness faults found in review become small
   changes after this ticket's commit, so the committed pages stay the exact bytes the counted runs

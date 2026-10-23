@@ -675,23 +675,29 @@ The D26 reveal can fire on a paint that draws ZERO splats.**
 (owner ruling 2026-09-27, below in these Comments); each is its own small change after this
 ticket's commit:
 - Widen `evict-readmit-pixel-identical`'s noise band — FINDING PL-1 (the STOP message's
-  "band-widening on the post-ticket list").
-- Convert the RS-1 line endings — ruling V4 b ("V4" below).
+  "band-widening on the post-ticket list"). **DONE 2026-10-23 — commits `7e1dc0a` (the floor-plus-band
+  rule, a reduction) and `36f84e0` (the closest-of-six comparison on both sides of the drill, owner
+  rulings SC-6 b and SC-7 a); raw numbers `docs/plan/results/phase-2-pl1-sort-noise.json`.**
+- Convert the RS-1 line endings — ruling V4 b ("V4" below). **DONE 2026-10-09 — commit `a0bdc49`, with
+  the `.gitattributes` evidence-file rule (owner ruling SC-1 1 B); the fresh-checkout proof: 86 of 86.**
 - Re-place the idle-heap reading in `examples/site-lab/hlife.ts` — after the collection rounds and
   outside `performance.memory`'s ~50 ms refresh window (OBSERVATION IH-1; owner ruling 2026-09-27,
-  below).
+  below). **DONE 2026-10-09 — commit `decac02`; the readout moved in every run on the new bytes.**
 - Require every stop's arrival (the rail at rest) in `e2e-every-stop-and-back` — it passes on the
   announced order alone (`examples/site-lab/hlife.ts:547-551`) — FINDING R1-F1 / R2-1 (owner
-  close-out ruling 1, 2026-09-27).
+  close-out ruling 1, 2026-09-27). **DONE 2026-10-09 — commit `decac02`, with the `restless` plant.**
 - Fix the `gpu-leak` plant keeping the last runtime alive (`plantGpuLeak`, `hlife.ts:337`: 6 of 9
   collected in both three-plant runs, 9 of 9 without it; the cause not isolated from the other two
-  plants) — R2-4 (close-out ruling 3).
+  plants) — R2-4 (close-out ruling 3). **DONE 2026-10-09 — commit `decac02` (a texture plant, ruling
+  SC-1 3 a); proven in the owner's plain tab, collected 9 of 9 (the pane keeps the last runtime
+  whatever the page: OBSERVATION LR-1).**
 - Clear `obs.runtime` even when `dispose()` throws — the dispose wrapper has no try/finally
-  (`hlife.ts:293-299`) — R2-5 (close-out ruling 3).
+  (`hlife.ts:293-299`) — R2-5 (close-out ruling 3). **DONE 2026-10-09 — commit `decac02`.**
 - Fix pager-lab's drill-scan bound: `chunk < pAsset - 1` skips the last chunk as well as the root
-  (`examples/pager-lab/main.ts:1060`) — R2-6 (close-out ruling 3).
+  (`examples/pager-lab/main.ts:1060`) — R2-6 (close-out ruling 3). **DONE 2026-10-09 — commit `38a0bdd`.**
 - Guard pager-lab's drill picks against fewer than two resident candidates
-  (`pager-lab/main.ts:1065-1066`) — R2-7 (close-out ruling 3).
+  (`pager-lab/main.ts:1065-1066`) — R2-7 (close-out ruling 3). **DONE 2026-10-09 — commit `38a0bdd`,
+  with the `drill-one-candidate` plant.**
 
 **H3 RECOVERY ATTEMPT — DONE (2026-09-24, per ruling H3): NOTHING SURVIVES; falling back to (a).**
 Method, read-only: a Python `http.server` on port 5209 serving an EMPTY scratch folder (no spike
@@ -2983,3 +2989,1021 @@ dependencies cruised)"; `test:crate:golden` 7 passed, 0 failed. The tree's statu
   item 6), R186-DOCS (`:1432`).
 What follows the commit: the owner items for the Phase 2 boundary (`:648-672`) and the post-ticket
 small changes (`:674-694`).
+
+**THE POST-TICKET SMALL CHANGES — the owner's message of 2026-10-05, quoted verbatim (the whole
+message).**
+
+> Work the post-ticket small-changes list recorded in .scratch/phase-2-backend/issues/13-phase2-exit-evidence.md:674-694 (eight items, each with its location cited), plus two leftovers noticed at close-out: PLAN.md line 5 still says "tickets 01-11 done; 12 and 13 remain" (all thirteen are done — fix with the current state), and the fresh-checkout line-ending risk — git on this machine converts line endings on checkout and docs/plan/results/ has no attributes rule, so the three .sha256 sidecar files and the results doc would check out CRLF in a fresh copy, breaking the sidecars' own recorded hashes. That risk is the same family as the RS-1 conversion; handle them together (a .gitattributes rule pinning the evidence files to LF is the expected shape — if the right scope for the rule is ambiguous, stop with options rather than deciding).
+>
+> Grouping, by owner ruling (supersedes the list's "each is its own small change" wording, with these grounds: every edit to a proven test page invalidates its fingerprint and requires its planted faults re-shown red, so changes to one file batch into one change to pay that cost once):
+> - Change 1: the four hlife.ts items (idle-heap reading re-placed outside the ~50 ms performance.memory window and after the collection rounds; e2e-every-stop-and-back requires every arrival at rest, not announced order; the gpu-leak plant no longer keeps the last runtime alive; the dispose wrapper clears obs.runtime via try/finally). After the edits: re-show ALL the page's planted faults red on the new fingerprinted bytes in the built-in pane (pumped, logic-only — the RG-3 discipline), and one unplanted green run per backend.
+> - Change 2: the two pager-lab items (drill-scan bound includes the last chunk; drill picks guarded against fewer than two resident candidates). Same discipline: planted fault red on the new bytes, unplanted green both backends.
+> - Change 3: widen evict-readmit-pixel-identical's noise band (FINDING PL-1 — it failed 4 of 11 WebGPU runs comparing one frame against a band measured too narrowly). Derive the band from measurements, not invention: re-measure the sort noise across enough runs to justify the bound, record the measurement, show the check still goes red on a planted real difference.
+> - Change 4: the RS-1 line-ending conversion (the files named in ticket 13's RS-1 finding) together with the .gitattributes evidence-file rule and a fresh-checkout verification (prove the sidecar hashes survive: after committing, check the stored copies would check out byte-identical — if you cannot prove it without a second clone, stop and say what the proof needs).
+> - Change 5: the PLAN.md line-5 record fix.
+>
+> Each change is its own commit under a scoped delegation covering exactly these five: staged list shown first per commit, stop on anything stray, no credit lines of any kind, plain-English git explanations throughout — the owner does not use git. The four hook-written compaction briefs in .scratch/handoffs/ are never staged. npm run check:full with a true exit code before each commit that touches code. After all five: one built-in /code-review pass at high over the combined diff (no registry round — test-only scope, owner ruling), every finding re-verified — confirm or refute, never absorb — findings fixed in a sixth commit if any, then a final report: per-change summary, the re-proof evidence, the review verdicts.
+>
+> Process, unchanged: no time estimates; rule-11 stops on anything the list does not settle (options + evidence + recommendation); red-first with plants restored byte-identical and sha-proven; records updated where the items came from (tick each item off the ticket 13 sublist with a dated note and the commit id; doc 06 only if a ruling is superseded). GLOSSARY.md now exists at the repo root — use its vocabulary (reveal not ready, deferred means currently-held-back, settled vs full quality never bare "finished").
+
+**WORK LOG — the post-ticket small changes (2026-10-05).** Environment: the built-in pane
+(Chrome 152.0.7977.130, `visibilityState` hidden; WebGPU adapter nvidia / ampere, probed first at
+`http://localhost:5173/`), the dev server `toolkit-dev` started by this session; frames driven by the
+pages (logic evidence, never timing). The pages' bytes at the start: `hlife.ts` `112a179f…`,
+`hlife.html` `28c14731…`, `pager-lab/main.ts` `8859e840…` — identical to HEAD (`498ff62`).
+- *PREDICTIONS P1-P2 (R2-4, the `gpu-leak` plant), written at 2026-10-05 14:19:26 -0500, BEFORE
+  either run.* Background (ticket 13's RG-3 table, rg3b-plants-webgpu/-webgl2): with three plants
+  together (`gpu-leak,skip-stop,expect-other`, two cycles) the READOUT was collected 6 of 9, NOT
+  runtime 2, renderer 2, mesh 2, on both backends; 9 of 9 without them; the cause never isolated.
+  - **P1 — isolation.** `hlife.html?pump=1&cycles=2&plant=gpu-leak&v=iso-gpuleak-webgpu` on the
+    committed bytes (`112a179f…`), the pane, WebGPU: exactly one check fails,
+    `hlife-counters-back-to-baseline-exactly` (the planted one), and the READOUT reads **collected 6
+    of 9; NOT runtime 2, renderer 2, mesh 2**. Refuted by 9 of 9 (then the plant alone does not keep
+    it; the other two plants or their combination do), or by a different set left uncollected.
+  - **P2 — the holder, read in the same tab right after P1's run.** Suspected by reading three
+    0.185.1: a module-level TSL node keeps a pointer to the last object or material it was updated
+    for (`node_modules/three/src/nodes/accessors/ModelNode.js:44`, `this.object3d = frame.object`;
+    `ReferenceNode.js:344`, `MaterialReferenceNode.js:63`, `RendererReferenceNode.js:57`), and the
+    plant's box is the last object the page renders before the final teardown (`hlife.ts:502`). The
+    prediction: **at least one node exported from `three/webgpu` holds the plant's last box — a
+    `Mesh` with a `BoxGeometry` of side 0.01 — as its `object3d` or `reference`, and that box's
+    `parent` is a `Scene`.** Refuted if no exported node holds it. This would locate a holder, not
+    prove the whole path to the runtime; the fix's own run (to be predicted before it) is the test
+    of that.
+- *P1-P2 OUTCOMES, recorded at 2026-10-05 14:26:50 -0500.*
+  - **P1 HELD.** `iso-gpuleak-webgpu` (committed bytes `112a179f…`, pane, pumped, WebGPU): 6 passed,
+    1 failed — only `hlife-counters-back-to-baseline-exactly` (`[000]`, the plant); READOUT
+    verbatim: "after teardown: idle heap 1317.3 MB; collected 6 of 9 (runtimes, renderers, splat
+    meshes) after 40 pressure round(s); NOT collected: runtime 2, renderer 2, mesh 2". Steady heaps
+    1,320.1 / 1,310.4 / 1,317.3 MB; the idle readout equal to the last steady one (IH-1 again). **The
+    `gpu-leak` plant alone keeps the last runtime** — R2-4's cause is no longer "not isolated".
+  - **P2 HELD, after a scan-scope fault of mine.** The first scan read `object3d` / `reference` on
+    every top-level export of the page's own module (`/node_modules/.vite/deps/three_webgpu.js?v=46439e98`,
+    629 exports, 424 objects) and found NO holder — but `three/webgpu` exports its TSL nodes inside
+    its `TSL` namespace export, which a top-level scan cannot see. The scan of that namespace (653
+    entries) found exactly one: **`TSL.modelWorldMatrix.object3d` = a `Mesh` with a `BoxGeometry` of
+    width 0.01 whose `parent` is a `Scene`** — the plant's last box. That Scene's only child is the
+    box (the runtime's own objects are gone); the box's geometry and material each still carry one
+    `dispose` listener. By reading three 0.185.1: a render object registers `dispose` listeners on
+    its geometry and material (`node_modules/three/src/renderers/common/RenderObject.js:346-347`)
+    and holds its renderer (`:106`); `Geometries.js:218` registers one too — so the path runs shared
+    node → box → listener → renderer 2. Which listener owns which edge was not inspected.
+  - *Why unplanted runs free everything:* the vendored splat mesh never touches `modelWorldMatrix`
+    (`src/vendor/three-gs/GaussianSplatMesh.js` builds its own matrices, `:228-308`; no
+    `modelWorld*` / `modelView*` reference in the file), so nothing of the runtime's is ever left in
+    that node. It follows that "take the box out and render once more" cannot fix the plant: the
+    runtime's own renders never move the pointer.
+- *The other measurements made before the stop below (2026-10-05):* FINDING PL-1's noise, the
+  line-ending risk and the history of the recorded bands — summarized in the stop.
+
+**FINDING PL-1 RE-MEASURED (2026-10-05) — the sort noise behind `evict-readmit-pixel-identical`,
+WebGPU, both regimes.** Console-driven on pager-lab's own DEV hook (`window.__pagerLab`), after a
+complete fixture run on the committed bytes (`8859e840…`; `?pages=32` 27 passed / 0 failed,
+default 27 / 0) — NO source change. Script `pl1-measure.js` (session scratchpad, 5,714 B, sha256
+`13e1b36a03bfc59d6145eea81c3da3c9e84327ca38bc32074664d538c3daaa04`). Per load: a fresh
+`backend.load` of the hero (rotation.x = π, the fixture's pose), ready, settled, LOD residency
+converged (three stable samples, nothing admitting); the page's own loop held (`throttleGate`);
+selection OFF (the drill's state, `main.ts:681-683`); P0 captured; then
+- **K = 200 plain re-sorts** (`_sortInitialized = false`, render, capture; max channel difference
+  over the ten points against P0) — the quantity the check's band is built from;
+- **M = 40 drill cycles**, each exactly the drill (`main.ts:711-753`): the band from the load's first
+  5 re-sorts, resident chunks evicted in index order until the nine grid points move by MORE than
+  it, every evicted chunk re-admitted, one render, capture, difference against P0 over all ten
+  points — the quantity the check judges; then **R = 5 re-sorts of the re-admitted state** (against
+  P0).
+Raw records in the pane's localStorage (`pl1-measure-v1-pages32`, 26,451 chars;
+`pl1-measure-v1-default`, 25,847 chars). Every cycle: all chunks resident again, every chunk back
+in its own slot.
+
+| regime | load | ms | re-sorts (value:count) | 5-re-sort band | re-admit (value:count) | after max | evicted | eviction steps |
+|---|---|---|---|---|---|---|---|---|
+| `?pages=32` | 1 | 10,216 | 1:19 2:63 3:38 4:24 5:21 6:20 7:14 8:1 | 7 | 1:1 2:16 3:5 4:4 5:6 6:4 7:3 8:1 | 8 | [0,27] ×40 | 2-6, then 34-38 |
+| `?pages=32` | 2 | 9,798 | 1:26 2:54 3:28 4:59 5:11 6:10 7:7 8:5 | 4 | 1:3 2:15 3:7 4:11 6:1 7:2 8:1 | 9 | [0] ×40 | 11 |
+| `?pages=32` | 3 | 9,458 | 1:9 2:86 3:29 4:30 5:26 6:9 7:9 8:1 9:1 | 5 | 2:17 3:6 4:4 5:4 6:6 7:3 | 10 | [0] ×40 | 8-11 |
+| `?pages=32` | 4 | 10,113 | 1:6 2:44 3:21 4:31 5:29 6:26 7:20 8:15 9:7 10:1 | 5 | 1:3 2:7 3:5 4:5 5:8 6:5 7:2 8:3 9:2 | 9 | [0] ×5, [0,27] ×35 | 2-8, then 34-38 |
+| `?pages=32` | 5 | 9,141 | 1:24 2:38 3:30 4:33 5:45 6:18 7:2 8:7 9:2 10:1 | 7 | 1:2 2:13 3:5 4:7 5:4 6:4 8:2 9:2 10:1 | 10 | [0] ×40 | 8-9 |
+| default (122) | 1 | 36,815 | 0:1 1:38 2:46 3:32 4:34 5:19 6:17 7:8 8:4 9:1 | 5 | 1:5 2:9 3:12 4:9 5:1 6:2 8:2 | 9 | [0] ×40 | 9-12 |
+| default (122) | 2 | 35,012 | 1:38 2:42 3:37 4:55 5:12 6:7 7:8 8:1 | 7 | 1:8 2:13 3:4 4:6 5:4 6:4 7:1 | 8 | [0] ×40 | 9-13 |
+| default (122) | 3 | 34,644 | 1:14 2:87 3:43 4:27 5:22 6:2 7:3 8:2 | 3 | 1:3 2:16 3:8 4:8 5:3 6:1 7:1 | 8 | [0] ×40 | 9 |
+| default (122) | 4 | 34,371 | 0:2 1:31 2:62 3:44 4:29 5:13 6:6 7:8 8:4 10:1 | 4 | 1:7 2:11 3:6 4:7 5:4 6:3 7:1 9:1 | 7 | [0] ×40 | 9-12 |
+| default (122) | 5 | 35,134 | 1:46 2:53 3:33 4:34 5:12 6:9 7:12 8:1 | 4 | 1:8 2:10 3:10 4:7 5:4 7:1 | 9 | [0] ×40 | 9-10 |
+
+- *Pooled, `?pages=32`:* re-sorts (1,000) 1:84 2:285 3:146 4:177 5:132 6:83 7:52 8:29 9:10 10:2;
+  re-admits (200) 1:9 2:68 3:28 4:31 5:22 6:20 7:10 8:7 9:4 10:1; after (1,000) 0:4 1:99 2:272 3:157
+  4:151 5:155 6:60 7:63 8:23 9:12 10:4.
+- *Pooled, default:* re-sorts (1,000) 0:3 1:167 2:290 3:189 4:179 5:78 6:41 7:39 8:12 9:1 10:1;
+  re-admits (200) 1:31 2:59 3:40 4:37 5:16 6:10 7:4 8:2 9:1; after (1,000) 0:5 1:153 2:305 3:216
+  4:159 5:89 6:36 7:26 8:9 9:2.
+- *Reading:* the three populations have one shape — a re-admitted frame is one more draw of sort
+  noise. The largest value in all 4,400 draws is **10** (8 draws of 10, none above).
+- *False-fail rate of each candidate rule on a healthy system* (each cycle's re-admit value against
+  bands resampled from its own load's 200 re-sorts, 2,000 draws per cycle; `?pages=32` / default):
+  one frame vs max of 5 (TODAY'S RULE) 14.2 % / 12.1 %; vs max of 10: 8.4 % / 6.2 %; of 20: 4.5 % /
+  3.0 %; of 50: 1.8 % / 1.0 %; of 100: 0.91 % / 0.44 %; of 200: 0.42 % / 0.19 % (the 10-200 figures
+  from a 500-draw pass); a fixed 10: 0 of 200 / 0 of 200; a fixed 9: 0.5 % / 0; the closest of 6
+  frames (the re-admit and its 5 re-sorts) vs max of 5: 0.10 % / 0.05 %.
+- *History (records, not re-measured):* recorded 5-re-sort control bands 6-7 (tickets 06, 07, 13);
+  `pager-lab/main.ts:708-709` records "a band of 13" at full residency on 2026-09-12, under older
+  code. Ticket 07's "band 9-16" is the render-scale probe with selection ON — a different quantity.
+  PL-1's own failing values: re-admit 5, 8, 10, 7 against bands 4, 5, 8, 6.
+
+**STOP SC-1 (2026-10-05, written at 14:29:03 -0500, before sending) — the five decisions put to the
+owner, VERBATIM.** The message as sent follows between the markers.
+
+<!-- BEGIN verbatim: STOP SC-1, 2026-10-05 -->
+**Where things stand.** Nothing is edited or committed yet, except ticket 13, where I keep this session's log: your message verbatim, each prediction with its time, each outcome. The dev server is running. Five decisions below are not settled by the list. Each has my evidence and a recommendation.
+
+**1. How far the line-ending rule should reach (change 4).**
+How I checked: `git cat-file --filters` prints a stored file exactly as a fresh copy on this machine would receive it. So it shows the problem without making a second copy.
+- The sidecars do break: 85 → 86 bytes, and `sha256sum -c` then fails ("No such file", exit 1).
+- The JSON records survive (they have no line breaks). The PNGs survive (git treats them as binary).
+- But hashed records also live outside `docs/plan/results/`. Ticket 13 records its close-out block as 1,382 B, sha256 `e208d380…`. A fresh copy makes it 1,391 B, `319e0903…`. Doc 06, PLAN.md, the handoffs and tickets 03 and 09-12 hold such hashes too.
+
+Options:
+- **(A)** Only `docs/plan/results/**`. Fixes exactly what you named. Ticket 13, doc 06, PLAN.md and the handoffs stay exposed.
+- **(B) Recommended:** every record folder: `docs/**`, `.scratch/**`, `PLAN.md`, with `-text`. That tells git to keep the exact bytes, the same rule `src/**` and `examples/**` already use, and PNGs are safe under it. Simulated: every file above survives. Side effect: three files are stored LF but sit on this disk as CRLF today (PLAN.md, `docs/plan/02-architecture.md`, ticket 08). I would rewrite those three disk copies to LF so git does not flag them; their stored content does not change.
+- **(C)** The whole repo, `* -text`. Also covers configs and spikes; I found nothing hashed there. Adds `vite.config.ts` to the disk rewrites.
+
+The proof after committing: the same `--filters` read of the committed copies, hashed against the stored bytes, and `sha256sum -c` run on exactly those bytes. No second clone is needed. If you also want a real checkout, I can make a temporary second working folder from this repo inside my scratchpad (`git worktree`) and remove it afterwards. That needs your OK.
+
+RS-1's files, as I read the finding: `CameraPath.ts`, `CameraRail.ts`, `LoadingUI.ts`, and `CameraSystem.ts`'s line endings. Converted, the three copies equal the pin snapshot byte for byte (checked). `examples/shared/sandbox-styles.css` stays as it is (the phase-1 ruling).
+
+**2. How to widen PL-1's noise band (change 3).**
+Measured today on WebGPU, both regimes, 5 fresh loads each. Per load: 200 plain re-sorts, then 40 evict/re-admit cycles copying the drill, each followed by 5 re-sorts. 4,400 noise draws in all.
+- A re-admitted frame behaves like one more draw of ordinary sort noise. Every chunk came back to its own slot.
+- The largest difference anywhere was 10 (8 draws of 10, none above).
+- Today's rule (one frame against the max of 5 re-sorts) fails a healthy system 14.2 % of the time at 32 pages and 12.1 % at 122. That is close to the 1-in-6 a comparison of two noise draws gives by construction.
+- History: a code comment records a 5-re-sort band of 13 on 2026-09-12, under older code. A fixed 10 would have failed that run.
+
+Options, with the measured false-fail rate (32 / 122 pages):
+- **(a)** Same rule, 100 re-sorts instead of 5: 0.91 % / 0.44 %. Never zero. About 100 more renders per run.
+- **(b)** A fixed band of 10: 0 of 200 / 0 of 200. Fails again if the GPU, driver or sort code moves the noise (the 13).
+- **(c) Recommended:** the larger of the run's own band and 10, on WebGPU only. WebGL2 stays exact at 0. Never narrower than the measured floor, and it still widens itself in a noisier run. 0 of 200 / 0 of 200.
+- **(d)** Change the comparison instead of the band: re-sort the re-admitted state 5 more times, keep the closest of the 6 frames, and compare that with the max-of-5 band. 0.10 % / 0.05 %. This is not literally "widen the band", which is why it is a question.
+
+The planted real difference (any option): `?plant=readmit-lost`. After the re-admission and its residency check, the page evicts the drill's chunks again before the comparison frame. The picture then lacks them while residency read "all back". The drill only stops once its eviction moves the picture by more than the band, so this must go red.
+
+Where the measurement is kept: per-load histograms go into ticket 13. The raw numbers stay in the pane's storage, unless you want them as a file in `docs/plan/results/`.
+
+**3. How to stop the `gpu-leak` plant keeping the last runtime (change 1).**
+Found prediction-first (written 14:19:26, both held):
+- P1: `gpu-leak` alone leaves runtime 2, renderer 2 and mesh 2 uncollected (6 of 9). The other two plants are not involved.
+- P2: three's shared node `TSL.modelWorldMatrix` still points at the plant's box after teardown. The box's geometry and material keep three's dispose listeners, which lead to renderer 2 (`RenderObject.js:346-347`, `:106`).
+- The splat mesh never uses that node, so rendering the scene again cannot move the pointer.
+
+Options:
+- **(a) Recommended:** plant a texture instead of a mesh, with `renderer.initTexture` on a tiny texture the runtime does not own. The same counters check goes red, and no shared node is ever touched. The plant's description changes from "renders a mesh" to "allocates a texture".
+- **(b)** Keep the mesh, and dispose its geometry and material after the counters are read. That removes the listeners, but it runs three's disposal code against an already-disposed renderer (untried).
+- **(c)** Keep the mesh, and clear the shared node's pointer from the page. That reaches into three's internals.
+
+Whichever you pick, I write the prediction before its run: the planted check red, collected 9 of 9.
+
+**4. New plants for the new failure paths (changes 1-3).**
+Three checks gain a failure path no plant reaches today. RG-3 requires red on the exact bytes that will run, so each needs a URL plant:
+- hlife, "arrival at rest": the product announces a stop only when its settle ends (`CameraRail.ts:584-591`), so this needs motion after an announcement. `?plant=restless`: after stop 2 is announced, the page nudges the rail every pumped frame. The order stays [1, 2, 0], stop 2 never comes to rest, and its wait runs to the 240 s bound, so the check goes red. Pane only. Untried; I prove it red before relying on it.
+- pager-lab, the drill guard: `?plant=drill-one-candidate` keeps one candidate, which triggers the guard's named failure.
+- pager-lab, the band: `?plant=readmit-lost` (above).
+
+Options: **(a) Recommended:** add the three. **(b)** Show them red with temporary source edits restored byte-identical; then they are not red on the exact bytes. **(c)** Rely on reading only.
+
+**5. Where the records go, and the commit order.**
+A commit cannot name its own id, so a tick that cites a commit id must land in a later commit.
+- **(a) Recommended:** commits 1-4 carry only their code or config files. Change 5's commit, made last, carries all the records: PLAN.md line 5; ticket 13 (this session's log, plus the eight items ticked with dated notes and commits 1-4's ids); and PLAN.md's progress lines, since the project's plan rules ask me to track work there.
+- **(b)** Each commit carries its own evidence, and its id is added in the next commit.
+
+**Readings I will use unless you correct them (no options needed):**
+- "requires every arrival at rest, not announced order": I add the at-rest requirement and keep the announced order [1, 2, 0]. The list item says the check "passes on the announced order alone".
+- PLAN.md line 5 becomes: "**Phase 2:** tickets 01–13 done (ticket 13, the exit evidence, closed 2026-09-27); eight owner items for the Phase 2 boundary open (ticket 13)." No record says Phase 2 is closed, so the line does not say it.
+- The idle heap is read after the collection rounds, once more than 50 ms have passed since the page's last heap reading. Chromium refreshes the value at most once per 50 ms, counted from its last refresh (`kFiftyMs` in `memory_info.cc`, read today); probe 2 measured 50.0-52.2 ms. One caveat, which I'll note in the page header: Chromium counts ArrayBuffer memory too, so the reading can still include the last pressure round's arrays if they are not collected yet. It stays a readout, not a check.
+- The drill guard: fewer than two candidates fails the check with a named reason. It never skips.
+<!-- END verbatim: STOP SC-1, 2026-10-05 -->
+
+The block between the markers: 65 lines, 8,383 B, sha256 `fdf79168c22f7275a3002b196f7ea33b3b03fbcb0aa6a106bbe4674ecc0b083b` (each line with its newline).
+
+**OWNER RULINGS on STOP SC-1 (2026-10-05, received before 14:40:17 -0500) — quoted verbatim, the
+whole message.**
+
+> Rulings on the five stops. The evidence quality here is high — the --filters fresh-checkout proof, the 4,400-draw noise measurement, and the P2 retainer trace with its prediction-first confirmation are each exactly the standard.
+>
+> 1 (B): every record folder — docs/**, .scratch/**, PLAN.md, with -text. Grounds: the e208d380 block demonstration proves (A) leaves hash-verified records breakable, and -text matches the rule src/** and examples/** already live under. The three disk rewrites to LF (PLAN.md, doc 02, ticket 08) are authorized — stored content unchanged, say so in the commit's plain-English note. The --filters proof suffices; no worktree needed. RS-1 files as you read them: the three copies converted to match the pin snapshot byte-for-byte, CameraSystem.ts's endings converted, sandbox-styles.css untouched per the phase-1 ruling.
+>
+> 2 (c): the larger of the run's own band and 10, WebGPU only, WebGL2 stays exact at 0. Grounds: never narrower than the measured floor (0-of-400 false fails today), self-widening if the noise moves (the 2026-09-12 band of 13 would have been absorbed, not failed). Record the derivation beside the check. The per-load histograms go in ticket 13 AND the raw numbers go to a file in docs/plan/results/ (named in the results convention, fingerprinted) — measurement that justified a rule is evidence, and evidence lives in the repo, not in a pane's storage.
+>
+> 3 (a): the texture plant. Grounds: it proves the same thing (uncollected GPU allocation caught by the counters) without ever touching the shared node machinery, and your P2 trace shows the mesh route's retention is three's page-lifetime singleton behavior, not a bug the plant should keep tripping over. Record the mechanism (modelWorldMatrix → dispose listeners → renderer, RenderObject.js:346-347/:106) with the plant's change — it is genuinely useful knowledge about three, cited for whoever meets it next.
+>
+> 4 (a): add the three URL plants. RG-3's rule is absolute: red on the exact bytes that run, or it has not been shown red. The restless plant's 240 s wait is acceptable in the pane; prove it red before relying on it, prediction written first, as you proposed.
+>
+> 5 (a): commits 1-4 carry only code/config; the fifth commit, last, carries all records including the ticked items with commits 1-4's ids. Your four readings are all confirmed, including the PLAN.md line-5 wording — "no record says Phase 2 is closed" is the right discipline; a formal phase-close declaration is an owner item for the boundary, not a line edit.
+>
+> Proceed: changes in your stated order, prediction-first on every plant run, staged list per commit, stop on anything stray, no credit lines, then the built-in review over the combined diff and the final report.
+
+Where recorded: here; PLAN.md `## decisions` (a summary entry, 2026-10-05). Doc 06: no ruling
+there is superseded — PL-1's widening, the plant changes and the attributes rule are new decisions
+inside ticket 13's post-ticket list, not changes to a D-numbered ruling.
+
+**CHANGE 1 BUILT (2026-10-05) — `examples/site-lab/hlife.ts` `112a179f…` → `d51f1641e7d50381ed9caea64a44430357a311bd62a1783ce6c2ca03167d33d0`
+(726 lines, 32,020 B, LF, 0 CR bytes; `hlife.html` unchanged at `28c14731…`).** Five edits and
+nothing else (`git diff --stat`: +62 / −23): (1) the idle heap read after the collection rounds,
+once more than `HEAP_REFRESH_MS` (50) has passed since the page's previous heap reading (IH-1);
+(2) `e2e-every-stop-and-back` requires every arrival at rest as well as the announced order
+[1, 2, 0] (R1-F1 / R2-1); (3) the `gpu-leak` plant uploads a 1×1 texture with
+`renderer.initTexture` instead of drawing a mesh, the three mechanism cited beside it (R2-4, ruling
+SC-1 3 a); (4) the dispose wrapper clears `obs.runtime` in a `finally` (R2-5); (5) a new plant,
+`restless` (pumped runs only): from the moment stop 2 is announced, `pump()` scrubs the rail in place
+after each update (ruling SC-1 4 a). `npx tsc --noEmit` exit 0.
+
+- *PREDICTIONS for the re-proof, written at 2026-10-05 14:43:34 -0500, BEFORE any run on
+  `d51f1641…`.* All runs: the built-in pane, `?pump=1` (logic only), run one at a time, the bytes
+  re-hashed on disk before the first and after the last.
+  - **`sc1-plants-webgpu`** (`plant=gpu-leak,skip-stop,expect-other&cycles=2`): fail
+    `backend-as-expected` (expected webgl2-fallback, three runtimes on webgpu),
+    `e2e-every-stop-and-back` (announced [2, 0]; every arrival at rest=true) and
+    `hlife-counters-back-to-baseline-exactly` (`[000]` — each runtime's after-dispose counters one
+    texture above its baseline); `e2e-ready-and-progress`, `hlife-every-cycle-ready-and-steady` and
+    `visible-throughout` pass. The heap check is NOT predicted (three readings; MR-1 stays open).
+    READOUT **collected 9 of 9** (the R2-4 fix: before it, this combination read 6 of 9).
+  - **`sc1-plants-webgl2`** (the same plants, `webgl=1`): the same three fail (expected webgpu,
+    three runtimes on webgl2-fallback); READOUT **collected 9 of 9**. Heap check not predicted.
+  - **`sc1-heap-webgpu`** (`plant=heap-grow&leakmb=256&cycles=2`): 6 passed, 1 failed — only
+    `hlife-heap-not-strictly-increasing`; READOUT collected 9 of 9.
+  - **`sc1-restless-webgpu`** (`plant=restless&cycles=2`): 6 passed, 1 failed — only
+    `e2e-every-stop-and-back`, its detail reading `2→never`, `every arrival at rest=false` and
+    announced **[1, 2, 0]** (the old clause alone would pass); stop 2's wait ends at the 240 s
+    bound; READOUT collected 9 of 9. Refuted if stop 2 reaches rest, or if the announced order is not
+    [1, 2, 0].
+  - **`sc1-ctl-webgpu-c4`** and **`sc1-ctl-webgl2-c4`** (no plant, `cycles=4`, the earlier pane
+    controls' size): 7 passed, 0 failed; counters `[11111]`; READOUT **collected 15 of 15**.
+  - **IH-1, every run above:** the idle readout is NOT equal to the run's last steady reading (the
+    old page's readout equalled it to the byte in every run read for it but one); in the two
+    controls it is LOWER. Refuted by a readout equal to the last steady reading.
+- *`sc1-plants-webgpu` OUTCOME (record sha256 `4f33b1a4…`, 5,641 chars), recorded at 2026-10-05
+  14:50:15 -0500:* 4 passed, 3 failed — exactly the three predicted: `backend-as-expected` (webgpu
+  ×3 vs expected webgl2-fallback), `e2e-every-stop-and-back` ("goToStop 2 → 0: 2→2/shelf in 74958
+  ms; 0→0/overview in 72539 ms; every arrival at rest=true; announced [2, 0]"), and
+  `hlife-counters-back-to-baseline-exactly` (`[000]`; runtime 0 "→ after dispose storage 0/0B,
+  attributes 0, geometries 0, textures 1/4B" — the planted texture). Heap 1,423.6 / 1,425.4 /
+  1,306.0 MB, not strictly increasing (passed; not predicted). **IH-1 prediction HELD:** idle
+  1,232.6 MB, below the last steady 1,306.0 MB. **The READOUT prediction FAILED:** "collected 6 of 9
+  (…) after 40 pressure round(s); NOT collected: runtime 2, renderer 2, mesh 2" — the same pattern
+  as before the change. So R2-4 is NOT fixed by the texture plant on this evidence, and the
+  modelWorldMatrix holder found in P2 is not the whole story.
+- *A wider scan, same tab, right after:* every top-level export of the page's three module and of
+  its `TSL` namespace, and every own property one level below each, checked for a renderer, a
+  scene, a mesh, a camera or the planted 1×1 `DataTexture` — **none found**. No module-level
+  mutable state in three's renderer sources that could hold one either (`grep '^let \|^var '` over
+  `renderers/common`, `renderers/webgpu`, `renderers/webgl-fallback`: only id counters, scratch
+  vectors and lookup tables).
+- **PREDICTION P4 — which plant keeps it, written at 2026-10-05 14:50:15 -0500, BEFORE either run.**
+  Two runs on `d51f1641…`, the pane, pumped, WebGPU, `cycles=2`:
+  **X1** `plant=gpu-leak&v=sc1-x1-gpuleak` (the texture plant alone) and **X2**
+  `plant=skip-stop,expect-other&v=sc1-x2-others`. If the texture plant keeps the last runtime: X1
+  reads collected **6 of 9 (NOT runtime 2, renderer 2, mesh 2)** and X2 **9 of 9**. If skip-stop or
+  expect-other keeps it: X1 9 of 9 and X2 6 of 9. Any other pair refutes both; I have no favoured
+  side — neither has a mechanism I can name by reading (skip-stop and expect-other act only on
+  runtime 0's tour and on a label).
+- *P4 OUTCOMES, recorded at 2026-10-05 15:01:48 -0500 — P4 REFUTED on both sides.*
+  - **X1** `sc1-x1-gpuleak` (record `42fb6b5b…`, 5,632 chars): 6 passed, 1 failed (the planted
+    counters check); READOUT "idle heap 1232.3 MB; collected 6 of 9 … after 40 pressure round(s);
+    NOT collected: runtime 2, renderer 2, mesh 2".
+  - **X2** `sc1-x2-others` (record `6057735f…`, 4,817 chars): 5 passed, 2 failed (the two planted
+    checks); READOUT "idle heap 1232.9 MB; collected 6 of 9 … after 40 pressure round(s); NOT
+    collected: runtime 2, renderer 2, mesh 2" — **with no `gpu-leak` plant at all.**
+  - *What this does to P1's reading:* P1 held as written, but its contrast was the earlier
+    session's unplanted 9 of 9 (rg3b-heap-webgpu) and 15 of 15 (the controls); no unplanted run had
+    been made TODAY. "The `gpu-leak` plant alone keeps the last runtime" is therefore withdrawn as
+    a conclusion: on today's runs the last runtime stays uncollected with the mesh plant, the
+    texture plant, and the other two plants. P2's holder (`modelWorldMatrix` → the box) stands as an
+    observed fact about the mesh plant, not as the cause of R2-4.
+- **The control's decision rule, written at 2026-10-05 15:01:48 -0500, BEFORE `sc1-ctl-webgpu-c4`
+  runs** (its prediction above stands: 7 passed, counters `[11111]`, collected 15 of 15): **15 of
+  15** → the retention needs a plant (something common to `gpu-leak`, `skip-stop` and
+  `expect-other`, and absent from `heap-grow`'s 9 of 9 in the earlier session); **12 of 15 with
+  runtime 4, renderer 4 and mesh 4 not collected** → the last runtime stays uncollected without any
+  plant today — on these bytes or in today's pane — and R2-4's "the plant keeps it" is not the
+  mechanism.
+- *`sc1-ctl-webgpu-c4` OUTCOME (record `7c01827b…`, 6,554 chars), recorded at 2026-10-05 15:09:19
+  -0500:* 7 passed, 0 failed; counters `[11111]` (as predicted). READOUT "collected 12 of 15 … after
+  40 pressure round(s); NOT collected: runtime 4, renderer 4, mesh 4" — **the prediction (15 of
+  15) FAILED, and by the decision rule written before the run, the last runtime stays uncollected
+  WITHOUT any plant today; R2-4's "the plant keeps it" is not the mechanism on today's evidence.**
+  IH-1 HELD: idle 1,292,052,830 B (1,232.2 MB) against the last steady 1,476,207,268 B (1,407.8 MB).
+- **PREDICTION P5 — the page's new bytes or today's pane, written at 2026-10-05 15:09:19 -0500,
+  BEFORE the run.** The committed page (`112a179f…`, which read 15 of 15 unplanted in the
+  2026-09-27 pane, `ctl-webgpu-c4`) is put back for ONE run — `git show HEAD:` into the working
+  file, sha-checked; the change-1 bytes kept in the session scratchpad (`d51f1641…`) and restored
+  byte-identical after, sha-checked — and run unplanted under the same conditions:
+  `hlife.html?pump=1&cycles=4&v=sc1-ctl-old-webgpu-c4`, WebGPU. **If today's pane keeps the last
+  runtime whatever the page: 12 of 15, NOT runtime 4, renderer 4, mesh 4. If the change-1 edits
+  cause it: 15 of 15.**
+- *P5 OUTCOME, recorded at 2026-10-05 15:16:17 -0500 — the "today's pane" branch HELD.*
+  `sc1-ctl-old-webgpu-c4` on the committed page (`112a179f…`, sha-checked before the run; record
+  `6e2b6ba3…`, 6,497 chars): 7 passed, 0 failed; READOUT "idle heap 1407.1 MB; collected 12 of 15 …
+  after 40 pressure round(s); NOT collected: runtime 4, renderer 4, mesh 4". **The change-1 edits
+  are not the cause: today's pane keeps the last runtime whatever the page**, where on 2026-09-27
+  the same bytes freed 15 of 15 in 3 rounds. IH-1 contrast on the old bytes: idle 1,475,458,641 B =
+  the last steady reading to the byte (the old placement), against the new page's readout moving
+  (above). The change-1 bytes restored from the scratchpad copy right after: `d51f1641…`,
+  sha-checked.
+- **PREDICTION P6 — this tab's state or the pane, written at 2026-10-05 15:16:17 -0500, BEFORE the
+  run.** One difference from 2026-09-27 I can name: this tab has had `read_console_messages` and
+  many console evaluations through the pane's debugging connection since 13:52 today. A FRESH tab
+  (`tabs_create`), no console read ever made in it, the change-1 bytes, unplanted:
+  `hlife.html?pump=1&cycles=4&v=sc1-ctl-fresh-webgpu-c4`, read only after DONE. **If the old tab's
+  accumulated state keeps the last runtime: 15 of 15. If the pane keeps it whatever the tab: 12 of
+  15, NOT runtime 4, renderer 4, mesh 4.**
+- *P6 OUTCOME, recorded at 2026-10-05 15:23:28 -0500 — the "pane, whatever the tab" branch HELD.*
+  `sc1-ctl-fresh-webgpu-c4`: a new tab (`tabs_create`), the old tab closed first, no console read
+  ever made in it, the change-1 bytes; read once, after DONE (record `fd1073aa…`, 6,560 chars): 7
+  passed, 0 failed; READOUT "idle heap 1230.2 MB; collected 12 of 15 … after 40 pressure round(s);
+  NOT collected: runtime 4, renderer 4, mesh 4".
+- *The runs of today, from the page's own store (`t13-hlife-v1`, read in the fresh tab after P6):*
+
+| run | bytes | plant | result | NOT collected | idle = last steady? |
+|---|---|---|---|---|---|
+| iso-gpuleak-webgpu (P1) | `112a179f…` | gpu-leak (mesh) | 6 passed, 1 failed | runtime 2, renderer 2, mesh 2 | YES (1,381,313,615 B) |
+| sc1-plants-webgpu | `d51f1641…` | gpu-leak (texture), skip-stop, expect-other | 4 passed, 3 failed | runtime 2, renderer 2, mesh 2 | no (1,292,436,506 vs 1,369,450,188) |
+| sc1-x1-gpuleak | `d51f1641…` | gpu-leak (texture) | 6 passed, 1 failed | runtime 2, renderer 2, mesh 2 | no (1,292,108,847 vs 1,513,889,541) |
+| sc1-x2-others | `d51f1641…` | skip-stop, expect-other | 5 passed, 2 failed | runtime 2, renderer 2, mesh 2 | no (1,292,757,658 vs 1,415,857,664) |
+| sc1-ctl-webgpu-c4 | `d51f1641…` | — | 7 passed, 0 failed | runtime 4, renderer 4, mesh 4 | no (1,292,052,830 vs 1,476,207,268) |
+| sc1-ctl-old-webgpu-c4 | `112a179f…` | — | 7 passed, 0 failed | runtime 4, renderer 4, mesh 4 | YES (1,475,458,641 B) |
+| sc1-ctl-fresh-webgpu-c4 | `d51f1641…` | — | 7 passed, 0 failed | runtime 4, renderer 4, mesh 4 | no (1,289,910,840 vs 1,467,774,658) |
+
+  **IH-1 is fixed on the new bytes** (the readout moved, lower, in 5 of 5; the old bytes repeat the
+  last reading to the byte in 2 of 2). **The last runtime stays uncollected in today's pane in 7 of
+  7 runs, with or without any plant, on either page version and in a fresh tab.**
+
+**STOP SC-2 (2026-10-05, written at 15:23:28 -0500, before sending) — R2-4 does not reproduce as
+stated; VERBATIM.** The message as sent follows between the markers.
+
+<!-- BEGIN verbatim: STOP SC-2, 2026-10-05 -->
+**Where change 1 stands.** Change 1 is built: `hlife.ts` `d51f1641…`, type check clean, not committed. One item, R2-4, does not reproduce as the list states it, so I am stopping before finishing its re-proof.
+
+**What R2-4 assumed.** On 2026-09-27, runs with the `gpu-leak` plant left the last runtime uncollected (6 of 9), and runs without it freed everything. So the plant looked like the cause.
+
+**What today's runs show (built-in pane, WebGPU, each prediction written in ticket 13 before its run):**
+- The texture plant you chose: the last runtime still stays (6 of 9). My prediction of 9 of 9 failed.
+- The texture plant alone: 6 of 9. The other two plants without `gpu-leak`: also 6 of 9.
+- No plant at all, new page: 12 of 15. The last runtime stays.
+- No plant at all, the committed page (the exact bytes that freed 15 of 15 on 2026-09-27): 12 of 15. So my edits are not the cause.
+- No plant, a fresh tab never console-read, the old tab closed: 12 of 15.
+
+So today the pane keeps the last runtime whatever the page or the plant does. That makes R2-4's "the plant keeps it" unprovable here today, either way. My earlier P1 reading ("the plant alone keeps it") is withdrawn in the ticket: it compared against the earlier session's controls, not today's.
+
+**What still holds:**
+- P2 is a real fact about three: its shared `modelWorldMatrix` node kept the mesh plant's box after teardown. The texture plant removes that by construction.
+- The other change 1 fixes behave as intended. The idle-heap readout now moves in all 5 runs on the new bytes (for example 1,232.2 MB against a last steady 1,407.8 MB), while the old page repeats the last reading to the byte. The three planted checks went red exactly as predicted.
+- The page's own checks are unaffected: the readout is reported, not gated, and it is computed before any verdict.
+
+**Options:**
+- **(a) Recommended:** keep change 1 as built. Finish the remaining reds and the WebGL2 control in the pane. Check R2-4 where it can be seen: you open one URL in an ordinary Chrome tab, `http://localhost:5173/examples/site-lab/hlife.html?cycles=2&plant=gpu-leak&v=plain-sc1-gpuleak` (a few minutes; no pump; the page runs on its own), and paste me its READOUT line. 9 of 9 there means the plant no longer keeps anything. The pane's behaviour gets recorded as a named observation, cause unknown, not this page's and not the product's.
+- **(b)** Find the pane's cause first. One monitored run holding only weak references, then tests: does later GPU work or time release the runtime, and what state is the surviving renderer in. It has no defined end, and it lies outside the five changes.
+- **(c)** Commit change 1 without any R2-4 proof, recorded as "not verifiable in today's pane".
+<!-- END verbatim: STOP SC-2, 2026-10-05 -->
+
+The block between the markers: 22 lines, 2,738 B, sha256 `41a6feebcf269e39337738e65a189dcd7fb23fb1e258127fbf38df6cd2e57eed` (each line with its newline).
+
+**OWNER RULING on STOP SC-2 (received 2026-10-09, before 00:03:55 -0500) — quoted verbatim, the
+whole message.**
+
+> Ruling: (a), keep change 1 as built. Grounds: the restored-committed-bytes run is conclusive — the exact bytes that freed 15 of 15 on 2026-09-27 free only 12 of 15 today, so today's pane keeps the last runtime regardless of page or plant, and R2-4 is unprovable in that instrument. The withdrawal of the earlier P1 reading is accepted and correctly reasoned: a prediction that comes true against a stale baseline proves nothing, and the record should keep that lesson visible.
+>
+> Record the pane's behavior as a named observation (cause unknown, not the page's, not the product's, dated, with the three isolation runs as evidence), and finish change 1's remaining reds and the WebGL2 control in the pane — the pane remains valid for everything that doesn't depend on the last runtime's collection.
+>
+> R2-4's proof moves to the owner's plain tab: the owner is opening hlife.html?cycles=2&plant=gpu-leak&v=plain-sc1-gpuleak in an ordinary Chrome tab now and will paste the READOUT line. Decision rule, stated before the result arrives: 9 of 9 collected → the texture plant holds no references, R2-4 is fixed and proven in a clean instrument; the last runtime uncollected there too → stop again with the pattern, because then the retention follows the page into a clean tab and the texture plant is not yet exonerated. Anything else → stop and report before interpreting.
+>
+> P2 stays recorded as the real three.js fact it is (modelWorldMatrix retention, the mesh→dispose-listener→renderer chain) — the texture plant's justification is unchanged by today's finding.
+>
+> Then continue the plan: changes 2-5 in order, prediction-first on every plant run, staged list per commit, no credit lines, the built-in review over the combined diff, the final report.
+
+- *Environment at resume (2026-10-09 00:03:55 -0500):* the dev server was DOWN (no listener on 5173;
+  the session's preview list empty) — so the owner's plain-tab URL could not load at that moment.
+  Restarted by this session (`toolkit-dev`, 00:04); `hlife.html` and `hlife.ts` answer 200 at
+  00:04:08; the owner told in chat. The page bytes unchanged: `hlife.ts` `d51f1641…`.
+
+**OBSERVATION LR-1 (named 2026-10-05, owner ruling 2026-10-09) — the built-in pane kept the LAST
+runtime of every H-LIFE run on 2026-10-05, whatever the page or the plant.** Cause unknown. Not the
+page's: the committed bytes `112a179f…`, which freed 15 of 15 in the same pane (Chrome
+152.0.7977.130) on 2026-09-27, freed 12 of 15 on 2026-10-05. Not the product's in any way this
+evidence shows: the owner's plain tab freed 12 of 12 and 33 of 33 on 2026-09-27. Evidence — the
+three isolation runs, each against a prediction written before it: `sc1-ctl-webgpu-c4` (new
+bytes, no plant: 12 of 15, runtime 4 / renderer 4 / mesh 4 kept), `sc1-ctl-old-webgpu-c4` (P5, the
+committed bytes, no plant: 12 of 15, the same three kept), `sc1-ctl-fresh-webgpu-c4` (P6, a fresh
+tab, never console-read, the old tab closed: 12 of 15, the same three kept); the plant runs of the
+same day agree (7 of 7 runs, table above). Consequence: in the pane, the READOUT's collected count
+cannot test any claim about the last runtime; every other check, and the READOUT's other entries,
+stay valid there (ruling above).
+
+**The lesson the record keeps (owner ruling):** P1 came true exactly as written and still proved
+nothing about its cause — its contrast case (9 of 9 without the plant) was another day's pane. A
+prediction that comes true against a stale baseline is not a confirmation; the contrast run belongs
+in the same session, the same instrument, and the same hour as the test.
+
+- *Amendment to the change-1 predictions of 2026-10-05 14:43:34, written before 2026-10-09 00:04:34 -0500 (its append time),
+  BEFORE the remaining pane runs (`sc1-plants-webgl2`, `sc1-heap-webgpu`, `sc1-restless-webgpu`,
+  `sc1-ctl-webgl2-c4`):* their checks are predicted exactly as written there; their READOUT's
+  collected count is NOT predicted (LR-1) — it is reported, with the last runtime expected among the
+  uncollected. The IH-1 clause stands (the idle readout not equal to the last steady reading).
+- *R2-4's proof — the owner's plain tab, decision rule as ruled above:* 9 of 9 → fixed and proven;
+  the last runtime uncollected there too → stop with the pattern; anything else → stop and report
+  before interpreting.
+
+**R2-4 PROVEN in the owner's plain tab (recorded at 2026-10-09 00:14:27 -0500).** The owner opened
+`hlife.html?cycles=2&plant=gpu-leak&v=plain-sc1-gpuleak` in an ordinary Chrome tab (own loop, no
+pump, the change-1 bytes `d51f1641…`) and pasted the page's lines; quoted verbatim:
+
+> READOUT — after teardown: idle heap 1522.9 MB; collected 9 of 9 (runtimes, renderers, splat meshes) after 3 pressure round(s)
+> PASS — backend-as-expected: expected webgpu; every runtime's backend [webgpu, webgpu, webgpu]
+> PASS — e2e-ready-and-progress: lab.site.json ready={"loadId":1,"src":"http://localhost:5173/examples/site-lab/sites/lab.site.json","name":"portfolio-lab-p0-scaffold","initialStop":{"index":0,"id":"overview","label":"Overview"},"stopCount":3}; progress: 2 report(s) [0.3388, 1.0000]; strictly rising below 1=true; exactly one 1 and it is last=true
+> PASS — e2e-every-stop-and-back: goToStop 1 → 2 → 0: 1→1/workbench in 3051 ms; 2→2/shelf in 3298 ms; 0→0/overview in 3121 ms; every arrival at rest=true; announced [1, 2, 0] (expected [1, 2, 0])
+> FAIL — hlife-counters-back-to-baseline-exactly: 3 runtime(s) (expected 3), each torn down once: [000]; runtime 0 (first, lab): baseline storage 0/0B, attributes 0, geometries 0, textures 0/0B (render calls 0) → loaded storage 10/799571968B, attributes 1, geometries 1, textures 0/0B → after dispose storage 0/0B, attributes 0, geometries 0, textures 1/4B, window open=true; runtime 1 (swap, lm): baseline storage 0/0B, attributes 0, geometries 0, textures 0/0B (render calls 0) → loaded storage 10/799571968B, attributes 1, geometries 1, textures 0/0B → after dispose storage 0/0B, attributes 0, geometries 0, textures 1/4B, window open=true; runtime 2 (readd, lm): baseline storage 0/0B, attributes 0, geometries 0, textures 0/0B (render calls 0) → loaded storage 10/799571968B, attributes 1, geometries 1, textures 0/0B → after dispose storage 0/0B, attributes 0, geometries 0, textures 1/4B, window open=true; runtime 0: baseline storage 0/0B, attributes 0, geometries 0, textures 0/0B → loaded storage 10/799571968B, attributes 1, geometries 1, textures 0/0B → after storage 0/0B, attributes 0, geometries 0, textures 1/4B
+> FAIL — hlife-heap-not-strictly-increasing: heap at each steady point (MB, site): [1362.5 lab, 1421.3 lm, 1427.2 lm] strictly increasing=true
+> PASS — hlife-every-cycle-ready-and-steady: 3 load(s); ready ms [1171, 1243, 1508]; steady ms [17919, 18085, 18439]; loaderror 0; page errors 0
+> PASS — visible-throughout: own loop; visibility visible@271
+> hlife: 5 passed, 2 failed
+
+- *By the rule stated before the result:* **collected 9 of 9 → the texture plant holds no
+  references; R2-4 is fixed and proven in a clean instrument.** The planted check is red with
+  exactly the plant's signature (each runtime one 4-byte texture above its baseline after dispose).
+- *Outside the rule's READOUT cases, reported and NOT interpreted:* `hlife-heap-not-strictly-increasing`
+  went red (1,362.5 → 1,421.3 → 1,427.2 MB). The plant does not act on that check. Recorded beside
+  OBSERVATION MR-1 (the unplanted memory red in planted runs) as one more planted-run occurrence,
+  now in a plain tab; MR-1's escalation clause names unplanted counted runs, so this does not
+  trigger it. Also as recorded in the page header's caveat: the idle readout (1,522.9 MB) sits
+  ABOVE the last steady reading after 3 pressure rounds — the reading counts ArrayBuffer memory,
+  so it can hold the last round's dropped arrays.
+- *CHANGE-1 PANE RUNS on `d51f1641…` (2026-10-09), each against the predictions of 2026-10-05
+  14:43:34 as amended before 2026-10-09 00:04:34 (READOUT counts not predicted, LR-1).* The pane:
+  Chrome 152.0.7977.130, nvidia / ampere (probed at 00:16), hidden, pumped.
+
+| run | result | the planted check(s), verbatim detail | other reds | READOUT | IH-1 (idle vs last steady) | record |
+|---|---|---|---|---|---|---|
+| sc1-plants-webgpu (10-05) | 4 passed, 3 failed | as recorded above | — | 6 of 9 (LR-1) | moved | `4f33b1a4…` |
+| sc1-plants-webgl2 | 3 passed, 4 failed | `backend-as-expected` "expected webgpu; every runtime's backend [webgl2-fallback, webgl2-fallback, webgl2-fallback]"; `e2e-every-stop-and-back` "goToStop 2 → 0: 2→2/shelf in 94840 ms; 0→0/overview in 65227 ms; every arrival at rest=true; announced [2, 0]"; `hlife-counters-back-to-baseline-exactly` `[000]` | `hlife-heap-not-strictly-increasing` 1,304.5 → 2,294.1 → 2,324.5 MB (not predicted — the same shape as rg3b-plants-webgl2 on 09-27, MR-1) | 6 of 9, runtime 2 / renderer 2 / mesh 2 (LR-1) | moved: 1,386.4 vs 2,324.5 MB | `f6dc4ee0…` (5,772) |
+| sc1-heap-webgpu | 6 passed, 1 failed — **as predicted** | `hlife-heap-not-strictly-increasing` "[1559.1 lab, 1860.8 lm, 2161.1 lm] strictly increasing=true (plant: +256 MB retained per cycle)" | — | 6 of 9 (LR-1) | moved: 1,677.8 vs 2,161.1 MB | `d97bdcfe…` (4,961) |
+| sc1-restless-webgpu | 5 passed, 2 failed | `e2e-every-stop-and-back` "goToStop 1 → 2 → 0: 1→1/workbench in 97730 ms; 2→never; 0→0/overview in 121311 ms; every arrival at rest=false; announced [1, 2, 0] (expected [1, 2, 0])" — **the new clause red, the announced order intact, as predicted** | `hlife-heap-not-strictly-increasing` 2,969.5 → 3,042.1 → 3,084.6 MB — **NOT predicted: my prediction said 6 passed, 1 failed; it MISSED by this check.** Steady heaps near 3 GB here, about twice the other WebGPU runs; not interpreted (MR-1) | 6 of 9 (LR-1) | moved: 973.5 vs 3,084.6 MB | `e93b234f…` (4,906) |
+
+  Every planted fault of the page is red on the bytes that will be committed: `gpu-leak`
+  (both backends), `skip-stop` (both), `expect-other` (both), `heap-grow` (WebGPU), `restless`
+  (WebGPU, the new plant). Heap reds outside a `heap-grow` run today, all in planted runs, none
+  interpreted (MR-1, whose standing rule escalates only an unplanted one): the owner's plain
+  `gpu-leak` run, `sc1-plants-webgl2`, `sc1-restless-webgpu`.
+- *`sc1-ctl-webgl2-c4` (the unplanted WebGL2 control):* 7 passed, 0 failed — **as predicted**;
+  counters `[11111]`; heap 1,247.9 / 2,316.5 / 2,324.7 / 2,324.8 / 2,323.2 MB, not strictly
+  increasing (so no unplanted heap red: MR-1 does not escalate); READOUT 12 of 15, runtime 4 /
+  renderer 4 / mesh 4 (LR-1); IH-1 moved: 1,387.0 vs 2,323.2 MB; record `a4dfcab4…` (6,658).
+  With `sc1-ctl-webgpu-c4` and `sc1-ctl-fresh-webgpu-c4` (both 7 of 7, 10-05): **one unplanted
+  green run per backend, done.** Change 1's re-proof is complete; the page bytes unchanged
+  (`d51f1641…`, re-hashed after the last run).
+- *CHANGE 1 COMMITTED (2026-10-09): `decac02` — `examples/site-lab/hlife.ts` alone, `d51f1641…`;
+  `check:full` true exit 0 (00:46:34 → 00:46:58; embed-size 3,117,066 B; crate 6 passed / 1
+  ignored; golden 7 passed; "no dependency violations found (186 modules, 615 dependencies
+  cruised)").*
+
+**CHANGE 2 BUILT (2026-10-09) — `examples/pager-lab/main.ts` `8859e840…` →
+`773cab77c8663e939b72a9d024587318657b0c7915c5cfb5825c4cb21958d0e7` (1,420 lines, 61,082 B, LF, 0
+CR; +9 / −2).** (1) The drill's scan runs `chunk < pAsset`, so the last chunk is a candidate
+(R2-6); (2) fewer than two candidates throws a named error inside the drill's `try`, so the check
+FAILS by name and never skips (R2-7); (3) a new URL plant, `drill-one-candidate` (WebGPU), keeps one
+candidate (ruling SC-1 4 a). `npx tsc --noEmit` exit 0.
+
+- *PREDICTIONS for change 2's re-proof, written at 2026-10-09 00:48:11 -0500, BEFORE any run on
+  `773cab77…`.* The pane, logic only, one run at a time.
+  - **`?pages=32&plant=sh-rearm-held` (WebGPU):** `sh-output-fresh-after-admission` FAILS — 0 SH
+    passes on the admission render, words differing between R1 and the forced pass.
+  - **`?pages=32&webgl=1&plant=sh-premise` (WebGL2):** the same check FAILS — "per-vertex SH node in
+    use=false".
+  - **`?pages=32&plant=drill-one-candidate` (WebGPU):** the same check FAILS, its detail reading
+    "the drill threw — Error: the drill needs two resident non-root chunks; 1 found".
+  - **Unplanted — default (WebGPU; every chunk resident, so the last chunk is now a candidate) and
+    `?pages=32&webgl=1` (WebGL2):** 27 passed, 0 failed; on WebGPU the drill's detail names a
+    landed slot equal to A's.
+  - **Not predicted, every WebGPU run:** `evict-readmit-pixel-identical` (FINDING PL-1, measured
+    12-14 % false fails per run on these bytes' rule; widened in change 3). A failure there alone is
+    reported, as ruled; every other check is predicted to pass in the planted runs.
+- *CHANGE-2 RUNS on `773cab77…` (2026-10-09), against the predictions of 00:48:11:*
+
+| run | result | the drill's check, verbatim | other reds |
+|---|---|---|---|
+| `?pages=32&plant=sh-rearm-held` (WebGPU) | 26 passed, 1 failed — **as predicted** | FAIL "chunk 85 (slot 31) admitted into chunk 27's vacated slot 1 → landed in 1; SH passes on the admission render=0; R1 vs R2 (forced pass): 196608 of 262144 words differ" | — |
+| `?pages=32&plant=drill-one-candidate` (WebGPU) | 26 passed, 1 failed — **as predicted** | FAIL "the drill threw — Error: the drill needs two resident non-root chunks; 1 found" | — |
+| `?pages=32&webgl=1&plant=sh-premise` (WebGL2) | 26 passed, 1 failed — **as predicted** | FAIL "contribution buffer allocated=false, per-vertex SH node in use=false; plant sh-premise" | — |
+| default (WebGPU), unplanted | 26 passed, 1 failed | PASS "chunk 56 (slot 121) admitted into chunk 18's vacated slot 1 → landed in 1; SH passes on the admission render=1; R1 vs R2 (forced pass): 0 of 262144 words differ" | `evict-readmit-pixel-identical` "re-admit max diff=5 … sort-only control band=4 … OUTSIDE the measured band" — FINDING PL-1, the check carved out of the prediction; reported, not re-run (ruled 09-27: a PL-1 failure alone does not block); change 3 widens it |
+| `?pages=32&webgl=1` (WebGL2), unplanted | 27 passed, 0 failed — **as predicted** | PASS "per-vertex SH node in use=true" | — |
+
+  Every plant of the drill red on the bytes that will be committed; the drill green unplanted on
+  both backends.
+- *CHANGE 2 COMMITTED (2026-10-09): `38a0bdd` — `examples/pager-lab/main.ts` alone, `773cab77…`;
+  `check:full` true exit 0 (01:05:10 → 01:05:28, the same figures as change 1's gate).*
+
+**CHANGE 3 BUILT (2026-10-09) — `examples/pager-lab/main.ts` `773cab77…` →
+`d25786dae4ac2c9db9f1437b90ed63d881424a180e755d881a5998896fb3e048` (1,442 lines, 62,704 B, LF, 0
+CR; +28 / −6).** `evict-readmit-pixel-identical` uses `readmitBand` = the larger of the run's own
+5-re-sort band and `SORT_NOISE_FLOOR_WEBGPU` (10) on WebGPU, the run's own band (0) on WebGL2
+(ruling SC-1 2 c), for the drill's stop rule, its "grid changed" test and its verdict; the
+derivation is written beside the check, citing the raw-numbers file that lands with the records
+commit (`docs/plan/results/phase-2-pl1-sort-noise.json`). The other three checks that read the
+control band (`selection-change-…`, `culling-off-…`, `culling-culls-when-away`) are untouched. A
+new URL plant, `readmit-lost`: after the residency check, the drilled chunks are evicted again
+before the comparison frame. `npx tsc --noEmit` exit 0.
+
+- *PREDICTIONS for change 3's re-proof, written at 2026-10-09 01:06:41 -0500, BEFORE any run on
+  `d25786da…`.* The pane, logic only, one at a time; `evict-readmit-pixel-identical` is now
+  predicted in every run (the floored rule failed 0 of 400 healthy cycles).
+  - **`?pages=32&plant=readmit-lost` (WebGPU):** 26 passed, 1 failed — only
+    `evict-readmit-pixel-identical`, its detail reading "all resident again=true", "band used=10
+    (the larger of that and the measured floor 10)" (unless this run's own band exceeds 10),
+    "evicted max diff" above it, and a re-admit max diff above the band — "OUTSIDE the band".
+  - **`?pages=32&plant=sh-rearm-held`, `?pages=32&plant=drill-one-candidate` (WebGPU),
+    `?pages=32&webgl=1&plant=sh-premise` (WebGL2):** 26 passed, 1 failed each — only
+    `sh-output-fresh-after-admission`, as on change 2's bytes; evict/re-admit passes.
+  - **Unplanted — default (WebGPU), `?pages=32` (WebGPU), `?pages=32&webgl=1` (WebGL2):** 27
+    passed, 0 failed each; on WebGPU the evict/re-admit detail reads "band used=10" (or the run's
+    own band if larger); on WebGL2 "band used=0" and the re-admit "(exact)".
+- *CHANGE-3 RUNS on `d25786da…` (2026-10-09), against the predictions of 01:06:41 — 7 of 7 AS
+  PREDICTED:*
+
+| run | result | `evict-readmit-pixel-identical`, verbatim (abridged at the slot clause) |
+|---|---|---|
+| `?pages=32&plant=readmit-lost` (WebGPU) | 26 passed, 1 failed (only this check) | FAIL "evicted 2 chunk(s) [0,27], all resident again=true …; sort-only control band=7 over 5 re-sorts; band used=10 (the larger of that and the measured floor 10); evicted max diff=38 (above band); re-admit max diff=38 [p00=7, p01=38, p02=6, p10=2, p11=11, p12=1, p21=1, corner=35] — OUTSIDE the band" |
+| `?pages=32&plant=sh-rearm-held` (WebGPU) | 26 passed, 1 failed (`sh-output-…`: "SH passes on the admission render=0; … 196608 of 262144 words differ") | PASS band 8 → used 10; re-admit 7 |
+| `?pages=32&plant=drill-one-candidate` (WebGPU) | 26 passed, 1 failed (`sh-output-…`: "the drill threw — Error: the drill needs two resident non-root chunks; 1 found") | PASS band 6 → used 10; re-admit 3 |
+| `?pages=32&webgl=1&plant=sh-premise` (WebGL2) | 26 passed, 1 failed (`sh-output-…`: "per-vertex SH node in use=false; plant sh-premise") | PASS "band used=0; … re-admit max diff=0 (exact)" |
+| default (WebGPU), unplanted | **27 passed, 0 failed** | PASS "evicted 9 chunk(s) [0,1,2,3,4,5,6,7,8], all resident again=true (1 in their original slot); sort-only control band=4 …; band used=10 …; evicted max diff=14 (above band); re-admit max diff=3" |
+| `?pages=32` (WebGPU), unplanted | **27 passed, 0 failed** | PASS band 7 → used 10; evicted [0,27] 38; re-admit 3 |
+| `?pages=32&webgl=1` (WebGL2), unplanted | **27 passed, 0 failed** | PASS "band used=0; … re-admit max diff=0 (exact)" |
+
+  - *One thing the 2026-10-05 measurement did not cover, seen here:* at the default regime the floor
+    makes the drill evict 9 chunks, and 8 of them came back in permuted slots (every measured
+    cycle returned to its own slots). The re-admit difference was 3, well inside the band — one
+    run, reported, not generalised.
+  - Every plant of the page red on the bytes that will be committed (`readmit-lost`,
+    `sh-rearm-held`, `drill-one-candidate`, `sh-premise`); unplanted 27 of 27 on WebGPU in both
+    regimes and on WebGL2.
+- *CHANGE 3 COMMITTED (2026-10-09): `7e1dc0a` — `examples/pager-lab/main.ts` alone, `d25786da…`;
+  `check:full` true exit 0 (01:29:17 → 01:29:46).*
+
+**CHANGE 4 BUILT AND COMMITTED (2026-10-09): `a0bdc49`.** `src/core/CameraPath.ts`, `CameraRail.ts`,
+`LoadingUI.ts` converted CRLF → LF (232 / 919 / 102 endings), each now byte-identical to the pin
+snapshot (`git archive fd67153`, handoff 009:216; the pin's own attributes `* text=auto eol=lf`):
+`d4fe32a2…` / `2426c19a…` / `60c3ab86…`. `CameraSystem.ts` converted (980 endings; `e1d9d211…`),
+24 diff lines against the pin as before. `git diff --ignore-cr-at-eol` on the four: empty; line
+counts unchanged. `.gitattributes` +8 lines: `docs/** -text`, `.scratch/** -text`, `PLAN.md -text`
+(ruling SC-1 1 B; `git check-attr text` → `unset` on a handoff, a PNG, the results doc and
+PLAN.md, `unspecified` on `vite.config.ts`). The three CRLF disk copies (PLAN.md,
+`docs/plan/02-architecture.md`, ticket 08) rewritten to LF; doc 02 and ticket 08 then equal their
+stored bytes (`git hash-object` = HEAD's blob, `a0f7d0a0…` for doc 02). Git still listed those two
+as modified on stat alone (the size it noted at checkout was the CRLF size); `git add` on them
+refreshed that note and staged nothing (`git diff --cached` empty) — explained to the owner.
+`check:full` true exit 0 (01:31:49 → 01:32:08). Not touched, not named by RS-1, mentioned to the
+owner: `examples/rad-lab/index.html` and `src/vendor/three-gs/patches/capacity-guard.ts` are also
+stored CRLF under `-text`; `sandbox-styles.css` untouched per the phase-1 ruling.
+- **THE FRESH-CHECKOUT PROOF, after committing (HEAD `a0bdc49`):** `git cat-file --filters` (the
+  bytes a fresh checkout on this machine writes) against `git cat-file blob` (the stored bytes) for
+  every committed file under `docs/`, `.scratch/`, PLAN.md and the four `src/core` files — **86
+  files, 0 differ.** On the fresh-copy bytes: ticket 13's close-out block reads "9 lines, 1382 B,
+  sha256 e208d380" (as recorded; 1,391 B `319e0903` before the rule); the three sidecars beside
+  their PNGs → `sha256sum -c`: "h8-ours-webgl2.png: OK", "h8-ours-webgpu.png: OK", "h8-pin.png:
+  OK", exit 0 (before the rule: "No such file", exit 1); the three RS-1 copies equal the pin
+  snapshot. No second clone used (the owner: "The --filters proof suffices").
+
+**FINDING SC-L1 (2026-10-09) — PL-1's raw numbers were lost.** The pane's localStorage on
+`http://localhost:5173`, read at 01:32 today, holds one key, `t13-hlife-v1`, with today's four
+records only: everything stored there on 2026-10-05 is gone — the two `pl1-measure-v1-*` keys and
+the 10-05 hlife records (their figures and hashes are in this ticket). My fault: I left the raw
+numbers in pane storage to move them with the records, instead of moving them to disk the same
+day. Surviving: the per-load histograms above (every value and its count for all 4,400 draws)
+and the script (`13e1b36a…`).
+
+**STOP SC-3 (2026-10-09, written at 01:33:26 -0500, before sending) — VERBATIM.** The message as
+sent follows between the markers.
+
+<!-- BEGIN verbatim: STOP SC-3, 2026-10-09 -->
+**Where things stand.** Changes 1-4 are committed: `decac02` (H-LIFE page), `38a0bdd` (pager-lab drill guard), `7e1dc0a` (PL-1 band), `a0bdc49` (line endings). Each gate was green with a true exit code 0. After commit 4, the fresh-checkout proof holds: all 86 covered files would check out byte-identical, the sidecars pass `sha256sum -c`, and ticket 13's close-out block hashes to `e208d380` as recorded. What remains is change 5, the records commit, and one item in it cannot be done as ruled.
+
+**What happened.** Ruling 2 asked for PL-1's raw numbers as a file in `docs/plan/results/`. On 10-05 I left them in the built-in pane's storage, meaning to move them with the records. Today that storage holds only today's four H-LIFE records: the pane's storage was emptied between sessions. So the raw numbers that justified the floor of 10 no longer exist. That was my mistake: the evidence should have gone to disk the same day. I've saved that rule to memory.
+
+**What survives.** The per-load histograms in ticket 13 (written 10-05): every value and its count for all 4,400 draws, the band of each load, and the evicted chunks. They lose only the order of the draws within each load. The measuring script is also kept, unchanged (sha256 `13e1b36a…`).
+
+**Options:**
+- **(a) Recommended:** repeat the measurement now with the same script and the same protocol (5 loads per regime, 200 re-sorts plus 40 drill cycles each), and move the raw numbers to disk byte-exact the same hour as `docs/plan/results/phase-2-pl1-sort-noise.json`, its sha256 in the ticket. The file says plainly that it is the 2026-10-09 repetition, and the ticket records that the 10-05 raw numbers were lost. If any draw exceeds 10, I stop again before anything else. One wrinkle: pager-lab's comment (commit `7e1dc0a`) describes the 10-05 measurement and names this file. Correcting that wording would change pager-lab's bytes and cost another full re-proof, so I'd leave it and record the mismatch in the ticket.
+- **(b)** Write the file from the ticket's histograms, labelled "derived from the 10-05 histograms; the raw numbers were lost". No new measurement, but the file is not raw data.
+- **(c)** Both: the repetition's raw numbers and the 10-05 histograms in one file, each labelled.
+
+Everything else in change 5 is ready to go: PLAN.md line 5 with the wording you confirmed, the eight items ticked with commits 1-4's ids, and this session's log.
+<!-- END verbatim: STOP SC-3, 2026-10-09 -->
+
+The block between the markers: 12 lines, 2,425 B, sha256 `ed7680576d5560ff686913e3d3f3a81e23b1cb1eb596026f502e02c903f23499` (each line with its newline).
+
+**OWNER RULING on STOP SC-3 (received 2026-10-14, before 17:18:33 -0500) — quoted verbatim, the
+whole message.**
+
+> Ruling: (a), repeat the measurement. Same script (13e1b36a…, unchanged), same protocol — 5 loads per regime, 200 re-sorts plus 40 drill cycles each — raw numbers to docs/plan/results/phase-2-pl1-sort-noise.json byte-exact THE SAME HOUR, sha256 in the ticket, the file stating plainly it is the 2026-10-09+ repetition and the ticket recording that the 10-05 raws were lost and why. Your stop rule stands: any draw above 10 and you stop before anything else, because that would be the measured floor moving, not noise to absorb. The pager-lab comment mismatch is recorded in the ticket, not fixed — re-proving a page's bytes over a comment's dating is cost without value; it can ride with any future real edit to that file.
+>
+> The MR-1 tally stands as recorded — three more planted-run heap reds, escalation rule untouched (unplanted runs only, and the unplanted WebGL2 control passed). The two CRLF files outside RS-1's naming (rad-lab/index.html, capacity-guard.ts) are correctly left alone; list them in the final report as noticed-not-touched so the record shows they were seen, not missed.
+>
+> Then finish change 5 as planned: PLAN.md line 5 with the confirmed wording, the eight items ticked with commits 1-4's ids and the dated notes, this session's log, the new noise file's fingerprint — one records commit, staged list first, stop on anything stray, no credit lines. Then the built-in /code-review at high over the combined diff of all five commits, every finding re-verified — confirm or refute, never absorb — fixes in a sixth commit only if findings demand them, and the final report: per-change summary, re-proof evidence, review verdicts, the noticed-not-touched list.
+
+- *The stop rule, restated before the repetition runs (2026-10-14):* any draw (re-sort, re-admit or
+  follow-up re-sort) above 10 in either regime → stop before anything else is done.
+- *The repetition, environment (2026-10-14):* the loopback receiver (`receiver.py`, now on
+  `ThreadingHTTPServer` — the single-threaded first start hung on an idle browser connection; its
+  log showed the pane's own GET and no line for my check) started through a temporary
+  `.claude/launch.json` entry, the file restored byte-identical after each start (`222aaee4…`,
+  checked). The script served unchanged from the git-ignored `.collab-logs/pl1-measure.js.txt`
+  (sha256 `13e1b36a…` on disk, as served, and in the page before `eval`). The pane VISIBLE today
+  (hidden on 10-05); Chrome 152.0.7977.130, nvidia / ampere; pager-lab `?pages=32` on `d25786da…`
+  27 passed, 0 failed before the measurement.
+- **REPETITION, REGIME 1 (`?pages=32`, WebGPU), started 2026-10-14 22:24:46 UTC — THE STOP RULE
+  FIRED: 2,200 draws, 45 above 10, the largest 12.** Raw numbers moved to disk byte-exact at once:
+  `pl1-part-pages32.json`, 27,411 B, sha256
+  `b0af8823fbb0479d6cab663833b02df242044a360980003694cadcb6d3f8e4b0` (page and receiver equal),
+  in the session scratchpad (`recv/`), NOT in the repo. The default regime NOT run.
+
+| load | ms | 5-re-sort band | re-sorts max / >10 | re-admits max / >10 | follow-ups max / >10 | evicted |
+|---|---|---|---|---|---|---|
+| 1 | 10,718 | 11 | 12 / 22 | 11 / 2 | 12 / 21 | [0,27] ×40 |
+| 2 | 11,022 | 6 | 8 / 0 | 7 / 0 | 7 / 0 | [0] ×3, [0,27] ×37 |
+| 3 | 9,461 | 6 | 9 / 0 | 7 / 0 | 9 / 0 | [0] ×40 |
+| 4 | 10,199 | 6 | 7 / 0 | 7 / 0 | 8 / 0 | [0] ×3, [0,27] ×37 |
+| 5 | 9,735 | 4 | 7 / 0 | 6 / 0 | 8 / 0 | [0] ×19, [0,27] ×21 |
+
+  Pooled: re-sorts (1,000) 0:2 1:96 2:232 3:192 4:140 5:134 6:57 7:45 8:21 9:27 10:32 11:13 12:9;
+  re-admits (200) 1:20 2:36 3:44 4:31 5:31 6:7 7:8 8:8 9:7 10:6 11:2; follow-ups (1,000) 0:2 1:91
+  2:210 3:205 4:142 5:138 6:54 7:42 8:32 9:36 10:27 11:9 12:12. Every re-admit back in its own slot.
+  Arithmetic on the committed rule (not a conclusion): load 1's band would be max(11, 10) = 11, its
+  largest re-admit 11 → 0 of 200 cycles failed here.
+
+**STOP SC-4 (2026-10-14, written at 17:26:32 -0500, before sending) — VERBATIM.** The message as
+sent follows between the markers.
+
+<!-- BEGIN verbatim: STOP SC-4, 2026-10-14 -->
+**The stop rule fired on the first regime.** I repeated the measurement at 32 pages (WebGPU), with the same script (`13e1b36a…`, checked in the page before running) and the same protocol: 5 loads, each with 200 re-sorts and 40 drill cycles of 5 follow-up re-sorts. Of the 2,200 draws, **45 are above 10, and the largest is 12.** The default regime has not run. Nothing else was done after the result.
+
+**Where the 45 are.** All of them are in load 1. Its own 5-re-sort band was 11; its re-sorts went up to 12 (22 above 10), its re-admits up to 11 (2 above 10), its follow-ups up to 12 (21 above 10). Loads 2-5 stayed at 9 or below. Every re-admit went back to its own slot, as on 10-05.
+
+**What is different from 10-05**, observed and not offered as a cause: the pane is visible today; on 10-05 it was hidden. Same Chrome 152.0.7977.130, same adapter (nvidia/ampere), same page fixture result (27 of 27).
+
+**One arithmetic fact about the committed rule**, not a conclusion: in load 1 the rule would have used max(11, 10) = 11 as its band, and that load's largest re-admit was 11. So it would have failed 0 of the 200 cycles here. The run's own band absorbed the wider noise, which is the self-widening half of ruling 2 (c).
+
+**The raw numbers are safe.** They're on disk byte-exact: `pl1-part-pages32.json`, 27,411 B, sha256 `b0af8823…` (computed in the page and by the receiver; equal). Today it's in the session scratchpad, not in the repo yet, because the rule said stop before anything else. Say where it should go.
+
+**What I need from you:** how to treat a measured floor that moved, with the evidence above. Until you rule, changes 1-4 stay committed as they are and change 5 waits.
+<!-- END verbatim: STOP SC-4, 2026-10-14 -->
+
+The block between the markers: 11 lines, 1,693 B, sha256 `cbea21e5982ce764a6a2eb764a592c2d06fd49b45617cb62b98c8a6a7aac1b5f` (each line with its newline).
+
+**OWNER RULING on STOP SC-4 (received 2026-10-22, before 03:25:54 -0500) — quoted verbatim, the
+whole message.**
+
+> Ruling on the moved floor: the committed rule stands unchanged — today's data is the self-widening half earning its keep, not a refutation. In the one wide load (band 11), the worst re-admit was 11: zero false fails in 200 cycles under exactly the committed rule. No new commit, no band change.
+>
+> What changes is the derivation's claim, with a dated amendment in ticket 13 beside the original: the floor of 10 is a LOWER BOUND on the band, not a ceiling on noise — the 10-09+ repetition measured noise to 12 in one load (visible pane, recorded as an observed difference, not offered as a cause), and the run's own band absorbed it. Also record the residual honestly: follow-up re-sorts in that load reached 12 against a band of 11, so a draw exceeding the run's own 5-re-sort band remains possible — the rule reduces the false-fail rate, it does not zero it by construction, and the 10-05 "0 of 400" is a measurement, not a guarantee.
+>
+> Resharpened stop rule for the remainder, replacing "any draw above 10": stop if any load's re-admit diff EXCEEDS its own max(band, 10) — that is, if the committed rule itself would have false-failed — or if any draw exceeds 15 (far enough above everything measured to mean a different regime, not wider noise). Draws of 11-12 under a band that absorbs them are now expected and recorded, not stops.
+>
+> Then resume: the default-regime run under the same protocol; the combined file to docs/plan/results/phase-2-pl1-sort-noise.json (both regimes, each load labeled, today's pages32 part included byte-exact — move it from the scratchpad into the file's assembly, its b0af8823… hash recorded as the part's provenance), sha256 in the ticket, the file stating it is the repetition and the ticket recording the 10-05 loss. Then change 5 as ruled: the records commit, staged list first, then the built-in review over the combined diff and the final report.
+
+**AMENDMENT to the derivation (dated 2026-10-22, owner ruling above; the derivation itself — FINDING
+PL-1 RE-MEASURED, 2026-10-05, and the comment at `examples/pager-lab/main.ts` `d25786da…` — kept
+as written).** The floor of 10 is a LOWER BOUND on the band, not a ceiling on noise. The repetition
+(2026-10-14, `?pages=32`) measured sort noise up to 12 in one load of five (the pane visible that
+day, hidden on 10-05 — an observed difference, not offered as a cause), and that load's own band
+(11) absorbed it under the committed rule: its largest re-admit was 11, 0 false fails in 200
+cycles. **The residual, recorded honestly:** in that load the follow-up re-sorts reached 12
+against a band of 11, so a draw above the run's own 5-re-sort band remains possible — the rule
+lowers the false-fail rate; it does not make it zero by construction. The 10-05 "0 of 400" is a
+measurement, not a guarantee.
+- *Comment mismatch, recorded and not fixed (owner ruling SC-3):* the pager-lab comment at
+  `d25786da…` says "Re-measured 2026-10-05 … (raw numbers: docs/plan/results/phase-2-pl1-sort-noise.json)";
+  the 10-05 raw numbers were lost (FINDING SC-L1) and that file holds the 2026-10-14+ repetition.
+  To ride with any future real edit of that file.
+- *The stop rule for the rest of the repetition, as resharpened (replacing "any draw above 10"):*
+  stop if any cycle's re-admit difference exceeds its load's max(5-re-sort band, 10) — the
+  committed rule false-failing — or if any draw exceeds 15. Draws of 11-12 under a band that absorbs
+  them are recorded, not stops.
+- *Environment (2026-10-22):* the receiver and the dev server restarted (the temporary launch entry,
+  `.claude/launch.json` restored byte-identical, `222aaee4…`, checked); the script as served
+  `13e1b36a…` (checked on disk, as served and in the page); the pane VISIBLE; **the pane's Chrome
+  now 152.0.7977.167** (152.0.7977.130 on every earlier run); nvidia / ampere; pager-lab default on
+  `d25786da…` 27 passed, 0 failed before the measurement.
+- **REPETITION, REGIME 2 (default, 122 pages, WebGPU), started 2026-10-22 08:32:06 UTC — THE
+  RESHARPENED STOP RULE FIRED: load 2, cycle 24, re-admit 12 > max(9, 10) = 10.** 2,200 draws, 18
+  above 10, none above 15 (the largest 12). Raw numbers to disk byte-exact at once:
+  `pl1-part-default.json`, 28,017 B, sha256
+  `323bce16a615ba643a55214a7c41cdd1208aec231d1df8b29a6149423fabdb20` (page and receiver equal),
+  beside regime 1's `b0af8823…`, both in the session scratchpad (`recv/`). The combined file NOT
+  assembled; change 5 NOT started.
+
+| load | ms | 5-re-sort band | re-sorts max | re-admits max | follow-ups max | draws >10 | evictions | all back in own slot |
+|---|---|---|---|---|---|---|---|---|
+| 1 | 53,036 | 5 | 9 | 10 | 9 | 0 | [0] ×40 | yes |
+| 2 | 81,943 | 9 | 12 | **12** | 12 | 14 | 1 to 19 chunks (6 single-chunk) | no (4 cycles permuted) |
+| 3 | 54,533 | 4 | 7 | 7 | 7 | 0 | [0] ×40 | yes |
+| 4 | 54,217 | 6 | 11 | 9 | 12 | 4 | [0] ×40 | yes |
+| 5 | 86,704 | 9 | 10 | 10 | 10 | 0 | 1 to 27 chunks | no |
+
+  Pooled: re-sorts (1,000) 0:3 1:75 2:237 3:155 4:175 5:87 6:97 7:63 8:45 9:44 10:8 11:8 12:3;
+  re-admits (200) 1:7 2:35 3:38 4:39 5:19 6:20 7:20 8:10 9:9 10:2 12:1; follow-ups (1,000) 0:6
+  1:85 2:233 3:145 4:190 5:89 6:77 7:70 8:54 9:32 10:13 11:3 12:3.
+- *The failing cycle (load 2, cycle 24), observed, not offered as a cause:* evicted [0..10] (11
+  chunks; steps 9, 7, 6, 3, 4, 2, 5, 1, 2, 3, 7), all 11 back in their own slots; evicted max 12;
+  **re-admit 12 — equal to the eviction's own maximum**; the five re-sorts of the same re-admitted
+  state 2, 3, 1, 3, 8. Load 2's other 39 re-admits: at most 9 (single-chunk cycles at most 9). Not
+  tested.
+- *A difference between the script and the committed drill, by reading:* `pl1-measure.js` stops
+  evicting once the grid moves by more than the load's 5-re-sort band (the drill before change 3);
+  the committed drill (`d25786da…`) stops at more than max(band, 10). In load 2 (band 9) the
+  committed drill would have evicted a different set; this exact cycle is not one the committed
+  page runs.
+
+**STOP SC-5 (2026-10-22, written at 03:38:27 -0500, before sending) — VERBATIM.** The message as
+sent follows between the markers.
+
+<!-- BEGIN verbatim: STOP SC-5, 2026-10-22 -->
+**The resharpened stop rule fired in the default regime.** In load 2, cycle 24, the re-admit difference was 12 against max(9, 10) = 10. So the committed rule itself would have false-failed that cycle. No draw exceeded 15 (the largest was 12; 18 of 2,200 were above 10). The file has not been assembled, and change 5 has not started.
+
+**The raw numbers are safe.** `pl1-part-default.json`, 28,017 B, sha256 `323bce16…` (page and receiver equal), is beside the 10-14 part (`b0af8823…`), both on disk in the session scratchpad.
+
+**That cycle, observed and not offered as a cause:**
+- It evicted 11 chunks (0-10). All 11 came back to their own slots.
+- Its re-admit difference (12) equals the eviction's own maximum (12).
+- The next five re-sorts of the same re-admitted state read 2, 3, 1, 3, 8.
+- Across load 2, single-chunk cycles reached at most 9; this was the only cycle above 10.
+
+Ordinary sort noise does not obviously produce that pattern: a re-admit frame as far off as the eviction itself, and calm frames right after. I have not tested anything about it.
+
+**Two facts that change how to read it:**
+- The measuring script copies the drill as it was before change 3: it stops evicting once the grid moves by more than the 5-re-sort band (9 here), not by more than max(band, 10). So the committed drill would have evicted a different set in this load, and this exact cycle is not one the committed page would run.
+- Since 10-14 the pane's Chrome changed from 152.0.7977.130 to 152.0.7977.167. The pane was visible on both days.
+
+**What I need from you:** how to treat this. One cycle where the committed comparison would have failed, but whose shape points away from sort noise, on a drill that differs slightly from the committed one.
+<!-- END verbatim: STOP SC-5, 2026-10-22 -->
+
+The block between the markers: 17 lines, 1,745 B, sha256 `5c30354dbacaac13e6e7edf17aa5fb8d6534fb8acf266a74dd0b19efdb0a3e09` (each line with its newline).
+
+**OWNER RULING on STOP SC-5 (received 2026-10-22, before 11:19:19 -0500) — summary; the three steps
+in the owner's words where quoted.** Before treating the cycle as noise or as a product fault, test
+the one candidate mechanism its shape points at — capture lag ("a hypothesis about the
+INSTRUMENT"): (1) read the committed drill's capture timing at `7e1dc0a` — "how many renders happen
+between re-admission completing and the comparison frame being read, and what — if anything — the
+drill waits on"; (2) modify the scratchpad script to capture TWO consecutive frames after each
+re-admission, prediction in the ticket first — "if capture lag is the mechanism, anomalous cycles
+show frame-1 wide and frame-2 within the band; if both frames read wide, the mechanism is something
+else and you stop with that" — one repeat of the default regime under the resharpened stop rule,
+the raw part to disk the same hour; (3) the verdict follows the evidence: (i) the committed drill
+waits properly and the script did not → an instrument artifact, the rule unchanged, the file
+assembled from the valid parts with the artifact cycles labeled; (ii) the committed drill has "the
+SAME single-frame capture → the band fix didn't close PL-1's real flake path, and you stop with
+options — the likely shape being 'compare after settle' rather than any band change"; (iii) the
+two-frame run refutes capture lag → stop with the data. The Chrome drift (.130 → .167) stays
+recorded as observed, not a cause, beside the visible-pane note; change 5 waits; commits 1-4 stand.
+
+- **STEP 1 — the committed drill's capture timing, by reading (`git show 7e1dc0a:examples/pager-lab/main.ts`,
+  :753-775; `examples/shared/capture.ts`; `src/backend/ThreeGsBackend.ts:1088-1123, :1201-1211`;
+  `src/vendor/three-gs/GaussianSplatMesh.js:174-191, :251-269`).** After the evicted chunks are
+  re-admitted one by one (`await diag.admitChunk(chunk)` — which resolves once the chunk is decoded
+  and inserted CPU-side: `pager.decodeCached` then `insertPage`; the GPU upload and the re-sort happen
+  at the next render, the sort in the mesh's `onBeforeRender`, dispatched before that render's draw),
+  the drill does ONE on-screen `scene3.renderer.render(...)` and then `meteredCapture()` →
+  `capture()`, which **renders the frame itself** into a 256×128 offscreen target
+  (`capture.ts:79-81`) and reads that render back. So: two renders between the last re-admission and
+  the read; the drill waits on nothing but the admission promises and the readback — no residency,
+  upload or sort settle. **The measuring script does exactly the same sequence**
+  (`render(); const P2 = await capture();`). Step 1's finding: the committed drill has the SAME
+  capture as the script; this cycle is NOT excluded on the committed page. (The only drill
+  difference remains the eviction stop: band vs max(band, 10).)
+- **PREDICTION P7 — capture lag, written at 2026-10-22 11:19:19 -0500, BEFORE the run.** The script
+  gains ONE change (new hash recorded with the run): after the existing re-admit frame (frame 1:
+  `render()` + `capture()`), a second plain frame (frame 2: `render()` + `capture()`, no forced
+  re-sort), its difference against P0 recorded as `readmit2`; everything else unchanged. One run of
+  the default regime, `?` default, WebGPU, 5 loads × (200 re-sorts + 40 cycles × 5 follow-ups).
+  - **If capture lag is the mechanism:** every anomalous cycle (frame-1 re-admit > its load's
+    max(band, 10)) has frame 2 WITHIN max(band, 10).
+  - **If something else:** an anomalous cycle with frame 2 also above max(band, 10) → stop with
+    the data (ruling 3 iii).
+  - **If no cycle is anomalous** (the observed rate: 1 in 200 on 10-22, 0 in 200 on 10-14 at 32
+    pages, 0 in 400 on 10-05): the run cannot decide; reported as that, with the frame-1 vs frame-2
+    figures for every cycle, and I stop rather than run again.
+  - The resharpened stop rule is evaluated on frame 1 after the run (as before), and the verdict
+    then follows ruling step 3; any draw above 15 is a stop either way.
+- *P7 run (2026-10-22, started 16:25:40 UTC):* script `pl1-measure-2f.js`, 5,794 B, sha256
+  `d8cfa7a7c849a61c866e81c96eb0718ba068a6137af4e7536c4d5566fa425f61` (served from
+  `.collab-logs/pl1-measure-2f.js.txt`, checked in the page); exactly two changes from `13e1b36a…`
+  (the second frame and its field). The servers had stopped between 03:38 and 11:19 (not by this
+  session) and were restarted the same way (launch config restored, `222aaee4…`). Pane visible,
+  Chrome 152.0.7977.167, nvidia / ampere; pager-lab default 27 passed, 0 failed first. Raw part to
+  disk at once: `pl1-part-default-2frame.json`, 34,267 B, sha256
+  `33f83e6b0a7cbcb02f8cc251f3b6312d5badeb9dee2786d30ae1849144963cb4` (page and receiver equal).
+- **P7 OUTCOME, recorded at 2026-10-22 11:32:06 -0500 — CAPTURE LAG REFUTED (ruling 3 iii).**
+  - **Frame 1 = frame 2 in 200 of 200 cycles** (to the unit; mean 4.44 both; the 40 multi-chunk
+    cycles of load 5 too). A second plain render reproduces the comparison frame exactly; only a
+    forced re-sort moves it.
+  - **Two anomalous cycles, both wide on BOTH frames:** load 1 (band 6), cycle 4 — 1 chunk, back in
+    its own slot, eviction 12, frame 1 11, frame 2 11, follow-ups 9, 7, 8, 2, 6; cycle 32 — 1
+    chunk, own slot, eviction 9, frames 11 / 11, follow-ups 2, 8, 9, 4, 2. Cycle 4 is the cycle the
+    committed drill runs (eviction 12 > max(6, 10), one chunk) and the committed rule false-fails
+    it. No draw above 15 (largest 11; 2,400 draws). Per load (band / frame-1 max / re-sort max): 6 /
+    11 / 11; 8 / 10 / 8; 5 / 9 / 11; 3 / 7 / 8; 11 / 11 / 11.
+  - *Every candidate rule over the 600 repetition cycles* (computed from the three parts on disk):
+    old (one frame vs its own 5-re-sort band) 10 + 28 + 43 = 81 false fails (13.5 %); committed
+    (one frame vs max(band, 10)) 0 + 1 + 2 = 3 (0.5 %); the closest of the re-admit frame and its 5
+    re-sorts vs max(band, 10): 0; vs the run's own band: 0.
+
+**STOP SC-6 (2026-10-22, written at 11:32:06 -0500, before sending) — VERBATIM.** The message as
+sent follows between the markers.
+
+<!-- BEGIN verbatim: STOP SC-6, 2026-10-22 -->
+**Capture lag is refuted (ruling 3 iii), so I am stopping with the data.**
+
+**Step 1, by reading.** The committed drill (`7e1dc0a`) does exactly what the script does after re-admission: one on-screen render, then `capture()`, which renders again offscreen and reads that back. It waits on nothing else. So the 10-22 cycle was not excluded on the committed page.
+
+**Step 2, the two-frame run** (default regime, script `d8cfa7a7…`, raw part `pl1-part-default-2frame.json`, 34,267 B, sha256 `33f83e6b…`, on disk byte-exact):
+- **Frame 1 equals frame 2 in all 200 cycles.** A second plain render reproduces the comparison frame exactly; only a forced re-sort changes the picture. The comparison frame is already settled, so "compare after settle" would change nothing.
+- **Two anomalous cycles, both wide on both frames:** load 1, cycles 4 and 32, frames 11 and 11 against max(6, 10) = 10. Each evicted a single chunk that came back to its own slot. Cycle 4 is the exact cycle the committed drill runs (eviction 12 > 10, one chunk), and there the committed rule false-fails.
+- No draw above 15 (largest 11).
+
+**What the data says the re-admit frame is:** a single draw of the sort noise that the re-admission's re-sort produces. A load whose first five re-sorts happen to run low (band 6) can still produce an 11 or 12. Across the 600 repetition cycles:
+
+| rule | false fails |
+|---|---|
+| old: one frame vs its own 5-re-sort band | 81 (13.5 %) |
+| committed: one frame vs max(band, 10) | 3 (0.5 %) |
+| closest of the re-admit frame and its 5 re-sorts vs max(band, 10) | 0 |
+| the same vs the run's own band | 0 |
+
+**Options:**
+- **(a)** Keep the committed rule, recorded as a reduction from 13.5 % to about 0.5 %, not a fix. Finish change 5 with all three parts in the file.
+- **(b) Recommended:** change the comparison, not the band: re-sort the re-admitted state five more times and let the check pass if the closest of the six frames is within max(band, 10). That was option (d) at SC-1. It is 0 of 600 here and 0.05-0.10 % by resampling the 10-05 data. A real loss still fails, because every re-sorted frame keeps the missing chunks missing. It costs a pager-lab edit and another full re-proof (all four plants, unplanted both backends). It would be a sixth code commit before the records commit, or its own later ticket.
+- **(c)** Raise the floor again (to 12 or 13). That chases the tail, which has moved twice already.
+
+Change 5 waits. Commits 1-4 stand.
+<!-- END verbatim: STOP SC-6, 2026-10-22 -->
+
+The block between the markers: 24 lines, 2,463 B, sha256 `250273aff4281cccb50c16303a8ce04ce2b3ac9e4cc26483da8e42542381b1d3` (each line with its newline).
+
+**OWNER RULING on STOP SC-6 (received 2026-10-23, before 00:13:38 -0500) — quoted verbatim, the
+whole message.**
+
+> Ruling: (b) — change the comparison, not the band. The closest of the six frames (the re-admit frame plus five re-sorts) against max(band, 10). Grounds, recorded with the ruling: 0 of 600 in the repetition, 0.05-0.10% by resampling the 10-05 data, and the mechanism — a real loss keeps the missing chunks missing in every re-sorted frame, while noise only occasionally pushes one frame high, so the minimum filters noise and cannot mask loss. This SUPERSEDES my SC-1 ruling of (c) over (d), with the supersession owned as the owner's: (c) was a reduction (13.5% → 0.5%), measurement has now shown (d)'s shape is the fix, and the record keeps both wrong turns visible — the original 1-in-6 rule, and the floor-plus-band that chased a moving tail.
+>
+> Build it as the sixth code commit, before the records commit: the pager-lab edit, then the FULL re-proof on the new bytes — all four plants red (readmit-lost must still go red: every one of its six frames lacks the evicted chunks, state that explicitly in the proof), unplanted green on both backends in both regimes — prediction-first throughout, gate green, staged list, commit. The capture()-renders-offscreen fact and the frame-1-equals-frame-2 proof go in the derivation so nobody re-litigates settle-waiting later.
+>
+> Then change 5, final shape: the records commit carries PLAN.md line 5, the eight items ticked with all SIX code commits' ids, this whole investigation's log (the two stops, P7, the 600-cycle table), and the noise file — docs/plan/results/phase-2-pl1-sort-noise.json assembled from ALL the parts on disk (the 10-14 pages32 part b0af8823…, the 10-22 default part 323bce16…, the two-frame part 33f83e6b…), each labeled with its date, regime, script hash, and what it fed; the anomalous cycles labeled, not deleted. Then the built-in /code-review at high over the combined diff of all six commits, findings re-verified, fixes in a seventh commit only if demanded, and the final report with the noticed-not-touched list.
+
+- *A count, stated to the owner (2026-10-23):* four code commits exist (`decac02`, `38a0bdd`,
+  `7e1dc0a`, `a0bdc49`), so this is the FIFTH code commit and the sixth commit overall with the
+  records commit; the ticks cite all five code commits' ids. No other code change is implied.
+- *The SC-1 supersession, as owned by the owner (doc 06: not a D-numbered ruling, so not touched):*
+  SC-1 ruled (c) "the larger of the run's own band and 10" over (d) "the closest of the six
+  frames"; now (d)'s shape, against max(band, 10). The two earlier rules stay visible here: the
+  original one frame vs the max of 5 re-sorts (about 1 in 6 by construction), and the floor plus
+  band (13.5 % → 0.5 %, a reduction).
+
+**THE CLOSEST-OF-SIX COMPARISON BUILT (2026-10-23) — `examples/pager-lab/main.ts` `d25786da…` →
+`69fea82e99432486e0335384f92fed5988e7384215e19a88d9c7d8d1e3678035` (1,462 lines, 63,976 B, LF, 0
+CR; +37 / −17).** After the re-admit frame, `READMIT_RESORTS` (5) forced re-sorts of the
+re-admitted state (`_sortInitialized = false`, render, capture — exactly the measured follow-ups),
+each one's max difference against P0 over the ten points; `evict-readmit-pixel-identical` passes
+when `min(re-admit frame, the five) <= max(band, 10)` on WebGPU (the run's own band, 0, on WebGL2);
+its detail names all six and the closest. The derivation comment rewritten in place: the two
+earlier rules and their rates, the current rule and its 0 of 600, that `capture()` renders the
+frame itself offscreen, that one more plain render reproduced it in 200 of 200 cycles (P7), and the
+floor as a lower bound; the dating mismatch recorded under SC-3 is corrected with it (the raw
+numbers are named as the 2026-10-14 and 2026-10-22 repetition). `npx tsc --noEmit` exit 0.
+
+- *PREDICTIONS for its re-proof, written at 2026-10-23 00:15:14 -0500, BEFORE any run on
+  `69fea82e…`.* The pane, logic only, one at a time.
+  - **`?pages=32&plant=readmit-lost` (WebGPU):** 26 passed, 1 failed — only
+    `evict-readmit-pixel-identical`: "all resident again=true", all six frames above the band (the
+    eviction there is [0,27], 36-38) — every one of the six frames lacks the evicted chunks — and
+    "closest of 6" above it, "OUTSIDE the band".
+  - **`plant=readmit-lost` at the default regime (WebGPU) — the thin-margin case:** the drill stops
+    at the first eviction above 10 (14 on 10-09), so the six re-sorted frames of the evicted state
+    sit only a little above the band. Predicted red (all six above max(band, 10)), but **if any of
+    the six reads within the band the minimum masks the loss, and that is a STOP** — the ruling's
+    "cannot mask loss" would not hold in this regime.
+  - **`?pages=32&plant=sh-rearm-held`, `?pages=32&plant=drill-one-candidate` (WebGPU),
+    `?pages=32&webgl=1&plant=sh-premise` (WebGL2):** 26 passed, 1 failed each — only
+    `sh-output-fresh-after-admission`; evict/re-admit passes.
+  - **Unplanted — default and `?pages=32` on WebGPU, default and `?pages=32` on WebGL2:** 27 passed,
+    0 failed each; on WebGL2 all six frames 0 ("exact" frame 1, re-sorts [0,0,0,0,0]).
+- **FIRST RE-PROOF RUN — PREDICTION FAILED (recorded at 2026-10-23 00:19:07 -0500).**
+  `?pages=32&plant=readmit-lost` (WebGPU; pane visible, Chrome 152.0.7977.167, nvidia / ampere) on
+  `69fea82e…`: **27 passed, 0 failed** — the plant GREEN. Verbatim: "evicted 1 chunk(s) [0], all
+  resident again=true (1 in their original slot); sort-only control band=6 over 5 re-sorts; band
+  used=10 (the larger of that and the measured floor 10); evicted max diff=13 (above band); re-admit
+  max diff=2 [p00=1, p01=2, p02=2, p10=2, p11=1, p12=2, p21=2, p22=1, corner=2]; 5 re-sorts of the
+  re-admitted state [2,2,9,2,6]; closest of 6=2 — within the band".
+  - *By reading:* the drill certifies an eviction from ONE frame (the eviction loop stops at the
+    first frame whose grid difference exceeds the band; `gridChanged` is that single-frame max).
+    Chunk 0's own first step at `?pages=32` in the 10-14 part ranged 1-11 over 200 cycles (1:3 2:42
+    3:24 4:28 5:32 6:9 7:7 8:2 9:8 10:43 11:2); here one eviction frame read 13 and the planted
+    re-eviction moved the six frames by 2-9 — most likely a noise spike certified a sub-noise
+    eviction (not tested). The new comparison did not mask a visible loss; the drill admitted an
+    invisible one. The same single-frame eviction test stood under every earlier rule.
+  - No other run made on these bytes.
+
+**STOP SC-7 (2026-10-23, written at 00:19:07 -0500, before sending) — VERBATIM.** The message as
+sent follows between the markers.
+
+<!-- BEGIN verbatim: STOP SC-7, 2026-10-23 -->
+**The first proof run failed its prediction: `readmit-lost` is green at 32 pages.** On the new bytes (`69fea82e…`, nothing committed), the page read 27 passed, 0 failed. The check's detail, verbatim: "evicted 1 chunk(s) [0], all resident again=true …; band used=10 …; evicted max diff=13 (above band); re-admit max diff=2 …; 5 re-sorts of the re-admitted state [2,2,9,2,6]; closest of 6=2 — within the band".
+
+**What happened, by reading the detail and the code:**
+- The drill decides an eviction is visible from ONE frame: it stops evicting as soon as a single eviction frame moves the grid by more than the band (`main.ts`, the eviction loop and `gridChanged`). That is the same single-frame test we just replaced on the re-admit side.
+- Here one eviction frame of chunk 0 alone read 13. The 10-14 measurement put chunk 0's own step at 1-11 at this regime (200 cycles), and the planted re-eviction moved the six frames by only 2-9. So the 13 was most likely a noise spike, not chunk 0's real effect. That reading is not tested.
+- The plant then removed chunk 0 again: a real loss, but smaller than the noise. The closest of six frames correctly called it within the band. No pixel comparison can see a loss smaller than the noise.
+- On 10-09 this plant went red only because that run's drill had evicted chunks 0 and 27 (difference 38).
+
+So the new comparison is not what masked the loss. The drill let a noise spike certify an eviction that was too small to see. The same hole existed under every earlier rule; the closest-of-six change only exposed it.
+
+**Options:**
+- **(a) Recommended:** make the eviction side match: keep evicting until the closest of six frames of the evicted state (the eviction frame and five re-sorts) exceeds the band. Then the evicted difference is real by the same standard as the re-admit check, and `readmit-lost` must go red, since it removes exactly that set. It costs five more renders per eviction step, and widens this pager-lab edit before its re-proof.
+- **(b)** Keep the drill as it is and run `readmit-lost` only on cycles with a large eviction. The plant would then prove only what was arranged for it.
+- **(c)** Make `readmit-lost` remove more than the drill evicted. Then the plant no longer tests the drill's own loss.
+
+Nothing else has run on these bytes. Change 5 waits, and commits 1-4 stand.
+<!-- END verbatim: STOP SC-7, 2026-10-23 -->
+
+The block between the markers: 16 lines, 2,352 B, sha256 `ec9cbe6ab72c0eb8d413a0fc393a26c08092b4c7c46b1f60f676d9ba33b839ae` (each line with its newline).
+
+**OWNER RULING on STOP SC-7 (received 2026-10-23) — summary in the owner's words where quoted.**
+"(a) — make the eviction side match. The drill keeps evicting until the closest of six frames of
+the EVICTED state (the eviction frame plus five re-sorts) exceeds the band, the same standard the
+re-admit check applies." Grounds: the single-frame eviction test is the same defect; "a noise spike
+(13, against chunk 0's measured step of 1-11) certified an eviction too small to see, and no pixel
+comparison can detect a loss smaller than the noise"; "an eviction certified by the six-frame
+minimum is real by construction, so readmit-lost removes a provably visible set and must go red."
+**Recorded as ruled:** the hole existed under EVERY earlier rule — the 10-09 red was luck of a
+larger evicted set (chunks 0 and 27, diff 38) — and the closest-of-six change exposed it rather
+than caused it; the chunk-0 step range is 1-11 (not 2-11). Five extra renders per eviction step
+accepted. Full re-proof on the final bytes, predictions first: all four plants red, readmit-lost in
+BOTH regimes; unplanted green on both backends in both regimes; gate, staged list, commit. "If
+readmit-lost is green again on the symmetric drill, stop immediately with the detail … no further
+patching happens on top of an un-understood mechanism."
+
+**THE SYMMETRIC DRILL BUILT (2026-10-23) — `examples/pager-lab/main.ts` → `f038b97cddf584caa97040850919ea2a85f4b0259e2eb08dedf5055077a1394e`
+(1,475 lines, 64,754 B, LF, 0 CR; +62 / −29 against `d25786da…`; supersedes the unrun-past-one-run
+`69fea82e…`).** After each eviction step the evicted state gets six frames (the eviction frame and
+`READMIT_RESORTS` forced re-sorts, nine grid points as before); the drill stops when their minimum
+exceeds `readmitBand`, and `gridChanged` is that minimum above the band; the detail names the six
+frames and the closest. `npx tsc --noEmit` exit 0.
+
+- *PREDICTIONS for the full re-proof, written at 2026-10-23 04:04:35 -0500, BEFORE any run on `f038b97c…`.* The pane,
+  logic only, one at a time.
+  - **`?pages=32&plant=readmit-lost` and `plant=readmit-lost` at the default regime (WebGPU):** 26
+    passed, 1 failed each — only `evict-readmit-pixel-identical`: the evicted state's closest of 6
+    above the band, all resident again=true, every one of the six re-admit frames above the band
+    (each lacks the evicted, certified-visible set), "closest of 6" above it — "OUTSIDE the band".
+    **If either is GREEN: STOP at once with the detail (owner ruling).**
+  - **`?pages=32&plant=sh-rearm-held`, `?pages=32&plant=drill-one-candidate` (WebGPU),
+    `?pages=32&webgl=1&plant=sh-premise` (WebGL2):** 26 passed, 1 failed each — only
+    `sh-output-fresh-after-admission`; evict/re-admit passes.
+  - **Unplanted — default and `?pages=32`, each on WebGPU and WebGL2:** 27 passed, 0 failed each;
+    on WebGL2 the evicted state's six frames are equal and the re-admit six are 0.
+- *THE FULL RE-PROOF on `f038b97c…` (2026-10-23; pane visible, Chrome 152.0.7977.167, nvidia /
+  ampere) — 9 of 9 AS PREDICTED.* `evict-readmit-pixel-identical`, verbatim where quoted:
+
+| run | result | evicted state (6 frames → closest) | re-admit: frame 1; 5 re-sorts → closest |
+|---|---|---|---|
+| `?pages=32&plant=readmit-lost` (WebGPU) | 26 / 1 — FAIL "OUTSIDE the band" | [0,27]: 38,38,36,36,38,38 → 36 | 36; [38,36,36,38,38] → **36** — every one of the six frames lacks the certified set |
+| `plant=readmit-lost`, default (WebGPU) | 26 / 1 — FAIL "OUTSIDE the band" | [0..27] (28 chunks): 32,32,32,31,31,32 → 31 | 33; [31,31,33,33,33] → **31** — every one of the six lacks the set |
+| `?pages=32&plant=sh-rearm-held` (WebGPU) | 26 / 1 (only `sh-output-…`: "SH passes on the admission render=0; … 196608 of 262144 words differ") | [0]: 12 ×6 → 12 | 4; [4,2,4,4,3] → 2, PASS |
+| `?pages=32&plant=drill-one-candidate` (WebGPU) | 26 / 1 (only `sh-output-…`: "the drill needs two resident non-root chunks; 1 found") | [0,27]: 38,36,38,38,38,36 → 36 | 3; [8,5,2,0,4] → 0, PASS |
+| `?pages=32&webgl=1&plant=sh-premise` (WebGL2) | 26 / 1 (only `sh-output-…`: "per-vertex SH node in use=false; plant sh-premise") | [0]: 4 ×6 → 4 | 0 (exact); [0,0,0,0,0] → 0, PASS |
+| default (WebGPU), unplanted | **27 / 0** | [0..27] (28 chunks, 2 back in their own slots): 32 ×6 → 32 | 2; [1,4,3,4,6] → 1 |
+| `?pages=32` (WebGPU), unplanted | **27 / 0** | [0,27]: 38 ×6 → 38 | 9; [2,4,6,5,4] → 2 |
+| default (WebGL2), unplanted | **27 / 0** | [0]: 18 ×6 → 18 | 0 (exact); [0,0,0,0,0] → 0 |
+| `?pages=32&webgl=1` (WebGL2), unplanted | **27 / 0** | [0]: 4 ×6 → 4 | 0 (exact); [0,0,0,0,0] → 0 |
+
+  - *Seen in passing:* with the symmetric drill, the default WebGPU regime certifies its eviction
+    only after 28 chunks (chunk 0 alone no longer passes on a noise spike); at `?pages=32` chunk 0
+    alone read 12 on all six frames in one load (a real effect there) and was certified alone.
+  - The page bytes unchanged through all nine runs (`f038b97c…`, re-hashed after the last).
+- *THE CLOSEST-OF-SIX CHANGE COMMITTED (2026-10-23): `36f84e0` — `examples/pager-lab/main.ts` alone,
+  `f038b97c…`; `check:full` true exit 0 (04:45:09 → 04:45:28; embed-size 3,117,066 B; crate 6
+  passed / 1 ignored; golden 7 passed; "no dependency violations found (186 modules, 615
+  dependencies cruised)").* The fifth code commit.
+
+**CHANGE 5 — THE RECORDS (2026-10-23).**
+- *The noise file:* `docs/plan/results/phase-2-pl1-sort-noise.json`, 93,716 B, sha256
+  `c1a92c35566edcfbbebfc6ad5e14a3cb82bfdaa851834f43175dc97a711fb019`, LF (`-text` applies). It
+  states it is the 2026-10-14+ repetition and why the 2026-10-05 raw numbers are gone (FINDING
+  SC-L1). Three parts, each embedded byte-exact (asserted: each part's bytes occur once in the file
+  and hash to its label), each labelled with date, regime, script hash and what it fed:
+  `pl1-part-pages32.json` (2026-10-14, `?pages=32`, `13e1b36a…`, `b0af8823…`, 27,411 B → STOP
+  SC-4 and the amendment), `pl1-part-default.json` (2026-10-22, default, `13e1b36a…`, `323bce16…`,
+  28,017 B → STOP SC-5), `pl1-part-default-2frame.json` (2026-10-22, default, `d8cfa7a7…`,
+  `33f83e6b…`, 34,267 B → P7 and STOP SC-6). Anomalous cycles labelled, not deleted: cycles whose
+  re-admit frame exceeds max(band, 10) — 0, 1 (load 2, cycle 24) and 2 (load 1, cycles 4 and 32) —
+  and every load with draws above 10.
+- *The eight items* ticked with their commit ids at the sublist above (`:674-694`, now longer).
+- *PLAN.md:* line 5 as confirmed ("**Phase 2:** tickets 01–13 done (ticket 13, the exit evidence,
+  closed 2026-09-27); eight owner items for the Phase 2 boundary open (ticket 13)."); the five
+  tasks `[x]` with their commits; the two decision entries (SC-1, SC-6).
+- *Clean-up:* the served script copies removed from `.collab-logs/`; the receiver not running;
+  `.claude/launch.json` at its original bytes (`222aaee4…`, checked); the raw parts and both
+  scripts kept in the session scratchpad.
+- *Noticed, not touched (owner ruling SC-3):* `examples/rad-lab/index.html` and
+  `src/vendor/three-gs/patches/capacity-guard.ts` are stored CRLF under `-text` and are not named
+  by RS-1.
