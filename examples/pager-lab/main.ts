@@ -703,29 +703,47 @@ const done = (async () => {
       sortBand = Math.max(sortBand, maxChannelDiff(px(P0, name), px(Pc, name)));
     }
   }
-  // The evict/re-admit band (ticket 13, FINDING PL-1; owner ruling SC-1 2 c,
-  // 2026-10-09). One re-admit frame against the max of the 5 re-sorts above
-  // failed a healthy WebGPU run 12-14 % of the time: the re-admitted frame is
-  // one more draw of the same sort noise, and a draw beats the max of five
-  // others about one time in six. Re-measured 2026-10-05: 5 loads per regime
-  // (?pages=32 and default), each 200 re-sorts and 40 drill cycles with 5
-  // re-sorts after each re-admit — 4,400 draws, the largest 10 (none above);
-  // this rule failed 0 of 400 healthy cycles (raw numbers:
-  // docs/plan/results/phase-2-pl1-sort-noise.json). So on WebGPU the band is
-  // never narrower than that floor and still widens itself when this run's
-  // noise is larger; WebGL2's CPU sort is deterministic, so its band stays
-  // this run's own (0) and the check stays exact.
+  // The evict/re-admit comparison (ticket 13, FINDING PL-1). Its history, kept in
+  // ticket 13: one re-admit frame against the max of the 5 re-sorts above failed
+  // a healthy WebGPU run 12-14 % of the time (the re-admitted frame is one more
+  // draw of the same sort noise, and a draw beats the max of five others about
+  // one time in six); a band of max(that, 10) cut it to 0.5 % (3 of 600 cycles),
+  // a reduction, not a fix (owner rulings SC-1, 2026-10-09, and SC-6,
+  // 2026-10-23). The check now passes when the CLOSEST of six frames — the
+  // re-admit frame and READMIT_RESORTS forced re-sorts of the re-admitted
+  // state — is within that band: a real loss keeps the missing chunks missing in
+  // every re-sorted frame, while noise only sometimes pushes one frame high; 0 of
+  // 600 repetition cycles failed (raw numbers, 2026-10-14 and 2026-10-22:
+  // docs/plan/results/phase-2-pl1-sort-noise.json). Waiting for a settle would
+  // not help: capture() renders the frame itself, offscreen
+  // (examples/shared/capture.ts), so the comparison frame is already the second
+  // render after re-admission, and one more plain render reproduced it exactly in
+  // 200 of 200 cycles (ticket 13, P7); only a forced re-sort moves it. The floor
+  // of 10 is a lower bound on the band, not a ceiling on noise (one load reached
+  // 12). WebGL2's CPU sort is deterministic: its band stays this run's own (0),
+  // its six frames are equal, and the check stays exact.
   const SORT_NOISE_FLOOR_WEBGPU = 10;
+  const READMIT_RESORTS = 5;
   const readmitBand = isWebGpu ? Math.max(sortBand, SORT_NOISE_FLOOR_WEBGPU) : sortBand;
-  // Evict chunks in index order, one at a time, until the sampled pixels
-  // move by MORE than readmitBand — the drill must be able to tell an
-  // eviction from sort noise before "restored" means anything (at full
-  // residency a single 65,536-splat chunk moved the ten points by 6 with a
-  // band of 13; measured 2026-09-12). The count is whatever the band
-  // demands, bounded by the resident pages — nothing pinned.
+  // Evict chunks in index order, one at a time, until the evicted state moves
+  // the grid by MORE than readmitBand by the same standard as the re-admit
+  // check: the CLOSEST of six frames (the eviction frame and READMIT_RESORTS
+  // forced re-sorts). The drill must be able to tell an eviction from sort
+  // noise before "restored" means anything; a single frame cannot — one
+  // eviction frame of chunk 0 alone read 13 while chunk 0's own step measured
+  // 1-11, and the loss it certified was smaller than the noise (ticket 13,
+  // STOP SC-7; owner ruling 2026-10-23 — the hole stood under every earlier
+  // rule). The count is whatever the band demands, bounded by the resident
+  // pages — nothing pinned.
   const evictedChunks: number[] = [];
   const slotsBefore = new Map<number, number>();
-  let evictedMax = 0;
+  let evictedClosest = 0;
+  let evictedFrames: number[] = [];
+  const gridDiffFrom = (P: Record<string, number[] | string>): number => {
+    let m = 0;
+    for (const name of CAPTURE_POINT_NAMES.slice(0, 9)) m = Math.max(m, maxChannelDiff(px(P0, name), px(P, name)));
+    return m;
+  };
   // Under LOD residency the resident set is the frontier's, not 0..pages-1
   // (at ?pages=32: chunks 0, 27, 104, ...) — walk the RESIDENT chunks.
   const residentForDrill: number[] = [];
@@ -734,17 +752,20 @@ const done = (async () => {
     for (let c = 0; c < 122; c++) if (dRes.isResident(c)) residentForDrill.push(c);
   }
   for (const chunk of residentForDrill) {
-    if (evictedMax > readmitBand) break;
+    if (evictedClosest > readmitBand) break;
     slotsBefore.set(chunk, backend.pagerDiagnostics(handle).slotOf(chunk));
     if (!backend.pagerDiagnostics(handle).evictChunk(chunk)) break;
     evictedChunks.push(chunk);
     scene3.renderer.render(scene3.scene, scene3.camera);
-    const P1 = await meteredCapture();
-    for (const name of CAPTURE_POINT_NAMES.slice(0, 9)) {
-      evictedMax = Math.max(evictedMax, maxChannelDiff(px(P0, name), px(P1, name)));
+    evictedFrames = [gridDiffFrom(await meteredCapture())];
+    for (let i = 0; i < READMIT_RESORTS; i++) {
+      meshRec._sortInitialized = false;
+      scene3.renderer.render(scene3.scene, scene3.camera);
+      evictedFrames.push(gridDiffFrom(await meteredCapture()));
     }
+    evictedClosest = Math.min(...evictedFrames);
   }
-  const gridChanged = evictedMax > readmitBand;
+  const gridChanged = evictedClosest > readmitBand;
   // Re-admission restores RESIDENCY, not slot identity: with several slots
   // free the pool hands out the first free one, so multi-chunk re-admits
   // land in a permutation of the freed slots (observed live 2026-09-12;
@@ -758,9 +779,9 @@ const done = (async () => {
     if (diag.slotOf(chunk) === slotsBefore.get(chunk)) sameSlot++;
   }
   // Plant (URL only, never source): `?plant=readmit-lost` evicts the drilled
-  // chunks again after the residency check above, before the comparison frame —
-  // residency read "all back" while the picture lacks them, so the check must
-  // FAIL on its pixels (ticket 13, PL-1).
+  // chunks again after the residency check above, before the comparison frames —
+  // residency read "all back" while every one of the six frames lacks them, so
+  // the check must FAIL on its pixels (ticket 13, PL-1).
   if (new URLSearchParams(location.search).get("plant") === "readmit-lost") {
     for (const chunk of evictedChunks) backend.pagerDiagnostics(handle).evictChunk(chunk);
   }
@@ -773,13 +794,25 @@ const done = (async () => {
     if (d > 0) diffDetails.push(`${name}=${d}`);
     readmitMax = Math.max(readmitMax, d);
   }
-  const evictReadmitOk = gridChanged && allResident && readmitMax <= readmitBand;
+  const readmitResorts: number[] = [];
+  for (let i = 0; i < READMIT_RESORTS; i++) {
+    meshRec._sortInitialized = false;
+    scene3.renderer.render(scene3.scene, scene3.camera);
+    const Pr = await meteredCapture();
+    let resortMax = 0;
+    for (const name of CAPTURE_POINT_NAMES) {
+      resortMax = Math.max(resortMax, maxChannelDiff(px(P0, name), px(Pr, name)));
+    }
+    readmitResorts.push(resortMax);
+  }
+  const readmitClosest = Math.min(readmitMax, ...readmitResorts);
+  const evictReadmitOk = gridChanged && allResident && readmitClosest <= readmitBand;
   backend.pagerDiagnostics(handle).lod.setSelectionEnabled(true);
   await spinUntilLodResidencyConverged(handle);
   assert(
     "evict-readmit-pixel-identical",
     evictReadmitOk,
-    `backend=${scene3.backend} evicted ${evictedChunks.length} chunk(s) [${evictedChunks.join(",")}], all resident again=${allResident} (${sameSlot} in their original slot); sort-only control band=${sortBand} over ${SORT_CONTROL_RUNS} re-sorts; band used=${readmitBand}${isWebGpu ? ` (the larger of that and the measured floor ${SORT_NOISE_FLOOR_WEBGPU})` : ""}; evicted max diff=${evictedMax} (${gridChanged ? "above band" : "NOT above band — drill blind"}); re-admit max diff=${readmitMax}${diffDetails.length > 0 ? ` [${diffDetails.join(", ")}]` : " (exact)"} — ${readmitMax <= readmitBand ? "within" : "OUTSIDE"} the band`,
+    `backend=${scene3.backend} evicted ${evictedChunks.length} chunk(s) [${evictedChunks.join(",")}], all resident again=${allResident} (${sameSlot} in their original slot); sort-only control band=${sortBand} over ${SORT_CONTROL_RUNS} re-sorts; band used=${readmitBand}${isWebGpu ? ` (the larger of that and the measured floor ${SORT_NOISE_FLOOR_WEBGPU})` : ""}; evicted state's ${READMIT_RESORTS + 1} frames [${evictedFrames.join(",")}], closest=${evictedClosest} (${gridChanged ? "above band" : "NOT above band — drill blind"}); re-admit max diff=${readmitMax}${diffDetails.length > 0 ? ` [${diffDetails.join(", ")}]` : " (exact)"}; ${READMIT_RESORTS} re-sorts of the re-admitted state [${readmitResorts.join(",")}]; closest of ${READMIT_RESORTS + 1}=${readmitClosest} — ${readmitClosest <= readmitBand ? "within" : "OUTSIDE"} the band`,
   );
 
   // The partial-path flag is LIVE; `diag` above is a snapshot taken at
