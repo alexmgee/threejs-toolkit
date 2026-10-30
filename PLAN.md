@@ -276,6 +276,9 @@ links: [scene-core, render-stack, text-markers, site-rules, diagnostics, backend
   by: claude
   from: roadmap
   tech: ticket 13 RS-1 (ruling V4 b) and the close-out line-ending leftover; `.gitattributes` `-text` on `docs/**`, `.scratch/**`, `PLAN.md`; `src/core/{CameraPath,CameraRail,LoadingUI,CameraSystem}.ts` to LF — done 2026-10-09: commit `a0bdc49`; after it, 86 of 86 covered files check out byte-identical in a fresh copy, the sidecars pass `sha256sum -c`
+- [ ] Apply the pager-lab and H-LIFE ride-alongs with the next real edit {#page-ride-alongs}
+  from: roadmap
+  tech: ticket 13 ride-along list (owner ruling 2026-10-30): review findings RV-1..RV-4 and RV-6 — the restless no-op outside pumped runs, the "0 of 600" comment provenance, skipping eviction re-sorts already decided, reuse of `maxCaptureDiff`, the stale control-band comment; applied only with a real edit to that file, under its re-proof
 - [ ] Trimmed public barrel restored as phases land {#trimmed-barrel}
   from: roadmap
   tech: phase-1 ticket 11 done (51 sources); Phase 2 ticket 09 returned the four embed names and ticket 11 the two counter names (StatsHUD, computeSplatBounds) — 7 of the original 13 still deferred, each returning with its phase

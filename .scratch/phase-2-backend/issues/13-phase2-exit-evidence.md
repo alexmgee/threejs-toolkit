@@ -698,6 +698,25 @@ ticket's commit:
 - Guard pager-lab's drill picks against fewer than two resident candidates
   (`pager-lab/main.ts:1065-1066`) — R2-7 (close-out ruling 3). **DONE 2026-10-09 — commit `38a0bdd`,
   with the `drill-one-candidate` plant.**
+- The built-in `/code-review` (high) over the combined diff `498ff62..cbafbff` — **DONE 2026-10-23: six
+  findings, five confirmed and placed on the ride-along list below, one refuted (owner ruling
+  2026-10-30; verdicts at the end of these Comments).**
+
+*Ride-alongs — pager-lab / hlife: apply with the next real edit to that file, under that edit's
+re-proof* (owner ruling 2026-10-30; each is too small to pay a page's full re-proof alone):
+- `examples/site-lab/hlife.ts`: the `restless` plant does nothing outside pumped runs — a visible-tab
+  run with `?plant=restless` reads green instead of "plant not applied" (review 2026-10-23, confirmed).
+- `examples/pager-lab/main.ts`: the derivation comment says "0 of 600 repetition cycles failed" as if
+  for the committed drill; those cycles used the measuring script's single-frame eviction drill (the
+  correction to the comment rides here; the record is corrected now, beside the derivation).
+- `examples/pager-lab/main.ts`: skip the five eviction re-sorts when the eviction frame is already
+  within the band (the minimum cannot exceed it; about 135 wasted captures per default-regime run).
+- `examples/pager-lab/main.ts`: `gridDiffFrom` and the inline re-sort loop duplicate the existing
+  `maxCaptureDiff` (`main.ts:112`).
+- `examples/pager-lab/main.ts`: the control-band comment (`:685-694`) still describes the band rule, not
+  the six-frame check below it.
+- Noticed, not touched (owner rulings SC-3 and 2026-10-30): `examples/rad-lab/index.html` and
+  `src/vendor/three-gs/patches/capacity-guard.ts` are stored CRLF under `-text`; not named by RS-1.
 
 **H3 RECOVERY ATTEMPT — DONE (2026-09-24, per ruling H3): NOTHING SURVIVES; falling back to (a).**
 Method, read-only: a Python `http.server` on port 5209 serving an EMPTY scratch folder (no spike
@@ -3870,6 +3889,12 @@ earlier rules and their rates, the current rule and its 0 of 600, that `capture(
 frame itself offscreen, that one more plain render reproduced it in 200 of 200 cycles (P7), and the
 floor as a lower bound; the dating mismatch recorded under SC-3 is corrected with it (the raw
 numbers are named as the 2026-10-14 and 2026-10-22 repetition). `npx tsc --noEmit` exit 0.
+- *PROVENANCE NOTE, dated 2026-10-30 (owner ruling, review 2026-10-23):* the "0 of 600" behind this
+  rule was measured with the measuring script's SINGLE-FRAME eviction drill (`pl1-measure.js` and its
+  two-frame variant), not with the committed symmetric drill (`36f84e0`, which certifies evictions by
+  the six-frame minimum and evicts far more chunks — 28 at the default regime). The committed drill is
+  covered by the nine proof runs below, not by the 600. The comment in `examples/pager-lab/main.ts`
+  says otherwise; its correction rides with the next edit of that file.
 
 - *PREDICTIONS for its re-proof, written at 2026-10-23 00:15:14 -0500, BEFORE any run on
   `69fea82e…`.* The pane, logic only, one at a time.
@@ -4007,3 +4032,33 @@ frames and the closest. `npx tsc --noEmit` exit 0.
 - *Noticed, not touched (owner ruling SC-3):* `examples/rad-lab/index.html` and
   `src/vendor/three-gs/patches/capacity-guard.ts` are stored CRLF under `-text` and are not named
   by RS-1.
+
+**REVIEW — the built-in `/code-review` (high), Claude, over `498ff62..cbafbff` (2026-10-23).** Six
+findings; each re-verified afterwards by reading:
+| # | where | claim | verdict |
+|---|---|---|---|
+| RV-1 | `hlife.ts:168` | the `restless` plant is a silent no-op outside pumped runs | CONFIRMED — `pump()` runs only under `?pump=1` (`hlife.ts:183`) |
+| RV-2 | `pager-lab/main.ts:722` | the "0 of 600" predates the symmetric drill it is cited for | CONFIRMED — the 600 cycles used the script's single-frame eviction |
+| RV-3 | `pager-lab/main.ts:760` | five eviction re-sorts run even when the first frame already decides | CONFIRMED — min ≤ band once frame 1 ≤ band |
+| RV-4 | `pager-lab/main.ts:742` | `gridDiffFrom` and the re-sort loop duplicate `maxCaptureDiff` | CONFIRMED — same logic as `main.ts:112` |
+| RV-5 | `pager-lab/main.ts:761` | eviction uses 9 points, re-admit 10 | **REFUTED** — the band itself is computed over all 10 points (`main.ts:698-704`), so the re-admit side matches its band; the 9-point eviction measure predates this work (`498ff62:728`) and can only make certification stricter |
+| RV-6 | `pager-lab/main.ts:693` | the control-band comment still describes the band rule | CONFIRMED |
+
+**OWNER RULING on the review (received 2026-10-30, before 00:51:06 -0500) — quoted verbatim, the whole
+message.**
+
+> Ruling on the five confirmed review findings: none justifies a seventh commit — every one is a comment, an efficiency, or a duplication, and any pager-lab edit costs the full nine-run re-proof. All five go on the post-ticket small-changes list (which now rides forward as "pager-lab/hlife ride-alongs: apply with the next real edit to that file, under that edit's re-proof"), with dated notes citing the review.
+>
+> One of them gets its record corrected NOW, for free: the "0 of 600" provenance. Add a dated note in ticket 13 beside the closest-of-six derivation stating that the 600 measured cycles used the measuring script's single-frame eviction drill, and the committed symmetric drill is covered by the nine proof runs, not the 600 — the comment in pager-lab says otherwise and its correction rides with the next edit. The refuted finding (9-vs-10 points) is recorded as refuted with your grounds.
+>
+> The P3 naming slip in commit 6's message is noted and left — commit messages are immutable history here, and the ticket's dated predictions are the authority. The two CRLF files outside RS-1 stay noticed-not-touched, now recorded on the ride-along list too so they stop being re-noticed.
+>
+> That closes the small-changes work: tick the review-findings item, update PLAN.md, and this session is done — no handoff needed if the tree is clean and the ticket records carry everything, which they do. Thank you; the re-proof discipline held through three consecutive stop-worthy surprises, and the record shows each one.
+
+- *Where recorded:* the review item ticked and the ride-along list under the post-ticket sublist
+  (`:674` onward); the provenance note beside the closest-of-six derivation; RV-5's refutation above.
+- *Noted and left (owner ruling):* commit `cbafbff`'s message calls the failed texture prediction "P3";
+  no prediction carries that name — it is the change-1 prediction written at 2026-10-05 14:43:34,
+  which is the authority.
+- *The small-changes work is closed (2026-10-30).* These records ride in one records-only commit so
+  the tree is clean (the four hook-written briefs excepted, never staged).
